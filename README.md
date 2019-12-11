@@ -120,7 +120,7 @@ limitations under the License.
 
 |Date|Version|Remarks|
 |----|----|----|
-|December 11, 2019|0.9.0_based_on_dnnl_0.19|First public release version.|
+|December 11, 2019|0.9.0_base_0.19|First public release version.|
 
 
 ## Copyright
