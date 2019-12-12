@@ -99,7 +99,7 @@ The following dpkgs are required.
 
 ## Installation
 
-Download DNNL_aarch674 source code or clone the repository.
+Download DNNL_aarch64 source code or clone the repository.
 
 ```
 git clone https://github.com/fujitsu/dnnl_aarch64.git
