@@ -482,6 +482,9 @@ struct jit_uni_reorder_kernel_f32 : public kernel_t, public jit_generator {
 				ur += 4;
 			}
 
+			add_imm(reg_tmpIn, reg_tmpIn, simd_w * ur, reg_tmp, reg_tmp1);
+			ur = 0;
+
 			// Residual
 			if (unroll - ur >= 3) {
 				ld3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpIn, ur));
@@ -518,6 +521,9 @@ struct jit_uni_reorder_kernel_f32 : public kernel_t, public jit_generator {
 			  st4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
 			  ur += 4;
 			}
+
+			add_imm(reg_tmpOut, reg_tmpOut, simd_w * ur, reg_tmp, reg_tmp1);
+			ur = 0;
 			
 			// Residual
 			if (unroll - ur >= 3) {
