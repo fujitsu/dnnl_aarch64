@@ -28,7 +28,7 @@
 #include "cpu_barrier.hpp"
 
 #include "jit_uni_1x1_conv_utils.hpp"
-#include "jit_avx512_common_1x1_conv_kernel.hpp"
+#include "jit_sve_common_1x1_conv_kernel.hpp"
 
 #define GET_OFF(field) offsetof(jit_1x1_conv_call_s, field)
 
@@ -42,7 +42,7 @@ using namespace mkldnn::impl::utils;
 
 using namespace Xbyak;
 
-void jit_avx512_common_1x1_conv_kernel::bcast_loop(int load_loop_blk)
+void jit_sve_common_1x1_conv_kernel::bcast_loop(int load_loop_blk)
 {
     mov(aux1_reg_bcast_data, reg_bcast_data);
     mov(aux_reg_bcast_data, reg_bcast_data);
@@ -133,7 +133,7 @@ void jit_avx512_common_1x1_conv_kernel::bcast_loop(int load_loop_blk)
     }
 }
 
-void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
+void jit_sve_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
          int ur, int substep, bool wraparound)
 {
     auto vreg_load = [=](int i_load, int i_fma) {
@@ -288,7 +288,7 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         };
 
         Label unaligned_store, end_store;
-        test(aux_reg_output_data, cpu_isa_traits<avx512_common>::vlen - 1);
+        test(aux_reg_output_data, cpu_isa_traits<sve_common>::vlen - 1);
         jnz(unaligned_store, T_NEAR);
         store_output(true);
         jmp(end_store, T_NEAR);
@@ -486,7 +486,7 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     store();
 }
 
-void jit_avx512_common_1x1_conv_kernel::generate()
+void jit_sve_common_1x1_conv_kernel::generate()
 {
     preamble();
 
@@ -605,7 +605,7 @@ void jit_avx512_common_1x1_conv_kernel::generate()
         eltwise_injector_->prepare_table();
 }
 
-bool jit_avx512_common_1x1_conv_kernel::post_ops_ok(
+bool jit_sve_common_1x1_conv_kernel::post_ops_ok(
         jit_1x1_conv_conf_t &jcp, const primitive_attr_t &attr) {
     const auto &p = attr.post_ops_;
 
@@ -622,14 +622,14 @@ bool jit_avx512_common_1x1_conv_kernel::post_ops_ok(
     return false;
 }
 
-status_t jit_avx512_common_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
+status_t jit_sve_common_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
         const memory_desc_wrapper &weights_d, const memory_desc_wrapper &dst_d,
         const primitive_attr_t &attr, int nthreads, bool reduce_src) {
-    if (!mayiuse(avx512_common)) return status::unimplemented;
+    if (!mayiuse(sve_common)) return status::unimplemented;
 
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
-    const int simd_w = cpu_isa_traits<avx512_common>::vlen / sizeof(float);
+    const int simd_w = cpu_isa_traits<sve_common>::vlen / sizeof(float);
     const int ndims = src_d.ndims();
 
     jcp.prop_kind = cd.prop_kind;
@@ -1223,7 +1223,7 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     return status::success;
 }
 
-void jit_avx512_common_1x1_conv_kernel::init_scratchpad(
+void jit_sve_common_1x1_conv_kernel::init_scratchpad(
         memory_tracking::registrar_t &scratchpad,
         const jit_1x1_conv_conf_t &jcp) {
     using namespace mkldnn::impl::memory_tracking::names;
@@ -1247,7 +1247,7 @@ void jit_avx512_common_1x1_conv_kernel::init_scratchpad(
     }
 }
 
-void jit_avx512_common_1x1_conv_kernel::balance(jit_1x1_conv_conf_t &jcp,
+void jit_sve_common_1x1_conv_kernel::balance(jit_1x1_conv_conf_t &jcp,
         int nthreads)
 {
     // initialize jcp reduction threading properties

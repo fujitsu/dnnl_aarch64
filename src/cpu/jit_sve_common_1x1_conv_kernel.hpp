@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef JIT_AVX512_COMMON_1x1_CONV_KERNEL_HPP
-#define JIT_AVX512_COMMON_1x1_CONV_KERNEL_HPP
+#ifndef JIT_SVE_COMMON_1x1_CONV_KERNEL_HPP
+#define JIT_SVE_COMMON_1x1_CONV_KERNEL_HPP
 
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
@@ -28,24 +28,24 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-struct jit_avx512_common_1x1_conv_kernel : public jit_generator {
-    jit_avx512_common_1x1_conv_kernel(jit_1x1_conv_conf_t ajcp,
+struct jit_sve_common_1x1_conv_kernel : public jit_generator {
+    jit_sve_common_1x1_conv_kernel(jit_1x1_conv_conf_t ajcp,
             const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
     {
         if (jcp.with_eltwise)
-            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
+            eltwise_injector_ = new jit_uni_eltwise_injector_f32<sve_common>(
                     this, jcp.eltwise);
 
         this->generate();
         jit_ker = (void (*)(jit_1x1_conv_call_s *)) this->getCode();
     }
 
-    ~jit_avx512_common_1x1_conv_kernel() {
+    ~jit_sve_common_1x1_conv_kernel() {
         delete eltwise_injector_;
     }
 
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_1x1_conv_kernel)
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sve_common_1x1_conv_kernel)
 
     static bool post_ops_ok(jit_1x1_conv_conf_t &jcp,
                                 const primitive_attr_t &attr);
@@ -89,7 +89,7 @@ struct jit_avx512_common_1x1_conv_kernel : public jit_generator {
 
     Xbyak::Zmm vreg_bcast = Xbyak::Zmm(31);
 
-    jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
+    jit_uni_eltwise_injector_f32<sve_common> *eltwise_injector_;
 
     int bcast_loop_work_offt = 0;
     int stack_space_needed = 16;
