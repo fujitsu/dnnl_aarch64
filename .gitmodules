@@ -7,3 +7,6 @@
 [submodule "third_party/mbuild"]
 	path = third_party/mbuild
 	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/mbuild.git
+[submodule "third_party/xed"]
+	path = third_party/xed
+	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/xed.git
