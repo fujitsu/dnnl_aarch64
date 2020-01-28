@@ -81,10 +81,17 @@ include("cmake/MKL.cmake")
 include("cmake/Doxygen.cmake")
 include("cmake/profiling.cmake")
 include("cmake/version.cmake")
+include("cmake/translate.cmake")
 
 enable_testing()
 
 include_directories(include)
+
+if(XBYAK_TRANSLATE_AARCH64 STREQUAL "ON")
+    append(CMAKE_C_FLAGS "-DXBYAK_TRANSLATE_TO_AARCH64")
+    append(CMAKE_CXX_FLAGS "-DXBYAK_TRANSLATE_TO_AARCH64")
+endif()
+
 
 add_subdirectory(src)
 add_subdirectory(examples)

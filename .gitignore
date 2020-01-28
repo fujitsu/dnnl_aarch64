@@ -1,3 +1,6 @@
 build
 external
 .*.sw?
+build_vs2019
+build_a64fx
+build_xed_x86_64
