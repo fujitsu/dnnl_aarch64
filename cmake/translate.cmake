@@ -23,9 +23,15 @@ endif()
 set(translate_cmake_included true)
 
 # =============================
-# Building properties and scope
+# JIT translationi function
 # =============================
-if(CMAKE_SYSTEM_PROCESOR STREQUAL "aarch64")
+if(NOT DEFINED CMAKE_SYSTEM_PROCESSOR OR CMAKE_SYSTEM_PROCESSOR STREQUAL "")
+    message(FATAL_ERROR "CMAKE_SYSTEM_PROCESSOR is not defined. Perhaps CMake toolchain is broken")
+else()
+    message(STATUS "CMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     option(XBYAK_TRANSLATE_AARCH64
         "enables translating JIT code from x86_64 to AArch64 architecture."
         ON) # disabled by default on AArch64 CPU
@@ -34,3 +40,5 @@ else()
         "enables translating JIT code from x86_64 to AArch64 architecture."
         OFF) # disabled by default on x86_64 CPU
 endif()
+
+message(STATUS "XBYAK_TRANSLATE_AARCH64=${XBYAK_TRANSLATE_AARCH64}")

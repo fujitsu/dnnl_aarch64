@@ -32,6 +32,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/xbyak
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_aarch64/xbyak_aarch64
     )
 
 # propagate SRC specific flags
@@ -103,6 +104,23 @@ target_include_directories(${LIB_NAME} PUBLIC
     # $<INSTALL_PREFIX> is required for compatibility with cmake 2.8
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
     )
+
+if(XBYAK_TRANSLATE_AARCH64)
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        find_library(XED
+            NAMES "xed"
+            HINTS ../third_party/build_xed_aarch64/kits/xed/lib)
+    else()
+        find_library(XED
+            NAMES "xed"
+            HINTS ../third_party/build_xed_x86_64/kits/xed/lib)
+    endif()
+
+    list(APPEND EXTRA_STATIC_LIBS ${XED})
+    list(APPEND EXTRA_SHARED_LIBS ${XED})
+endif()
+
+
 
 target_link_libraries_build(${LIB_NAME}
     "${EXTRA_SHARED_LIBS};${EXTRA_STATIC_LIBS}")
