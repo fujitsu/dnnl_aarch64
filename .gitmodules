@@ -1,0 +1,3 @@
+[submodule "third_party/mbuild"]
+	path = third_party/mbuild
+	url = https://github.com/intelxed/mbuild.git
