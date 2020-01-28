@@ -1,3 +1,6 @@
 [submodule "third_party/mbuild"]
 	path = third_party/mbuild
 	url = https://github.com/intelxed/mbuild.git
+[submodule "third_party/xbyak"]
+	path = third_party/xbyak
+	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/xbyak.git
