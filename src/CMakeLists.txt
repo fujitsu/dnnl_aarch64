@@ -122,6 +122,10 @@ if(XBYAK_TRANSLATE_AARCH64)
             )
     endif()
 
+    if(NOT XED)
+        message(FATAL_ERROR, "libxed not found!")
+    endif()
+
     list(APPEND EXTRA_STATIC_LIBS ${XED})
     list(APPEND EXTRA_SHARED_LIBS ${XED})
 endif()
