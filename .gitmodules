@@ -4,3 +4,6 @@
 [submodule "third_party/xbyak"]
 	path = third_party/xbyak
 	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/xbyak.git
+[submodule "third_party/xbyak_aarch64"]
+	path = third_party/xbyak_aarch64
+	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/xbyak_aarch64.git
