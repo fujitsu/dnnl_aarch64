@@ -110,10 +110,16 @@ if(XBYAK_TRANSLATE_AARCH64)
         find_library(XED
             NAMES "xed"
             HINTS ../third_party/build_xed_aarch64/kits/xed/lib)
+        include_directories(
+            ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_aarch64/kits/xed/include
+            )
     else()
         find_library(XED
             NAMES "xed"
             HINTS ../third_party/build_xed_x86_64/kits/xed/lib)
+        include_directories(
+            ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_x86_64/kits/xed/include
+            )
     endif()
 
     list(APPEND EXTRA_STATIC_LIBS ${XED})
