@@ -30,7 +30,8 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/common
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/xbyak
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/xbyak
     )
 
 # propagate SRC specific flags
