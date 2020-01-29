@@ -81,6 +81,7 @@ include("cmake/MKL.cmake")
 include("cmake/Doxygen.cmake")
 include("cmake/profiling.cmake")
 include("cmake/version.cmake")
+include("cmake/jit_aarch64.cmake")
 include("cmake/translate.cmake")
 
 enable_testing()

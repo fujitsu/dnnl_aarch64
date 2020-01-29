@@ -37,6 +37,23 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_aarch64/xbyak_aarch64
     )
 
+if(DNNL_AARCH64_NATIVE_JIT_REORDER)
+    file(GLOB_RECURSE EXCLUDE_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_uni_reorder.cpp
+        )
+    message(STATUS "jit_uni_reorder.cpp")
+else()
+    file(GLOB_RECURSE EXCLUDE_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_reorder.cpp
+        )
+endif()
+
+foreach(i IN LISTS EXCLUDE_SOURCES)
+    message(STATUS "Remove source file : ${i}")
+    list(REMOVE_ITEM SOURCES ${i})
+endforeach(i)
+
+
 # propagate SRC specific flags
 append(CMAKE_C_FLAGS "${CMAKE_SRC_CCXX_FLAGS}")
 append(CMAKE_CXX_FLAGS "${CMAKE_SRC_CCXX_FLAGS}")
