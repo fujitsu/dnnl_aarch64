@@ -125,7 +125,7 @@ target_include_directories(${LIB_NAME} PUBLIC
     )
 
 if(XBYAK_TRANSLATE_AARCH64)
-    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    if(XBYAK_XED_LIB_ARCH STREQUAL "aarch64")
         find_library(XED
             NAMES "xed"
             HINTS ../third_party/build_xed_aarch64/kits/xed/lib)

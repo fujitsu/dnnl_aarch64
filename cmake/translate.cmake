@@ -41,4 +41,15 @@ else()
         OFF) # disabled by default on x86_64 CPU
 endif()
 
+if(EXISTS "/.dockerenv")
+    option(XBYAK_XED_LIB_ARCH
+        "select architecture of libxed"
+        "aarch64")
+else()
+    option(XBYAK_XED_LIB_ARCH
+        "select architecture of libxed"
+        "x86_64")
+endif()
+
+
 message(STATUS "XBYAK_TRANSLATE_AARCH64=${XBYAK_TRANSLATE_AARCH64}")
