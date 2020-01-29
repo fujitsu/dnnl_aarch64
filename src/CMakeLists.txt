@@ -178,10 +178,16 @@ if(WIN32)
         foreach(BUILD_TYPE Release Debug RelWithDebInfo MinSizeRel)
             append_to_windows_path_list(CTESTCONFIG_PATH
                 "${CMAKE_CURRENT_BINARY_DIR}/${BUILD_TYPE}")
+
+            append_to_windows_path_list(CTESTCONFIG_PATH
+                "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_x86_64/kits/xed/bin")
         endforeach()
     else()
         append_to_windows_path_list(CTESTCONFIG_PATH
             "${CMAKE_CURRENT_BINARY_DIR}")
+
+        append_to_windows_path_list(CTESTCONFIG_PATH
+            "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_x86_64/kits/xed/bin")
     endif()
     set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}" PARENT_SCOPE)
 endif()
