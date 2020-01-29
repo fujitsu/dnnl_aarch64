@@ -42,13 +42,15 @@ else()
 endif()
 
 if(EXISTS "/.dockerenv")
-    option(XBYAK_XED_LIB_ARCH
+    option(XBYAK_XED_LIB_ARCH_IS_AARCH64
         "select architecture of libxed"
-        "aarch64")
+        ON)
+    message(STATUS "detect docker environment")
 else()
-    option(XBYAK_XED_LIB_ARCH
+    option(XBYAK_XED_LIB_ARCH_IS_AARCH64
         "select architecture of libxed"
-        "x86_64")
+        OFF)
+    message(STATUS "NOT detect docker environment")
 endif()
 
 
