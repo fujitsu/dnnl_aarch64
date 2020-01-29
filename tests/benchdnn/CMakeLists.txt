@@ -41,7 +41,10 @@ endif()
 if(UNIX AND NOT APPLE)
     find_library(LIBRT rt)
 endif()
-register_exe(benchdnn "${SOURCES}" "" "${LIBRT}")
+
+if(NOT EXISTS "/.dockerenv")
+    register_exe(benchdnn "${SOURCES}" "" "${LIBRT}")
+endif()
 
 file(COPY inputs DESTINATION .)
 
