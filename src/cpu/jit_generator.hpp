@@ -1,4 +1,20 @@
 /*******************************************************************************
+* Copyright 2019-2020 FUJITSU LIMITED
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*******************************************************************************/
+
+/*******************************************************************************
 * Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,6 +65,10 @@ namespace cpu {
 // TODO: move this to jit_generator class?
 namespace {
 
+#ifdef XBYAK_TRANSLATE_AARCH64
+namespace xa = Xbyak::Xbyak_aarch64;
+#endif
+
 typedef enum {
     PAGE_4K = 4096,
     PAGE_2M = 2097152,
@@ -81,6 +101,27 @@ static inline int float2int(float x) {
 // #endif
 //
 // (Roma)
+
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+// Callee-saved registers
+constexpr xa::Operand::Code abi_save_gpr_regs_aarch64[] = { xa::Operand::X19,
+    xa::Operand::X20, xa::Operand::X21, xa::Operand::X22, xa::Operand::X23,
+    xa::Operand::X24, xa::Operand::X25, xa::Operand::X26, xa::Operand::X27,
+    xa::Operand::X28 };
+
+// See "Procedure Call Standsard for the ARM 64-bit Architecture (AArch64)"
+static const xa::XReg abi_param1_aarch64(xa::Operand::X0),
+        abi_param2_aarch64(xa::Operand::X1),
+        abi_param3_aarch64(xa::Operand::X2),
+        abi_param4_aarch64(xa::Operand::X3),
+        abi_param5_aarch64(xa::Operand::X4),
+        abi_param6_aarch64(xa::Operand::X5),
+        abi_param7_aarch64(xa::Operand::X6),
+        abi_param8_aarch64(xa::Operand::X7),
+        abi_not_param1_aarch64(xa::Operand::X15); // Fujitsu uses X15 on A64FX
+                                                  // as abi_not_param1 on x64.
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
 
 #ifdef XBYAK64
 constexpr Xbyak::Operand::Code abi_save_gpr_regs[] = {
@@ -145,6 +186,28 @@ private:
     const size_t xmm_to_preserve = 0;
 #endif
 
+#ifdef XBYAK_TRANSLATE_AARCH64
+    const size_t xreg_len = 8;
+
+    const size_t vreg_len_preserve = 8; // Only bottom 8byte must be preserved.
+    const size_t vreg_to_preserve_start = 8;
+    const size_t vreg_to_preserve = 8; // VREG8 - VREG15
+
+    const size_t gpr_to_preserve_start = 19;
+    const size_t gpr_to_preserve = 19;
+
+    const size_t num_abi_save_gpr_regs_aarch64
+            = sizeof(abi_save_gpr_regs_aarch64)
+            / sizeof(abi_save_gpr_regs_aarch64[0]);
+
+    const size_t size_of_abi_save_regs_aarch64
+            = num_abi_save_gpr_regs_aarch64 * x0.getBit() / 8
+            + vreg_to_preserve * vreg_len_preserve;
+
+    const size_t preserved_stack_size
+            = xreg_len * (2 + num_abi_save_gpr_regs_aarch64)
+            + vreg_len_preserve * vreg_to_preserve;
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
     const size_t num_abi_save_gpr_regs
         = sizeof(abi_save_gpr_regs) / sizeof(abi_save_gpr_regs[0]);
 
@@ -164,7 +227,24 @@ public:
         _op_floor = 1u,
     };
 
-    Xbyak::Reg64 param1 = abi_param1;
+#ifdef XBYAK_TRANSLATE_AARCH64
+    xa::XReg param1_aarch64 = abi_param1_aarch64;
+
+    class XRegValue : public xa::XReg
+    {
+    public:
+        int64_t value_;
+        explicit XRegValue(uint32_t idx, int64_t value)
+            : xa::XReg(idx), value_(value) {}
+        explicit XRegValue(uint32_t idx)
+            : xa::XReg(idx), value_(0xFFFFFFFFFFFFFFFF) {}
+    };
+
+    inline size_t get_size_of_abi_save_regs_aarch64() {
+        return size_of_abi_save_regs_aarch64;
+    }
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+  Xbyak::Reg64 param1 = abi_param1;
     const int EVEX_max_8b_offt = 0x200;
     const Xbyak::Reg64 reg_EVEX_max_8b_offt = rbp;
 
@@ -173,16 +253,36 @@ public:
     }
 
     void preamble() {
+#ifdef XBYAK_TRANSLATE_AARCH64
+        assert(!(num_abi_save_gpr_regs % 2));
+
+        stp(x29, x30,
+                xa::pre_ptr(CodeGeneratorAArch64::sp,
+                        -(static_cast<int64_t>(preserved_stack_size))));
+        CodeGeneratorAArch64::add(x29, CodeGeneratorAArch64::sp, xreg_len * 2);
+        if (vreg_to_preserve) {
+            CodeGeneratorAArch64::st4((v8.d - v11.d)[0],
+                    xa::post_ptr(x29, vreg_len_preserve * 4));
+            CodeGeneratorAArch64::st4((v12.d - v15.d)[0],
+                    xa::post_ptr(x29, vreg_len_preserve * 4));
+        }
+        for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
+            stp(xa::XReg(abi_save_gpr_regs[i]),
+                    xa::XReg(abi_save_gpr_regs[i + 1]),
+                    post_ptr(x29, xreg_len * 2));
+        }
+#else //#ifdef XBYAK_TRANSLATE_AARCH64
         if (xmm_to_preserve) {
-            sub(rsp, xmm_to_preserve * xmm_len);
+            sub(rsp, xmm_to_preserve * xmm_len); // subtract by imm
             for (size_t i = 0; i < xmm_to_preserve; ++i)
-                movdqu(ptr[rsp + i * xmm_len], Xbyak::Xmm(xmm_to_preserve_start + i));
+                movdqu(ptr[rsp + i * xmm_len], Xbyak::Xmm(xmm_to_preserve_start + i)); // store xmm regs
         }
         for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
             push(Xbyak::Reg64(abi_save_gpr_regs[i]));
         if (mayiuse(avx512_common)) {
             mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
         }
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
     }
 
     void mic_prefetcht0(Xbyak::Address a) {
@@ -206,6 +306,25 @@ public:
     }
 
     void postamble() {
+#ifdef XBYAK_TRANSLATE_AARCH64
+        CodeGeneratorAArch64::add(x29, CodeGeneratorAArch64::sp, xreg_len * 2);
+
+        if (vreg_to_preserve) {
+            ld4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve * 4));
+            ld4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve * 4));
+        }
+
+        for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
+            ldp(xa::XReg(abi_save_gpr_regs_aarch64[i]),
+                    xa::XReg(abi_save_gpr_regs_aarch64[i + 1]),
+                    xa::post_ptr(x29, xreg_len * 2));
+        }
+
+        ldp(x29, x30,
+                xa::post_ptr(CodeGeneratorAArch64::sp,
+                        static_cast<int64_t>(preserved_stack_size)));
+        ret();
+#else //#ifdef XBYAK_TRANSLATE_AARCH64
         for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
             pop(Xbyak::Reg64(abi_save_gpr_regs[num_abi_save_gpr_regs - 1 - i]));
         if (xmm_to_preserve) {
@@ -215,9 +334,10 @@ public:
         }
         uni_vzeroupper();
         ret();
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
     }
 
-    template<typename T>
+    template <typename T>
     Xbyak::Address EVEX_compress_addr(Xbyak::Reg64 base,
             T raw_offt, bool bcast = false)
     {
