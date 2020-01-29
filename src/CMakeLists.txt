@@ -18,6 +18,8 @@ file(GLOB_RECURSE HEADERS
     ${PROJECT_BINARY_DIR}/include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/xbyak/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_aarch64/xbyak_aarch64/*.h
     )
 file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.c
