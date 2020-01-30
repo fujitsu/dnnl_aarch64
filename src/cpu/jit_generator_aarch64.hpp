@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 FUJITSU LIMITED
+* Copyright 2019-2020 FUJITSU LIMITED
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+
 /*******************************************************************************
 * Copyright 2016-2018 Intel Corporation
 *
@@ -32,11 +33,7 @@
 #ifndef CPU_JIT_AVX2_GENERATOR_HPP_AARCH64
 #define CPU_JIT_AVX2_GENERATOR_HPP_AARCH64
 
-#if 1
 #define XBYAK_CODE_PTR uint32
-#else
-#define XBYAK_CODE_PTR uint8
-#endif
 
 #include "cpu_isa_traits.hpp"
 #include <limits.h>
@@ -67,10 +64,11 @@ namespace impl {
 namespace cpu {
 
 // TODO: move this to jit_generator class?
-#if 0
+#if 1
 namespace {
 
-#if __ARM_ARCH
+/* following code is implemented in jit_generator.hpp */
+#if 0
 typedef enum {
     PAGE_4K = 4096,
     PAGE_2M = 2097152,
@@ -87,6 +85,7 @@ static inline int float2int(float x) {
     return cvt.vint;
 }
 #endif
+
 
 // TODO: A GPR class that hides ABI details from the JIT kernels and allows
 // numbering registers from 0 to 14 (x86_64) / 6 (x32) (gpr0, gpr1, ...) and
@@ -107,18 +106,18 @@ static inline int float2int(float x) {
 
 #if XBYAK_TRANSLATE_AARCH64
 // Callee-saved registers
-constexpr Xbyak::Operand::Code abi_save_gpr_regs[] = { Xbyak::Operand::X19,
-    Xbyak::Operand::X20, Xbyak::Operand::X21, Xbyak::Operand::X22,
-    Xbyak::Operand::X23, Xbyak::Operand::X24, Xbyak::Operand::X25,
-    Xbyak::Operand::X26, Xbyak::Operand::X27, Xbyak::Operand::X28 };
+  constexpr Xbyak::Xbyak_aarch64::Operand::Code abi_save_gpr_regs_aarch64[] = { Xbyak::Xbyak_aarch64::Operand::X19,
+    Xbyak::Xbyak_aarch64::Operand::X20, Xbyak::Xbyak_aarch64::Operand::X21, Xbyak::Xbyak_aarch64::Operand::X22,
+    Xbyak::Xbyak_aarch64::Operand::X23, Xbyak::Xbyak_aarch64::Operand::X24, Xbyak::Xbyak_aarch64::Operand::X25,
+    Xbyak::Xbyak_aarch64::Operand::X26, Xbyak::Xbyak_aarch64::Operand::X27, Xbyak::Xbyak_aarch64::Operand::X28 };
 
 // See "Procedure Call Standsard for the ARM 64-bit Architecture (AArch64)"
-static const Xbyak::Xbyak_aarch64::XReg abi_param1(Xbyak::Operand::X0),
-        abi_param2(Xbyak::Operand::X1), abi_param3(Xbyak::Operand::X2),
-        abi_param4(Xbyak::Operand::X3), abi_param5(Xbyak::Operand::X4),
-        abi_param6(Xbyak::Operand::X5), abi_param7(Xbyak::Operand::X6),
-        abi_param8(Xbyak::Operand::X7),
-        abi_not_param1(Xbyak::Operand::X15); // Fujitsu uses X15 on A64FX as
+static const Xbyak::Xbyak_aarch64::XReg abi_param1(Xbyak::Xbyak_aarch64::Operand::X0),
+        abi_param2(Xbyak::Xbyak_aarch64::Operand::X1), abi_param3(Xbyak::Xbyak_aarch64::Operand::X2),
+        abi_param4(Xbyak::Xbyak_aarch64::Operand::X3), abi_param5(Xbyak::Xbyak_aarch64::Operand::X4),
+        abi_param6(Xbyak::Xbyak_aarch64::Operand::X5), abi_param7(Xbyak::Xbyak_aarch64::Operand::X6),
+        abi_param8(Xbyak::Xbyak_aarch64::Operand::X7),
+        abi_not_param1(Xbyak::Xbyak_aarch64::Operand::X15); // Fujitsu uses X15 on A64FX as
                                              // abi_not_param1 on x64.
 
 #else // __ARM_ARCH
@@ -198,7 +197,7 @@ private:
 #endif
 
     const size_t num_abi_save_gpr_regs
-            = sizeof(abi_save_gpr_regs) / sizeof(abi_save_gpr_regs[0]);
+            = sizeof(abi_save_gpr_regs_aarch64) / sizeof(abi_save_gpr_regs_aarch64[0]);
 
 #ifdef XBYAK_TRANSLATE_AARCH64
     const size_t size_of_abi_save_regs = num_abi_save_gpr_regs * x0.getBit() / 8
@@ -224,7 +223,7 @@ public:
     };
 
 #if defined(XBYAK_TRANSLATE_AARCH64)
-    Xbyak::Reg64 param1 = abi_param1;
+  Xbyak::Xbyak_aarch64::XReg param1 = abi_param1;
     const int EVEX_max_8b_offt = 0x200;
 //    const Xbyak::Reg64 reg_EVEX_max_8b_offt = x5;
 
@@ -245,8 +244,8 @@ public:
             st4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
         }
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
-            stp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs[i]),
-                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs[i + 1]), post_ptr(x29, xreg_len*2));
+            stp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i]),
+                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x29, xreg_len*2));
 	}
     }
 #else
@@ -326,8 +325,8 @@ public:
         }
 
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
-            ldp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs[i]),
-                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs[i + 1]), post_ptr(x29, xreg_len*2));
+            ldp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i]),
+                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x29, xreg_len*2));
 	}
 
 	ldp(x29, x30, post_ptr(sp, static_cast<int64_t>(preserved_stack_size)));
@@ -1483,11 +1482,11 @@ public:
 
     // XXX: use normal_case name and update all callees (?)
 
-    const uint32_t *getCode() {
+    const uint32_t *getCode32() {
         const uint32_t *code = CodeGeneratorAArch64::getCode32();
         register_code(code);
 
-        if (mkldnn_jit_dump())
+	if (mkldnn_jit_dump())
             dump_code(code);
 
         return code;
@@ -1497,7 +1496,7 @@ public:
     template <typename F>
     const F getCode() {
         // XXX (Roma): Xbyak code probably has a bug here
-        return (const F)getCode();
+        return (const F)getCode32();
     }
 };
 
