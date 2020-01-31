@@ -65,4 +65,4 @@ cat ~/test_reorder.sh
 > export MKLDNN_JIT_DUMP=1
 > ./test_reorder
 
-~/test_reorder.sh
+pjsub ~/test_reorder.sh
