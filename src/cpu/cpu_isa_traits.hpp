@@ -65,9 +65,10 @@ typedef enum {
     avx512_mic,
     avx512_mic_4ops,
     avx512_core_bf16,
-    
+#ifdef XBYAK_AARCH64_FOR_DNNL
     simd,
     sve,
+#endif
 } cpu_isa_t;
 
 template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
