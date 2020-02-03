@@ -21,7 +21,7 @@
 
 #include "jit_generator.hpp"
 
-#include "jit_sve_common_1x1_convolution.hpp"
+#include "jit_sve_1x1_convolution.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -39,7 +39,7 @@ using namespace mkldnn::impl::utils;
 /* convolution forward */
 
 template <data_type_t src_type, data_type_t wei_type, data_type_t dst_type>
-void jit_sve_common_1x1_convolution_fwd_t<src_type, wei_type, dst_type>::
+void jit_sve_1x1_convolution_fwd_t<src_type, wei_type, dst_type>::
 execute_forward() const {
     auto src = reinterpret_cast<const src_data_t *>(this->input_memory(0));
     auto weights =
@@ -68,7 +68,7 @@ execute_forward() const {
 }
 
 template <data_type_t src_type, data_type_t wei_type, data_type_t dst_type>
-void jit_sve_common_1x1_convolution_fwd_t<src_type, wei_type, dst_type>::
+void jit_sve_1x1_convolution_fwd_t<src_type, wei_type, dst_type>::
 execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
         const wei_data_t *weights, const dst_data_t *bias, dst_data_t *dst,
         const memory_tracking::grantor_t &scratchpad) const {
@@ -94,7 +94,7 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
 
     auto p = jit_1x1_conv_call_s();
 
-    auto rp = rtus_driver_t<sve_common>::call_params_t();
+    auto rp = rtus_driver_t<sve>::call_params_t();
 
     const int nb_oc = jcp.nb_load;
     const int nb_ic = jcp.nb_reduce;
@@ -252,14 +252,14 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
 }
 
 
-template struct jit_sve_common_1x1_convolution_fwd_t<data_type::f32>;
-template struct jit_sve_common_1x1_convolution_fwd_t<data_type::s16,
+template struct jit_sve_1x1_convolution_fwd_t<data_type::f32>;
+template struct jit_sve_1x1_convolution_fwd_t<data_type::s16,
     data_type::s16, data_type::s32>;
 /* convolution backward wtr data */
 
 template <data_type_t diff_dst_type, data_type_t wei_type,
          data_type_t diff_src_type>
-void jit_sve_common_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
+void jit_sve_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
      diff_src_type>::execute_backward_data() const {
     auto diff_dst = reinterpret_cast<const diff_dst_data_t *>
         (this->input_memory(0));
@@ -298,7 +298,7 @@ void jit_sve_common_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
 
     parallel(0, [&](const int ithr, const int nthr) {
         auto p = jit_1x1_conv_call_s();
-        auto rp = rtus_driver_t<sve_common>::call_params_t();
+        auto rp = rtus_driver_t<sve>::call_params_t();
 
         int bcast_start{0}, bcast_end{0}, icb_start{0}, icb_end{0};
         balance2D(nthr, ithr, work_amount, bcast_start, bcast_end,
@@ -390,8 +390,8 @@ void jit_sve_common_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
     });
 }
 
-template struct jit_sve_common_1x1_convolution_bwd_data_t<data_type::f32>;
-template struct jit_sve_common_1x1_convolution_bwd_data_t<data_type::s16,
+template struct jit_sve_1x1_convolution_bwd_data_t<data_type::f32>;
+template struct jit_sve_1x1_convolution_bwd_data_t<data_type::s16,
     data_type::s16, data_type::s32>;
 
 /* convolution backward wtr weights */
@@ -401,17 +401,17 @@ template struct jit_sve_common_1x1_convolution_bwd_data_t<data_type::s16,
          ? (d).blk_off((g), __VA_ARGS__) \
          : (d).blk_off(__VA_ARGS__))
 
-jit_sve_common_1x1_convolution_bwd_weights_t ::
-        jit_sve_common_1x1_convolution_bwd_weights_t(const pd_t *apd,
+jit_sve_1x1_convolution_bwd_weights_t ::
+        jit_sve_1x1_convolution_bwd_weights_t(const pd_t *apd,
                 const input_vector &inputs, const output_vector &outputs)
     : cpu_primitive_t(apd, inputs, outputs)
     , kernel_(nullptr), acc_ker_(nullptr), reducer_bias_(nullptr)
     , trans_kernel_(nullptr), rtus_driver_(nullptr)
 {
-    kernel_ = new jit_sve_common_1x1_conv_kernel(pd()->jcp_, *pd()->attr());
+    kernel_ = new jit_sve_1x1_conv_kernel(pd()->jcp_, *pd()->attr());
     acc_ker_ = new cpu_accumulator_1d_t<data_type::f32>();
     reducer_bias_ = new cpu_reducer_t<data_type::f32>(pd()->reducer_bia_conf_);
-    init_rtus_driver<sve_common>(this);
+    init_rtus_driver<sve>(this);
 
     const auto &jcp = kernel_->jcp;
 
@@ -425,7 +425,7 @@ jit_sve_common_1x1_convolution_bwd_weights_t ::
     }
 }
 
-void jit_sve_common_1x1_convolution_bwd_weights_t::execute_backward_weights() const
+void jit_sve_1x1_convolution_bwd_weights_t::execute_backward_weights() const
 {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
@@ -638,7 +638,7 @@ void jit_sve_common_1x1_convolution_bwd_weights_t::execute_backward_weights() co
                         const data_t *local_src = diff_src;
 
                         auto p = jit_1x1_conv_call_s();
-                        auto rp = rtus_driver_t<sve_common>::call_params_t();
+                        auto rp = rtus_driver_t<sve>::call_params_t();
 
                         p.output_stride
                                 = jcp.ic * jcp.oc_block * jcp.typesize_out;
