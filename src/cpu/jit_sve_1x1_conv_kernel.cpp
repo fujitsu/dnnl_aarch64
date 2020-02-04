@@ -32,6 +32,9 @@
 
 #define GET_OFF(field) offsetof(jit_1x1_conv_call_s, field)
 
+using namespace Xbyak::Xbyak_aarch64;
+//using namespace mkldnn::impl::types;
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {

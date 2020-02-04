@@ -44,13 +44,13 @@
 #endif
 
 #if defined(_WIN32) && !defined(__GNUC__)
-#   define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
+#    define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
 #else
-#   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
+#    define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
 
 #if defined(_WIN32)
-#   define OFFSET_SHADOWSPACE 0x28
+#    define OFFSET_SHADOWSPACE 0x28
 #endif
 
 #define DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_name) \
@@ -104,6 +104,8 @@ static inline int float2int(float x) {
 
 
 #ifdef XBYAK_TRANSLATE_AARCH64
+//#ifndef ABI_GPR_REGS_AARCH64
+//#define ABI_GPR_REGS_AARCH64
 // Callee-saved registers
 constexpr xa::Operand::Code abi_save_gpr_regs_aarch64[] = { xa::Operand::X19,
     xa::Operand::X20, xa::Operand::X21, xa::Operand::X22, xa::Operand::X23,
@@ -121,6 +123,7 @@ static const xa::XReg abi_param1_aarch64(xa::Operand::X0),
         abi_param8_aarch64(xa::Operand::X7),
         abi_not_param1_aarch64(xa::Operand::X15); // Fujitsu uses X15 on A64FX
                                                   // as abi_not_param1 on x64.
+//#endif //#ifndef ABI_GPR_REGS_AARCH64
 #endif //#ifdef XBYAK_TRANSLATE_AARCH64
 
 #ifdef XBYAK64
@@ -147,7 +150,7 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
              abi_param6(Xbyak::Operand::R9),
              abi_not_param1(Xbyak::Operand::RCX);
 #endif
-#endif
+#endif //#ifdef XBYAK64
 
 inline unsigned int get_cache_size(int level, bool per_core = true){
     unsigned int l = level - 1;

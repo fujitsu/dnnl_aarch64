@@ -20,6 +20,9 @@
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
 
+using namespace Xbyak::Xbyak_aarch64;
+//using namespace mkldnn::impl::types;
+
 #include "jit_generator_aarch64.hpp"
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise.hpp"
@@ -66,28 +69,27 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     void (*jit_ker)(jit_1x1_conv_call_s *);
 
   private:
-    using reg64_t = const Xbyak::Xbyak_aarch64::WReg;
-    using zmm_t = const Xbyak::Xbyak_aarch64::ZReg;
+    using reg64_t = const Xbyak::Xbyak_aarch64::XReg;
+    using vregs_t = const Xbyak::Xbyak_aarch64::ZReg;
 
-#if 0 // under construction
-    reg64_t reg_bcast_data = r8;
-    reg64_t reg_load_data = r10;
-    reg64_t reg_output_data = r9;
-    reg64_t aux_reg_bcast_data = r14;
-    reg64_t aux1_reg_bcast_data = rbx;
-    reg64_t aux_reg_load_data = r15;
+    reg64_t reg_bcast_data = Xbyak::Xbyak_aarch64::Operand::X8;
+    reg64_t reg_load_data = Xbyak::Xbyak_aarch64::Operand::X10;
+    reg64_t reg_output_data = Xbyak::Xbyak_aarch64::Operand::X9;
+    reg64_t aux_reg_bcast_data = Xbyak::Xbyak_aarch64::Operand::X14;
+    reg64_t aux1_reg_bcast_data = Xbyak::Xbyak_aarch64::Operand::X1; //rbx
+    reg64_t aux_reg_load_data = Xbyak::Xbyak_aarch64::Operand::X15;
     reg64_t imm_addr64 = aux_reg_load_data;
     reg64_t aux_reg_output_data = abi_not_param1;
-    reg64_t reg_load_loop_work = rsi;
-    reg64_t reg_reduce_loop_work = r11;
-    reg64_t bcast_loop_iter = rdx;
+    reg64_t reg_load_loop_work = Xbyak::Xbyak_aarch64::Operand::X4; //rsi
+    reg64_t reg_reduce_loop_work = Xbyak::Xbyak_aarch64::Operand::X11;
+    reg64_t bcast_loop_iter = Xbyak::Xbyak_aarch64::Operand::X3; //xdx
     reg64_t reduce_loop_iter = abi_param1;
-    reg64_t reg_reduce_pos_flag = rax;
-    reg64_t reg_output_stride = r13;
-    reg64_t reg_bias_data = r12;
-    reg64_t reg_relu_ns = r13;
+    reg64_t reg_reduce_pos_flag = Xbyak::Xbyak_aarch64::Operand::X0; //rax
+    reg64_t reg_output_stride = Xbyak::Xbyak_aarch64::Operand::X13;
+    reg64_t reg_bias_data = Xbyak::Xbyak_aarch64::Operand::X12;
+    reg64_t reg_relu_ns = Xbyak::Xbyak_aarch64::Operand::X13;
     reg64_t reg_bcast_loop_work = aux1_reg_bcast_data;
-#endif
+
     vregs_t vreg_bcast_s = Xbyak_aarch64::ZRegS(31);
 
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
