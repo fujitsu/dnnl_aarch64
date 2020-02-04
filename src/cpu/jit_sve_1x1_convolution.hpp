@@ -26,9 +26,9 @@
 #include "cpu_engine.hpp"
 #include "cpu_reducer.hpp"
 
-#include "jit_sve_1x1_conv_kernel.hpp"
-#include "jit_uni_1x1_conv_utils.hpp"
-#include "jit_transpose_src_utils.hpp"
+//#include "jit_sve_1x1_conv_kernel.hpp"
+//#include "jit_uni_1x1_conv_utils.hpp"
+//#include "jit_transpose_src_utils.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -47,6 +47,11 @@ struct jit_sve_1x1_convolution_fwd_t : public cpu_primitive_t {
             : cpu_convolution_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_(), rtus_() {}
 
+#ifdef DNNL_AARCH64
+        assert(src_type == data_type::f32);
+        assert(wei_type == data_type::f32);
+        assert(dst_type == data_type::f32);
+#endif
         DECLARE_PD_T(
                 JIT_IMPL_NAME_HELPER("jit_1x1:", sve, ""),
                 jit_sve_1x1_convolution_fwd_t);

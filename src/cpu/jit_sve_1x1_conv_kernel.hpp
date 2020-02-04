@@ -20,7 +20,7 @@
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
 
-#include "jit_generator.hpp"
+#include "jit_generator_aarch64.hpp"
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise.hpp"
 
@@ -66,9 +66,10 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     void (*jit_ker)(jit_1x1_conv_call_s *);
 
   private:
-    using reg64_t = const Xbyak::Reg64;
-    using zmm_t = const Xbyak::Zmm;
+    using reg64_t = const Xbyak::Xbyak_aarch64::WReg;
+    using zmm_t = const Xbyak::Xbyak_aarch64::ZReg;
 
+#if 0 // under construction
     reg64_t reg_bcast_data = r8;
     reg64_t reg_load_data = r10;
     reg64_t reg_output_data = r9;
@@ -86,8 +87,8 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     reg64_t reg_bias_data = r12;
     reg64_t reg_relu_ns = r13;
     reg64_t reg_bcast_loop_work = aux1_reg_bcast_data;
-
-    Xbyak::Zmm vreg_bcast = Xbyak::Zmm(31);
+#endif
+    vregs_t vreg_bcast_s = Xbyak_aarch64::ZRegS(31);
 
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
 

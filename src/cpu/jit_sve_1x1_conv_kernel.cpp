@@ -51,8 +51,8 @@ void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
     mov(aux_reg_output_data, reg_output_data);
     mov(bcast_loop_iter, EVEX_compress_addr(rsp, bcast_loop_work_offt));
 
-    Label bcast_loop;
-    Label bcast_loop_tail;
+    LabelAArch64 bcast_loop;
+    LabelAArch64 bcast_loop_tail;
 
     cmp(bcast_loop_iter, jcp.ur);
     jl(bcast_loop_tail, T_NEAR);
@@ -81,7 +81,7 @@ void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
 
     L(bcast_loop_tail);
     if (jcp.ur_tail) {
-        Label bcast_loop_tail_out;
+        LabelAArch64 bcast_loop_tail_out;
         cmp(bcast_loop_iter, 0);
         jz(bcast_loop_tail_out, T_NEAR);
         reduce_loop(load_loop_blk, jcp.ur_tail, 0, true);
@@ -154,8 +154,8 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     };
 
     auto init = [=]() {
-        Label init_done;
-        Label init_zero;
+        LabelAArch64 init_done;
+        LabelAArch64 init_zero;
 
         if (jcp.with_sum) {
             for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
@@ -191,7 +191,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
     auto store = [=]() {
 
-        Label store_noadd;
+        LabelAArch64 store_noadd;
         if (!jcp.with_sum) {
             test(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
             jnz(store_noadd, T_NEAR);
@@ -205,7 +205,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         L(store_noadd);
         if (jcp.with_eltwise) {
-            Label store_noeltwise;
+            LabelAArch64 store_noeltwise;
             test(reg_reduce_pos_flag, FLAG_REDUCE_LAST);
             jz(store_noeltwise, T_NEAR);
 
@@ -225,7 +225,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                             vreg_accum(i_load, i_ur));
         };
 
-        Label unaligned_store, end_store;
+        LabelAArch64 unaligned_store, end_store;
         test(aux_reg_output_data, cpu_isa_traits<sve>::vlen - 1);
         jnz(unaligned_store, T_NEAR);
         store_output(true);
@@ -332,8 +332,8 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 // and clear remaining
                 if (jcp.transpose_src && jcp.is % jcp.fma_step && last_block
                         && i_reduce == jcp.reduce_loop_unroll - reduce_step) {
-                    Label load_all;
-                    Label load_finish;
+                    LabelAArch64 load_all;
+                    LabelAArch64 load_finish;
                     test(reg_reduce_pos_flag, FLAG_SP_LAST);
                     jz(load_all, T_NEAR);
 
@@ -385,8 +385,8 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             }
         }
     };
-    Label reduce_loop;
-    Label reduce_loop_tail;
+    LabelAArch64 reduce_loop;
+    LabelAArch64 reduce_loop_tail;
 
     mov(aux_reg_load_data, reg_load_data);
 
@@ -414,7 +414,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 void jit_sve_1x1_conv_kernel::generate()
 {
     preamble();
-
+/*
     mov(reg_bcast_data, ptr[param1 + GET_OFF(bcast_data)]);
     mov(reg_load_data, ptr[param1 + GET_OFF(load_data)]);
     mov(reg_output_data, ptr[param1 + GET_OFF(output_data)]);
@@ -435,7 +435,7 @@ void jit_sve_1x1_conv_kernel::generate()
         mov(reg_output_stride, ptr[param1 + GET_OFF(output_stride)]);
 
     auto load_loop_body = [=](int load_loop_blk) {
-        bcast_loop(load_loop_blk);
+        //bcast_loop(load_loop_blk); // under construction
         add(reg_load_data, load_loop_blk * jcp.load_loop_load_step);
         switch (jcp.prop_kind) {
         case forward_training:
@@ -463,7 +463,7 @@ void jit_sve_1x1_conv_kernel::generate()
 
     const int simd_w = 16;
 
-    Label load_loop_blk[7];
+    LabelAArch64 load_loop_blk[7];
 
     static const int ur_cases_fma_embd_bcast[] = { 2, 4, 5, 8, 14, 32 };
     static const int ur_cases_fma_expl_bcast[] = { 2, 5, 6, 9, 14, 32 };
@@ -517,7 +517,7 @@ void jit_sve_1x1_conv_kernel::generate()
     L(load_loop_blk[num_ur_cases]);
 
     add(rsp, stack_space_needed);
-
+*/
     postamble();
 
     if (jcp.with_eltwise)

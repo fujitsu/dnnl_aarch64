@@ -55,12 +55,15 @@ include_directories(
 
 if(DNNL_AARCH64_NATIVE_JIT_REORDER)
     file(GLOB_RECURSE EXCLUDE_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_1x1_conv_kernel.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_1x1_convolution.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_uni_reorder.cpp
         )
-    message(STATUS "jit_uni_reorder.cpp")
 else()
     file(GLOB_RECURSE EXCLUDE_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_reorder.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_1x1_conv_kernel.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_1x1_convolution.cpp
         )
 endif()
 
