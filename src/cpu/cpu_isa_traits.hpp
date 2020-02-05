@@ -189,11 +189,6 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
 
 /* whatever is required to generate string literals... */
 #include "z_magic.hpp"
-#ifdef XBYAK_AARCH64_FOR_DNNL
-#define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
-    (isa == sve ? prefix STRINGIFY(sve) : \
-    prefix suffix_if_any)
-#else //#ifdef XBYAK_AARCH64_FOR_DNNL
 #define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
     (isa == sse42 ? prefix STRINGIFY(sse42) : \
     (isa == avx ? prefix STRINGIFY(avx) : \
@@ -203,8 +198,8 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
     (isa == avx512_mic ? prefix STRINGIFY(avx512_mic) : \
     (isa == avx512_mic_4ops ? prefix STRINGIFY(avx512_mic_4ops) : \
     (isa == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
-    prefix suffix_if_any))))))))
-#endif //#ifdef XBYAK_AARCH64_FOR_DNNL
+    (isa == sve ? prefix STRINGIFY(sve) : \
+    prefix suffix_if_any)))))))))
 
 }
 }
