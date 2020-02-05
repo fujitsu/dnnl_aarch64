@@ -104,8 +104,8 @@ static inline int float2int(float x) {
 
 
 #ifdef XBYAK_TRANSLATE_AARCH64
-//#ifndef ABI_GPR_REGS_AARCH64
-//#define ABI_GPR_REGS_AARCH64
+#ifndef ABI_GPR_REGS_AARCH64
+#define ABI_GPR_REGS_AARCH64
 // Callee-saved registers
 constexpr xa::Operand::Code abi_save_gpr_regs_aarch64[] = { xa::Operand::X19,
     xa::Operand::X20, xa::Operand::X21, xa::Operand::X22, xa::Operand::X23,
@@ -123,7 +123,7 @@ static const xa::XReg abi_param1_aarch64(xa::Operand::X0),
         abi_param8_aarch64(xa::Operand::X7),
         abi_not_param1_aarch64(xa::Operand::X15); // Fujitsu uses X15 on A64FX
                                                   // as abi_not_param1 on x64.
-//#endif //#ifndef ABI_GPR_REGS_AARCH64
+#endif //#ifndef ABI_GPR_REGS_AARCH64
 #endif //#ifdef XBYAK_TRANSLATE_AARCH64
 
 #ifdef XBYAK64

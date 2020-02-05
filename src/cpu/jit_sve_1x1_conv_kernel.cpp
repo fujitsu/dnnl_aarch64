@@ -45,9 +45,9 @@ using namespace mkldnn::impl::utils;
 
 using namespace Xbyak::Xbyak_aarch64;
 
-#if 0 // under construction
 void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
 {
+#if 0 // under construction
     mov(aux1_reg_bcast_data, reg_bcast_data);
     mov(aux_reg_bcast_data, reg_bcast_data);
 
@@ -90,11 +90,13 @@ void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
         reduce_loop(load_loop_blk, jcp.ur_tail, 0, true);
         L(bcast_loop_tail_out);
     }
+#endif // #if 0 // under construction
 }
 
 void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
          int ur, int substep, bool wraparound)
 {
+#if 0
     auto vreg_load = [=](int i_load, int i_fma) {
         return Zmm(utils::rnd_up(ur * load_loop_blk, jcp.fma_step)
                     + jcp.fma_step * i_load + i_fma);
@@ -412,8 +414,8 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     fma_block(true);
 
     store();
+#endif //#if 0
 }
-#endif //#if 0 // under construction
 void jit_sve_1x1_conv_kernel::generate()
 {
     preamble();
@@ -520,17 +522,17 @@ void jit_sve_1x1_conv_kernel::generate()
     L(load_loop_blk[num_ur_cases]);
 
     add(rsp, stack_space_needed);
-*/
     postamble();
 
     if (jcp.with_eltwise)
         eltwise_injector_->prepare_table();
+*/
 }
 
 bool jit_sve_1x1_conv_kernel::post_ops_ok(
         jit_1x1_conv_conf_t &jcp, const primitive_attr_t &attr) {
     const auto &p = attr.post_ops_;
-
+/*
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
 
@@ -540,7 +542,7 @@ bool jit_sve_1x1_conv_kernel::post_ops_ok(
     case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
     default: return false;
     }
-
+*/
     return false;
 }
 
@@ -549,7 +551,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         const memory_desc_wrapper &weights_d, const memory_desc_wrapper &dst_d,
         const primitive_attr_t &attr, int nthreads, bool reduce_src) {
     if (!mayiuse(sve)) return status::unimplemented;
-
+#if 0
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
     const int simd_w = cpu_isa_traits<sve>::vlen / sizeof(float);
     const int ndims = src_d.ndims();
@@ -1034,7 +1036,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
     jcp.nb_load = div_up(jcp.load_dim, jcp.load_block);
     jcp.nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
-
+#endif
     return status::success;
 }
 
@@ -1042,7 +1044,7 @@ void jit_sve_1x1_conv_kernel::init_scratchpad(
         memory_tracking::registrar_t &scratchpad,
         const jit_1x1_conv_conf_t &jcp) {
     using namespace mkldnn::impl::memory_tracking::names;
-
+#if 0
     if (jcp.prop_kind != backward_data && jcp.with_bias
             && jcp.oc != jcp.oc_without_padding)
         scratchpad.book(key_conv_padded_bias, jcp.typesize_out * jcp.oc);
@@ -1060,11 +1062,13 @@ void jit_sve_1x1_conv_kernel::init_scratchpad(
         scratchpad.book(key_conv_tr_src_bctx,
                 sizeof(simple_barrier::ctx_t) * jcp.nthr);
     }
+#endif
 }
 
 void jit_sve_1x1_conv_kernel::balance(jit_1x1_conv_conf_t &jcp,
         int nthreads)
 {
+#if 0
     // initialize jcp reduction threading properties
     jcp.nthr = jcp.nthr_mb = jcp.nthr_g = jcp.nthr_oc_b = jcp.nthr_ic_b = 1;
     if (nthreads < jcp.ngroups) {
@@ -1135,6 +1139,7 @@ void jit_sve_1x1_conv_kernel::balance(jit_1x1_conv_conf_t &jcp,
 
     jcp.nthr = jcp.nthr_mb * jcp.nthr_g * jcp.nthr_oc_b * jcp.nthr_ic_b;
     assert(jcp.nthr <= nthreads);
+#endif
 }
 
 }

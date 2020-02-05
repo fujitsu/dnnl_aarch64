@@ -105,6 +105,8 @@ static inline int float2int(float x) {
 // (Roma)
 
 #if XBYAK_TRANSLATE_AARCH64
+#ifndef CPU_JIT_AVX2_GENERATOR_HPP
+#define CPU_JIT_AVX2_GENERATOR_HPP
 // Callee-saved registers
   constexpr Xbyak::Xbyak_aarch64::Operand::Code abi_save_gpr_regs_aarch64[] = { Xbyak::Xbyak_aarch64::Operand::X19,
     Xbyak::Xbyak_aarch64::Operand::X20, Xbyak::Xbyak_aarch64::Operand::X21, Xbyak::Xbyak_aarch64::Operand::X22,
@@ -112,13 +114,17 @@ static inline int float2int(float x) {
     Xbyak::Xbyak_aarch64::Operand::X26, Xbyak::Xbyak_aarch64::Operand::X27, Xbyak::Xbyak_aarch64::Operand::X28 };
 
 // See "Procedure Call Standsard for the ARM 64-bit Architecture (AArch64)"
-static const Xbyak::Xbyak_aarch64::XReg abi_param1(Xbyak::Xbyak_aarch64::Operand::X0),
-        abi_param2(Xbyak::Xbyak_aarch64::Operand::X1), abi_param3(Xbyak::Xbyak_aarch64::Operand::X2),
-        abi_param4(Xbyak::Xbyak_aarch64::Operand::X3), abi_param5(Xbyak::Xbyak_aarch64::Operand::X4),
-        abi_param6(Xbyak::Xbyak_aarch64::Operand::X5), abi_param7(Xbyak::Xbyak_aarch64::Operand::X6),
-        abi_param8(Xbyak::Xbyak_aarch64::Operand::X7),
-        abi_not_param1(Xbyak::Xbyak_aarch64::Operand::X15); // Fujitsu uses X15 on A64FX as
+static const Xbyak::Xbyak_aarch64::XReg abi_param1_aarch64(Xbyak::Xbyak_aarch64::Operand::X0),
+        abi_param2_aarch64(Xbyak::Xbyak_aarch64::Operand::X1),
+        abi_param3_aarch64(Xbyak::Xbyak_aarch64::Operand::X2),
+        abi_param4_aarch64(Xbyak::Xbyak_aarch64::Operand::X3),
+        abi_param5_aarch64(Xbyak::Xbyak_aarch64::Operand::X4),
+        abi_param6_aarch64(Xbyak::Xbyak_aarch64::Operand::X5),
+        abi_param7_aarch64(Xbyak::Xbyak_aarch64::Operand::X6),
+        abi_param8_aarch64(Xbyak::Xbyak_aarch64::Operand::X7),
+        abi_not_param1_aarch64(Xbyak::Xbyak_aarch64::Operand::X15); // Fujitsu uses X15 on A64FX as
                                              // abi_not_param1 on x64.
+#endif //#ifndef CPU_JIT_AVX2_GENERATOR_HPP
 
 #else // __ARM_ARCH
 constexpr Xbyak::Operand::Code abi_save_gpr_regs[] = {
@@ -146,6 +152,7 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
 #endif // #ifdef _WIN32
 #endif // __ARM_ARCH
 
+#if 0
 inline unsigned int get_cache_size(int level, bool per_core = true) {
     unsigned int l = level - 1;
     // Currently, if XByak is not able to fetch the cache topology
@@ -168,6 +175,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true) {
     } else
         return 0;
 }
+#endif
 
 } // namespace
 #endif //#if 1
@@ -223,12 +231,12 @@ public:
     };
 
 #if defined(XBYAK_TRANSLATE_AARCH64)
-  Xbyak::Xbyak_aarch64::XReg param1 = abi_param1;
+    Xbyak::Xbyak_aarch64::XReg param1 = abi_param1_aarch64;
     const int EVEX_max_8b_offt = 0x200;
 //    const Xbyak::Reg64 reg_EVEX_max_8b_offt = x5;
 
-  class XRegValue : public Xbyak::Xbyak_aarch64::XReg {
-  public:
+    class XRegValue : public Xbyak::Xbyak_aarch64::XReg {
+public:
     int64_t value_;
     explicit XRegValue(uint32_t idx, int64_t value) : XReg(idx), value_(value) {}
     explicit XRegValue(uint32_t idx) : XReg(idx), value_(0xFFFFFFFFFFFFFFFF) {}

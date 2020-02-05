@@ -26,7 +26,7 @@
 #include "cpu_engine.hpp"
 #include "cpu_reducer.hpp"
 
-//#include "jit_sve_1x1_conv_kernel.hpp"
+#include "jit_sve_1x1_conv_kernel.hpp"
 #include "jit_uni_1x1_conv_utils.hpp"
 #include "jit_transpose_src_utils.hpp"
 
@@ -79,7 +79,6 @@ struct jit_sve_1x1_convolution_fwd_t : public cpu_primitive_t {
             const memory_desc_t *src_d = this->src_pd_.desc();
             rtus_prepare(this, conv_d, src_d, this->dst_pd_.desc());
 
-/*
             status_t status = jit_sve_1x1_conv_kernel::init_conf(
                     jcp_, *conv_d, *src_d, *this->weights_pd_.desc(),
                     *this->dst_pd_.desc(), *this->attr(),
@@ -91,7 +90,6 @@ struct jit_sve_1x1_convolution_fwd_t : public cpu_primitive_t {
                     jcp_);
 
             rtus_prepare_space_info(this, scratchpad);
-*/
 
             return status::success;
         }
@@ -132,7 +130,6 @@ struct jit_sve_1x1_convolution_fwd_t : public cpu_primitive_t {
     template <cpu_isa_t isa, typename conv_t>
     friend void init_rtus_driver(conv_t *self);
 
-/*
     jit_sve_1x1_convolution_fwd_t(const pd_t *apd,
             const input_vector &inputs, const output_vector &outputs)
         : cpu_primitive_t(apd, inputs, outputs)
@@ -142,12 +139,9 @@ struct jit_sve_1x1_convolution_fwd_t : public cpu_primitive_t {
             new jit_sve_1x1_conv_kernel(pd()->jcp_, *pd()->attr());
         init_rtus_driver<sve>(this);
     }
-*/
 
     ~jit_sve_1x1_convolution_fwd_t() {
-/*
         delete kernel_;
-*/
         delete rtus_driver_;
     }
 
@@ -168,9 +162,7 @@ struct jit_sve_1x1_convolution_fwd_t : public cpu_primitive_t {
             const memory_tracking::grantor_t &scratchpad) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 
-/*
     jit_sve_1x1_conv_kernel *kernel_;
-*/
     rtus_driver_t<sve> *rtus_driver_;
 };
 
@@ -214,7 +206,6 @@ struct jit_sve_1x1_convolution_bwd_data_t : public cpu_primitive_t {
             const memory_desc_t *diff_src_d = this->diff_src_pd_.desc();
             rtus_prepare(this, conv_d, diff_src_d, this->diff_dst_pd_.desc());
 
-/*
             status_t status = jit_sve_1x1_conv_kernel::init_conf(
                     jcp_, *conv_d, *diff_src_d, *this->weights_pd_.desc(),
                     *this->diff_dst_pd_.desc(), *this->attr(),
@@ -224,7 +215,6 @@ struct jit_sve_1x1_convolution_bwd_data_t : public cpu_primitive_t {
             auto scratchpad = scratchpad_registry().registrar();
             jit_sve_1x1_conv_kernel::init_scratchpad(scratchpad,
                     jcp_);
-*/
 
             rtus_prepare_space_info(this, scratchpad);
 
@@ -270,7 +260,6 @@ struct jit_sve_1x1_convolution_bwd_data_t : public cpu_primitive_t {
     template <cpu_isa_t isa, typename conv_t>
     friend void init_rtus_driver(conv_t *self);
 
-/*
     jit_sve_1x1_convolution_bwd_data_t(const pd_t *apd,
             const input_vector &inputs, const output_vector &outputs)
         : cpu_primitive_t(apd, inputs, outputs)
@@ -280,12 +269,9 @@ struct jit_sve_1x1_convolution_bwd_data_t : public cpu_primitive_t {
                     *pd()->attr());
         init_rtus_driver<sve>(this);
     }
-*/
 
     ~jit_sve_1x1_convolution_bwd_data_t() {
-/*
         delete kernel_;
-*/
         delete rtus_driver_;
     }
 
@@ -308,9 +294,7 @@ struct jit_sve_1x1_convolution_bwd_data_t : public cpu_primitive_t {
     void execute_backward_data() const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 
-/*
     jit_sve_1x1_conv_kernel *kernel_;
-*/
     rtus_driver_t<sve> *rtus_driver_;
 };
 
@@ -356,7 +340,6 @@ struct jit_sve_1x1_convolution_bwd_weights_t : public cpu_primitive_t
             const memory_desc_t *src_d = this->src_pd_.desc();
             rtus_prepare(this, conv_d, src_d, this->diff_dst_pd_.desc());
 
-/*
             status_t status = jit_sve_1x1_conv_kernel::init_conf(
                     jcp_, *conv_d, *src_d, *this->diff_weights_pd_.desc(),
                     *this->diff_dst_pd_.desc(), *this->attr(),
@@ -374,7 +357,6 @@ struct jit_sve_1x1_convolution_bwd_weights_t : public cpu_primitive_t
             reducer_bia_conf_.init_scratchpad(reducer_bia_scratchpad);
 
             rtus_prepare_space_info(this, scratchpad);
-*/
 
             return status::success;
         }
@@ -423,9 +405,7 @@ struct jit_sve_1x1_convolution_bwd_weights_t : public cpu_primitive_t
             const input_vector &inputs, const output_vector &outputs);
 
     ~jit_sve_1x1_convolution_bwd_weights_t() {
-/*
         delete kernel_;
-*/
         delete acc_ker_;
         delete reducer_bias_;
         delete rtus_driver_;
@@ -449,9 +429,7 @@ struct jit_sve_1x1_convolution_bwd_weights_t : public cpu_primitive_t
     void execute_backward_weights() const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 
-/*
     jit_sve_1x1_conv_kernel *kernel_;
-*/
     cpu_accumulator_1d_t<data_type::f32> *acc_ker_;
     cpu_reducer_t<data_type::f32> *reducer_bias_;
     jit_transpose4x16_src *trans_kernel_;
