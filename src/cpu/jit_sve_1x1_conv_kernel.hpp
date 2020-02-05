@@ -22,7 +22,7 @@
 
 #include "jit_generator_aarch64.hpp"
 #include "jit_primitive_conf.hpp"
-#include "jit_uni_eltwise.hpp"
+//#include "jit_sve_eltwise.hpp"
 
 using namespace Xbyak::Xbyak_aarch64;
 using namespace mkldnn::impl::types;
@@ -31,17 +31,19 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-struct jit_sve_1x1_conv_kernel : public jit_generator {
+struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
     jit_sve_1x1_conv_kernel(jit_1x1_conv_conf_t ajcp,
             const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
     {
+        /*
         if (jcp.with_eltwise)
             eltwise_injector_ = new jit_uni_eltwise_injector_f32<sve>(
                     this, jcp.eltwise);
+        */
 
         this->generate();
-        jit_ker = (void (*)(jit_1x1_conv_call_s *)) this->getCode();
+        jit_ker = (void (*)(jit_1x1_conv_call_s *)) this->getCode32();
     }
 
     ~jit_sve_1x1_conv_kernel() {
@@ -91,8 +93,11 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     reg64_t reg_bcast_loop_work = aux1_reg_bcast_data;
 
     vregs_t vreg_bcast_s = z31;
-
+#if 0
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
+#else
+    void *eltwise_injector_;
+#endif
 
     int bcast_loop_work_offt = 0;
     int stack_space_needed = 16;

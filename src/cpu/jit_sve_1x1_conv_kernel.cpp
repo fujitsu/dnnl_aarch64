@@ -25,15 +25,15 @@
 #include "utils.hpp"
 
 #include "cpu_memory.hpp"
-#include "cpu_barrier.hpp"
+//#include "cpu_barrier.hpp"
 
-#include "jit_uni_1x1_conv_utils.hpp"
+//#include "jit_uni_1x1_conv_utils.hpp"
 #include "jit_sve_1x1_conv_kernel.hpp"
 
 #define GET_OFF(field) offsetof(jit_1x1_conv_call_s, field)
 
 using namespace Xbyak::Xbyak_aarch64;
-//using namespace mkldnn::impl::types;
+using namespace mkldnn::impl::types;
 
 namespace mkldnn {
 namespace impl {
@@ -47,11 +47,11 @@ using namespace Xbyak::Xbyak_aarch64;
 
 void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
 {
-#if 0 // under construction
     mov(aux1_reg_bcast_data, reg_bcast_data);
     mov(aux_reg_bcast_data, reg_bcast_data);
 
     mov(aux_reg_output_data, reg_output_data);
+#if 0 // under construction
     mov(bcast_loop_iter, EVEX_compress_addr(rsp, bcast_loop_work_offt));
 
     LabelAArch64 bcast_loop;
@@ -551,7 +551,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         const memory_desc_wrapper &weights_d, const memory_desc_wrapper &dst_d,
         const primitive_attr_t &attr, int nthreads, bool reduce_src) {
     if (!mayiuse(sve)) return status::unimplemented;
-#if 0
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
     const int simd_w = cpu_isa_traits<sve>::vlen / sizeof(float);
     const int ndims = src_d.ndims();
@@ -669,11 +668,16 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     int reduce_blocking_max{ 0 };
 
     jcp.load_grp_count = 1;
-
+/*
     const int L1_capacity = get_cache_size(1, true) / sizeof(float);
     const int L2_size = get_cache_size(2, true) / sizeof(float);
     const int L2_capacity = (L2_size * 3) / 4;
+*/
+    const int L1_capacity = 64 * 1024;
+    const int L2_size = 4 * 1024 * 1024;
+    const int L2_capacity = (L2_size * 3) / 4;
 
+#if 0
     if (one_of(jcp.prop_kind, forward_training, forward_inference,
                 backward_data)) {
         if (one_of(jcp.prop_kind, forward_training, forward_inference)) {
@@ -1008,6 +1012,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 
         reduce_blocking_max = rnd_dn(reduce_blocking * 3 / 2, jcp.reduce_block);
     } else
+#endif //#if 0
         return status::unimplemented;
 
     assert(load_blocking);
@@ -1036,7 +1041,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
     jcp.nb_load = div_up(jcp.load_dim, jcp.load_block);
     jcp.nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
-#endif
     return status::success;
 }
 
