@@ -25,18 +25,44 @@
 #include "cpu_sum.hpp"
 
 #include "cpu/rnn/ref_rnn.hpp"
+
+#include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
+#include "cpu/jit_avx512_common_1x1_convolution.hpp"
+#include "cpu/jit_avx512_core_fp32_wino_conv_4x3.hpp"
+#include "cpu/jit_avx512_common_convolution_winograd.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_convolution.hpp"
+#include "cpu/jit_avx512_core_bf16_convolution.hpp"
+#include "cpu/jit_avx512_core_bf16_1x1_convolution.hpp"
+#include "cpu/jit_avx512_common_convolution.hpp"
+#include "cpu/jit_avx2_1x1_convolution.hpp"
+#include "cpu/jit_sse42_1x1_convolution.hpp"
+#include "cpu/jit_avx2_convolution.hpp"
+#include "cpu/jit_sse42_convolution.hpp"
 #include "cpu/gemm_convolution.hpp"
 #include "cpu/gemm_bf16_convolution.hpp"
 #include "cpu/gemm_x8s8s32x_convolution.hpp"
+
+//#ifdef __ARM_ARCH
+#include "cpu/jit_sve_1x1_convolution.hpp"
+//#endif // #ifndef __ARM_ARCH
+
 #include "cpu/ref_convolution.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_deconvolution.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
 #include "cpu/ref_deconvolution.hpp"
 #include "cpu/ref_shuffle.hpp"
+#include "cpu/jit_uni_eltwise.hpp"
 #include "cpu/ref_eltwise.hpp"
 #include "cpu/ref_softmax.hpp"
+#include "cpu/jit_uni_pooling.hpp"
+#include "cpu/jit_uni_i8i8_pooling.hpp"
 #include "cpu/ref_pooling.hpp"
 #include "cpu/nchw_pooling.hpp"
 #include "cpu/nhwc_pooling.hpp"
+#include "cpu/jit_avx512_common_lrn.hpp"
+#include "cpu/jit_uni_lrn.hpp"
 #include "cpu/ref_lrn.hpp"
+#include "cpu/jit_uni_batch_normalization.hpp"
 #include "cpu/ref_batch_normalization.hpp"
 #include "cpu/ncsp_batch_normalization.hpp"
 #include "cpu/nspc_batch_normalization.hpp"
@@ -44,32 +70,6 @@
 #include "cpu/gemm_inner_product.hpp"
 #include "cpu/gemm_bf16_inner_product.hpp"
 #include "cpu/gemm_x8s8s32x_inner_product.hpp"
-
-#include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
-//#ifndef __ARM_ARCH
-#include "cpu/jit_avx512_common_1x1_convolution.hpp"
-#include "cpu/jit_avx2_1x1_convolution.hpp"
-#include "cpu/jit_sse42_1x1_convolution.hpp"
-//#else // #ifndef __ARM_ARCH
-#include "cpu/jit_sve_1x1_convolution.hpp"
-//#endif // #ifndef __ARM_ARCH
-
-#include "cpu/jit_avx512_core_fp32_wino_conv_4x3.hpp"
-#include "cpu/jit_avx512_common_convolution_winograd.hpp"
-#include "cpu/jit_avx512_core_x8s8s32x_convolution.hpp"
-#include "cpu/jit_avx512_core_bf16_convolution.hpp"
-#include "cpu/jit_avx512_core_bf16_1x1_convolution.hpp"
-#include "cpu/jit_avx512_common_convolution.hpp"
-#include "cpu/jit_avx2_convolution.hpp"
-#include "cpu/jit_sse42_convolution.hpp"
-#include "cpu/jit_avx512_core_x8s8s32x_deconvolution.hpp"
-#include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
-#include "cpu/jit_uni_eltwise.hpp"
-#include "cpu/jit_uni_pooling.hpp"
-#include "cpu/jit_uni_i8i8_pooling.hpp"
-#include "cpu/jit_avx512_common_lrn.hpp"
-#include "cpu/jit_uni_lrn.hpp"
-#include "cpu/jit_uni_batch_normalization.hpp"
 #include "cpu/jit_uni_dw_convolution.hpp"
 #include "cpu/jit_avx512_core_u8s8s32x_wino_convolution.hpp"
 #include "cpu/jit_avx512_core_fp32_wino_conv_2x3.hpp"
@@ -261,6 +261,7 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_eltwise_bwd_t<avx2, f32>),
     INSTANCE(jit_uni_eltwise_fwd_t<sse42, f32>),
     INSTANCE(jit_uni_eltwise_bwd_t<sse42, f32>),
+
     INSTANCE(ref_eltwise_fwd_t<f32>),
     INSTANCE(ref_eltwise_fwd_t<bf16>),
     INSTANCE(ref_eltwise_bwd_t<f32>),
