@@ -1,3 +1,5 @@
 build
+build_*
 external
 .*.sw?
+*~

@@ -1,4 +1,20 @@
 #===============================================================================
+# Copyright 2020 FUJITSU LIMITED
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#===============================================================================
+
+#===============================================================================
 # Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +40,36 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/in
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpu
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak/xbyak
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak_aarch64/xbyak_aarch64
                     )
+
+if(XBYAK_TRANSLATE_AARCH64)
+    if(XBYAK_XED_LIB_ARCH_IS_AARCH64)
+        find_library(XED
+            NAMES "xed"
+            HINTS ../../third_party/build_xed_aarch64/kits/xed/lib)
+        include_directories(
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/build_xed_aarch64/kits/xed/include
+            )
+        else()
+        find_library(XED
+            NAMES "xed"
+            HINTS ../../third_party/build_xed_x86_64/kits/xed/lib)
+        include_directories(
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/build_xed_x86_64/kits/xed/include
+            )
+    endif()
+
+    if(NOT XED)
+        message(FATAL_ERROR, "libxed not found!")
+    endif()
+
+    list(APPEND EXTRA_STATIC_LIBS ${XED})
+    list(APPEND EXTRA_SHARED_LIBS ${XED})
+endif()
+
 if(WIN32)
     # Correct 'jnl' macro/jit issue
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
