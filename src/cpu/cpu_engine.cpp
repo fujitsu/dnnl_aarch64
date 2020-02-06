@@ -123,8 +123,8 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx512_common_1x1_convolution_bwd_data_s16s16s32_t),
 #else //#ifndef __ARM_ARCH
     INSTANCE(jit_sve_1x1_convolution_fwd_f32_t),
-//    INSTANCE(jit_sve_1x1_convolution_bwd_data_f32_t),
-//    INSTANCE(jit_sve_1x1_convolution_bwd_weights_t),
+    INSTANCE(jit_sve_1x1_convolution_bwd_data_f32_t),
+    INSTANCE(jit_sve_1x1_convolution_bwd_weights_t),
 #endif //#ifndef __ARM_ARCH
     INSTANCE(jit_avx512_core_fp32_wino_conv_2x3_fwd_t),
     INSTANCE(jit_avx512_core_fp32_wino_conv_4x3_fwd_t),

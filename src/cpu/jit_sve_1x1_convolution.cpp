@@ -48,7 +48,6 @@ execute_forward() const {
     auto dst = reinterpret_cast<dst_data_t *>(this->memory());
 
     auto scratchpad = this->scratchpad();
-/*
     const auto &jcp = kernel_->jcp;
     if (pd()->wants_padded_bias()) {
         auto padded_bias = scratchpad.template get<dst_data_t>(
@@ -65,7 +64,6 @@ execute_forward() const {
 
     if (pd()->wants_zero_pad_dst())
         output_memory_primitive(0)->zero_pad();
-*/
 }
 
 template <data_type_t src_type, data_type_t wei_type, data_type_t dst_type>
@@ -76,7 +74,6 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
     const memory_desc_wrapper src_d(pd()->src_pd());
     const memory_desc_wrapper dst_d(pd()->dst_pd());
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
-/*
     const auto &jcp = kernel_->jcp;
     auto rtus_space = scratchpad.get<src_data_t>(key_conv_rtus_space);
 
@@ -250,7 +247,6 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
     } else {
         assert(!"unsupported loop order");
     }
-*/
 }
 
 
@@ -263,7 +259,6 @@ template <data_type_t diff_dst_type, data_type_t wei_type,
          data_type_t diff_src_type>
 void jit_sve_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
      diff_src_type>::execute_backward_data() const {
-/*
     auto diff_dst = reinterpret_cast<const diff_dst_data_t *>
         (this->input_memory(0));
     auto weights = reinterpret_cast<const wei_data_t *>
@@ -391,7 +386,6 @@ void jit_sve_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
             }
         }
     });
-*/
 }
 
 template struct jit_sve_1x1_convolution_bwd_data_t<data_type::f32>;
@@ -404,7 +398,6 @@ template struct jit_sve_1x1_convolution_bwd_data_t<data_type::s16,
         (pd()->with_groups() \
          ? (d).blk_off((g), __VA_ARGS__) \
          : (d).blk_off(__VA_ARGS__))
-#if 0
 jit_sve_1x1_convolution_bwd_weights_t ::
         jit_sve_1x1_convolution_bwd_weights_t(const pd_t *apd,
                 const input_vector &inputs, const output_vector &outputs)
@@ -792,7 +785,6 @@ void jit_sve_1x1_convolution_bwd_weights_t::execute_backward_weights() const
         utils::array_copy(diff_bias_in, diff_bias, jcp.oc_without_padding);
     }
 }
-#endif
 
 }
 }

@@ -532,7 +532,6 @@ void jit_sve_1x1_conv_kernel::generate()
 bool jit_sve_1x1_conv_kernel::post_ops_ok(
         jit_1x1_conv_conf_t &jcp, const primitive_attr_t &attr) {
     const auto &p = attr.post_ops_;
-/*
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
 
@@ -542,7 +541,6 @@ bool jit_sve_1x1_conv_kernel::post_ops_ok(
     case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
     default: return false;
     }
-*/
     return false;
 }
 
@@ -677,7 +675,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     const int L2_size = 4 * 1024 * 1024;
     const int L2_capacity = (L2_size * 3) / 4;
 
-#if 0
     if (one_of(jcp.prop_kind, forward_training, forward_inference,
                 backward_data)) {
         if (one_of(jcp.prop_kind, forward_training, forward_inference)) {
@@ -798,7 +795,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
             else if (spatial > SMALL_SPATIAL
                     && jcp.reduce_dim >= BIG_REDUCE_DIM)
                 reduce_blocking = 8;
-            reduce_blocking = best_divider(nb_reduce, 1, reduce_blocking, true);
+//            reduce_blocking = best_divider(nb_reduce, 1, reduce_blocking, true);
             reduce_blocking *= jcp.reduce_block;
         }
 
@@ -878,8 +875,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
             load_blocking = div_up(nb_load, jcp.load_grp_count) * jcp.load_block;
         } else {
             jcp.load_grp_count = div_up(nthreads, jcp.mb * jcp.ngroups * nb_bcast);
-            jcp.load_grp_count = best_divider(
-                nthreads, jcp.load_grp_count, 2 * jcp.load_grp_count, false);
+//            jcp.load_grp_count = best_divider(
+//                nthreads, jcp.load_grp_count, 2 * jcp.load_grp_count, false);
         }
 
         if (jcp.ver == ver_avx512_core && jcp.expl_bcast && jcp.bcast_dim <= 64
@@ -913,6 +910,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         bcast_blocking_max = bcast_blocking * 3 / 2;
         reduce_blocking_max = reduce_blocking;
 
+#if 0
     } else if (jcp.prop_kind == backward_weights) {
 
         jcp.use_vmovntps = false;
@@ -1011,8 +1009,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         }
 
         reduce_blocking_max = rnd_dn(reduce_blocking * 3 / 2, jcp.reduce_block);
-    } else
 #endif //#if 0
+    } else
         return status::unimplemented;
 
     assert(load_blocking);
@@ -1048,7 +1046,6 @@ void jit_sve_1x1_conv_kernel::init_scratchpad(
         memory_tracking::registrar_t &scratchpad,
         const jit_1x1_conv_conf_t &jcp) {
     using namespace mkldnn::impl::memory_tracking::names;
-#if 0
     if (jcp.prop_kind != backward_data && jcp.with_bias
             && jcp.oc != jcp.oc_without_padding)
         scratchpad.book(key_conv_padded_bias, jcp.typesize_out * jcp.oc);
@@ -1058,7 +1055,7 @@ void jit_sve_1x1_conv_kernel::init_scratchpad(
         scratchpad.book(key_conv_wei_reduction,
                 jcp.typesize_out * wei_size * (jcp.nthr_mb - 1));
     }
-
+/*
     if (jcp.transpose_src) {
         const size_t tr_src_size =
             (size_t)jcp.nthr_mb * jcp.ngroups * jcp.ic * jcp.tr_is;
@@ -1066,13 +1063,12 @@ void jit_sve_1x1_conv_kernel::init_scratchpad(
         scratchpad.book(key_conv_tr_src_bctx,
                 sizeof(simple_barrier::ctx_t) * jcp.nthr);
     }
-#endif
+*/
 }
 
 void jit_sve_1x1_conv_kernel::balance(jit_1x1_conv_conf_t &jcp,
         int nthreads)
 {
-#if 0
     // initialize jcp reduction threading properties
     jcp.nthr = jcp.nthr_mb = jcp.nthr_g = jcp.nthr_oc_b = jcp.nthr_ic_b = 1;
     if (nthreads < jcp.ngroups) {
@@ -1143,7 +1139,6 @@ void jit_sve_1x1_conv_kernel::balance(jit_1x1_conv_conf_t &jcp,
 
     jcp.nthr = jcp.nthr_mb * jcp.nthr_g * jcp.nthr_oc_b * jcp.nthr_ic_b;
     assert(jcp.nthr <= nthreads);
-#endif
 }
 
 }
