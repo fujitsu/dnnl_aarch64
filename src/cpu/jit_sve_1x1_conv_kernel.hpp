@@ -72,27 +72,43 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
 
   private:
     using reg64_t = const Xbyak::Xbyak_aarch64::XReg;
-    using vregs_t = const Xbyak::Xbyak_aarch64::ZReg;
+    using vreg_t  = const Xbyak::Xbyak_aarch64::ZReg;
+    using vregs_t = const Xbyak::Xbyak_aarch64::ZRegS;
 
-    reg64_t reg_bcast_data = x8;
-    reg64_t reg_load_data = x10;
-    reg64_t reg_output_data = x9;
-    reg64_t aux_reg_bcast_data = x14;
-    reg64_t aux1_reg_bcast_data = x1; //rbx
-    reg64_t aux_reg_load_data = x15;
-    reg64_t imm_addr64 = aux_reg_load_data;
-    reg64_t aux_reg_output_data = abi_not_param1_aarch64;
-    reg64_t reg_load_loop_work = x4; //rsi
-    reg64_t reg_reduce_loop_work = x11;
-    reg64_t bcast_loop_iter = x3; //xdx
-    reg64_t reduce_loop_iter = abi_param1_aarch64;
-    reg64_t reg_reduce_pos_flag = x0; //rax
-    reg64_t reg_output_stride = x13;
-    reg64_t reg_bias_data = x12;
-    reg64_t reg_relu_ns = x13;
-    reg64_t reg_bcast_loop_work = aux1_reg_bcast_data;
+    /* Pointer */
+    reg64_t reg_bcast_data          = x16; // Weight
+    reg64_t reg_load_data           = x17; // Input
+    reg64_t reg_output_data         = x18; // Output
+    reg64_t reg_bias_data           = x19; // bias
 
-    vregs_t vreg_bcast_s = z31;
+    reg64_t reg_output_data_tmp     = x20; // Output
+
+    /* Workload */
+    reg64_t reg_load_loop_work      = x4; //rsi
+    reg64_t reg_reduce_loop_work    = x11;
+    reg64_t reg_bcast_loop_work     = aux1_reg_bcast_data;
+
+    /* Flag */
+    reg64_t reg_reduce_pos_flag     = x0; //rax
+
+    reg64_t reg_relu_ns             = x13; // For forward
+    reg64_t reg_output_stride       = x13; // For backward
+
+    reg64_t aux_reg_bcast_data      = x14;
+    reg64_t aux1_reg_bcast_data     = x1; //rbx
+    reg64_t aux_reg_load_data       = x15;
+    reg64_t aux_reg_output_data     = abi_not_param1_aarch64;
+    reg64_t imm_addr64              = aux_reg_load_data;
+    reg64_t bcast_loop_iter         = x3; //xdx
+    reg64_t reduce_loop_iter        = abi_param1_aarch64;
+
+    /* Vector registers */
+    vreg_t vreg_bcast               = z30;
+    vregs_t vreg_bcast_s            = z30;
+    vreg_t vreg_sum                 = z31;
+    vregs_t vreg_sum_s              = z31;
+
+
 #if 0
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
 #else
