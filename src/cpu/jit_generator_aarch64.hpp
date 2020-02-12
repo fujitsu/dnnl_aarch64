@@ -1504,6 +1504,7 @@ public:
         // XXX (Roma): Xbyak code probably has a bug here
         return (const F)getCode32();
     }
+
 };
 
 } // namespace cpu

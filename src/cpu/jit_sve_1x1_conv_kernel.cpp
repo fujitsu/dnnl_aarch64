@@ -349,6 +349,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     ptrue( reg_p_all_ones.b );
 
     mov(reduce_loop_iter, reg_reduce_loop_work);
+    assert(jcp.reduce_loop_unroll < 4096);
     subs(reduce_loop_iter, reduce_loop_iter, jcp.reduce_loop_unroll);
     b(LE, reduce_loop_tail);
 
@@ -376,7 +377,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         }else{
           add(aux_reg_load_data, aux_reg_load_data, jcp.reduce_loop_load_step);
         }
-
+        assert(jcp.reduce_loop_unroll < 4096);
         subs(reduce_loop_iter, reduce_loop_iter, jcp.reduce_loop_unroll);
         b(GT, reduce_loop);
     }

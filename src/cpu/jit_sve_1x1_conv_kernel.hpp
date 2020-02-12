@@ -44,6 +44,7 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
 
         this->generate();
         jit_ker = (void (*)(jit_1x1_conv_call_s *)) this->getCode32();
+
     }
 
     ~jit_sve_1x1_conv_kernel() {
