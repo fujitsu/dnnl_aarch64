@@ -96,6 +96,17 @@ void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
 void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
          int ur, int substep, bool wraparound)
 {
+    auto vreg_bcast_s = [=]() {
+        return ZRegS(30);
+    };
+
+    auto vreg_sum = [=]() {
+        return ZReg(31);
+    };
+    auto vreg_sum_s = [=]() {
+        return ZRegS(31);
+    };
+
     auto vreg_load = [=](int i_load, int i_fma) {
         return ZReg(utils::rnd_up(ur * load_loop_blk, jcp.fma_step)
                     + jcp.fma_step * i_load + i_fma);
@@ -122,14 +133,14 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
             assert(!jcp.with_bias);
 
-            test(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
-            jz(init_zero, T_NEAR);
+            tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
+            b(EQ, init_zero);
 
             // TODO: We need impl offset calc part in the following loop
 
             for (int i_load = 0; i_load < load_loop_blk; i_load++)
                 for (int i_ur = 0; i_ur < ur; ++i_ur)
-                    ldr(vreg_accum(i_load, i_ur), reg_bias_data);
+                    ldr(vreg_accum(i_load, i_ur), ptr(reg_bias_data));
 
             b(init_done);
         }
@@ -138,14 +149,14 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         /* Zero clear */
         for (int i_load = 0; i_load < load_loop_blk; ++i_load)
             for (int i_ur = 0; i_ur < ur; ++i_ur) {
-                fmov(vreg_accum_s( i_load, i_ur ))
+                fmov(vreg_accum_s( i_load, i_ur ));
             }
         L(init_done);
     };
 
     auto bcast_ofs = [=] (int i_reduce, int i_ur){
 
-      int offs;
+      int offt;
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
                  backward_data)) {
 
@@ -158,7 +169,16 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       }
 
       return jcp.typesize_in * offt;
-    }
+    };
+
+    auto load_ofs = [=] (int i_reduce, int i_load){
+      int offt;
+      int u0 = i_reduce % jcp.reduce_loop_unroll;
+      int u1 = i_reduce / jcp.reduce_loop_unroll;
+      offt = (i_load * jcp.reduce_dim + u0) * jcp.load_block;
+      return u1 * jcp.reduce_loop_load_step + jcp.typesize_in * offt;
+
+    };
 
     auto output_ofs = [=](int i_load, int i_ur){
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
@@ -167,7 +187,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       else
         assert(NULL); // TODO
 
-    }
+    };
 
     auto store = [=]() {
 
@@ -179,11 +199,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         for (int i_ur = 0; i_ur < ur; ++i_ur)
             for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
-                auto r = vreg_accum(i_load, i_ur);
+                auto r = vreg_accum_s(i_load, i_ur);
                 // TODO: 12-bit imm
                 add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur) );
-                ldr(vreg_sum, reg_output_data_tmp);
-                fadd(r, r, vreg_sum);
+                ldr(vreg_sum(), ptr(reg_output_data_tmp));
+                fadd(r, r, vreg_sum_s());
             }
 
         L(store_noadd);
@@ -202,9 +222,10 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         auto store_output = [=](bool output_is_aligned) {
             for (int i_ur = 0; i_ur < ur; ++i_ur)
-                for (int i_load = 0; i_load < load_loop_blk; ++i_load)
+                for (int i_load = 0; i_load < load_loop_blk; ++i_load){
                     add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur));
-                    str(reg_output_data_tmp, vreg_accum(i_load, i_ur));
+                    str( vreg_accum(i_load, i_ur), ptr(reg_output_data_tmp));
+                }
         };
 
         LabelAArch64 unaligned_store, end_store;
@@ -241,41 +262,47 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
                     const int n_loads = jcp.is % jcp.fma_step;
                     for (int i_fma = 0; i_fma < jcp.fma_step; i_fma++) {
-                        if (i_fma < n_loads)
+                        if (i_fma < n_loads){
+                            add(reg_load_data_tmp, aux_reg_load_data, 
+                                load_ofs(i_reduce + load_scale * i_fma, i_load));
                             ldr(vreg_load(i_load, i_fma),
-                                    load_ptr(i_reduce + load_scale * i_fma,
-                                            i_load));
-                        else
+                                ptr(reg_load_data_tmp));
+                        }else
                             fmov(vreg_load_s(i_load, i_fma));
                     }
-                    jmp(load_finish);
+                    b(load_finish);
 
                     L(load_all);
                     for (int i_fma = 0; i_fma < jcp.fma_step; i_fma++) {
+                        add(reg_load_data_tmp, aux_reg_load_data, 
+                            load_ofs(i_reduce + load_scale * i_fma, i_load));
                         ldr(vreg_load(i_load, i_fma),
-                            load_ptr(i_reduce + load_scale * i_fma, i_load));
+                            ptr(reg_load_data_tmp));
                     }
                     L(load_finish);
                 } else {
                     for (int i_fma = 0; i_fma < jcp.fma_step; i_fma++) {
+                        add(reg_load_data_tmp, aux_reg_load_data, 
+                            load_ofs(i_reduce + load_scale * i_fma, i_load));
+
                         ldr(vreg_load(i_load, i_fma),
-                            load_ptr(i_reduce
-                                + load_scale * i_fma,
-                                i_load));
+                            ptr(reg_load_data_tmp));
                     }
                 }
             }
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
                 add(reg_bcast_data_tmp, aux_reg_bcast_data, bcast_ofs(i_reduce, i_ur));               
-                ld1rw(vreg_bcast_s, reg_bcast_data_tmp);
+                ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(reg_bcast_data_tmp));
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
-                    fmla(vreg_accum_s(i_load, i_ur),
-                                vreg_load_s(i_load, 0), vreg_bcast_s);
+                    fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
+                                vreg_load_s(i_load, 0), vreg_bcast_s());
                 }
             }
         }
     };
+
+
     LabelAArch64 reduce_loop;
     LabelAArch64 reduce_loop_tail;
 
@@ -283,6 +310,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
     mov(aux_reg_bcast_data, aux1_reg_bcast_data);
     init();
+    ptrue( reg_p_all_ones.b );
 
     mov(reduce_loop_iter, reg_reduce_loop_work);
     subs(reduce_loop_iter, reduce_loop_iter, jcp.reduce_loop_unroll);
@@ -301,7 +329,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     fma_block(true);
 
     store();
-#endif //#if 0
 }
 void jit_sve_1x1_conv_kernel::generate()
 {

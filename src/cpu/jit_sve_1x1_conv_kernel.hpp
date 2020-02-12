@@ -81,7 +81,9 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
     reg64_t reg_output_data         = x18; // Output
     reg64_t reg_bias_data           = x19; // bias
 
-    reg64_t reg_output_data_tmp     = x20; // Output
+    reg64_t reg_load_data_tmp     = x20; // Weight
+    reg64_t reg_bcast_data_tmp     = x21; // Input
+    reg64_t reg_output_data_tmp     = x22; // Output
 
     /* Workload */
     reg64_t reg_load_loop_work      = x4; //rsi
@@ -102,12 +104,7 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
     reg64_t bcast_loop_iter         = x3; //xdx
     reg64_t reduce_loop_iter        = abi_param1_aarch64;
 
-    /* Vector registers */
-    vreg_t vreg_bcast               = z30;
-    vregs_t vreg_bcast_s            = z30;
-    vreg_t vreg_sum                 = z31;
-    vregs_t vreg_sum_s              = z31;
-
+     const Xbyak::Xbyak_aarch64::PReg reg_p_all_ones  = p1;
 
 #if 0
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
