@@ -35,6 +35,8 @@
 using namespace Xbyak::Xbyak_aarch64;
 using namespace mkldnn::impl::types;
 
+#define ADDMAX 4096
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -68,12 +70,17 @@ void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
         for (int i = 0; i < num_substeps; i++) {
             reduce_loop(load_loop_blk, jcp.ur, i, false);
             if (i < num_substeps - 1) {
+                assert(jcp.bcast_loop_bcast_substep < ADDMAX);
                 add(aux1_reg_bcast_data, aux1_reg_bcast_data, jcp.bcast_loop_bcast_substep);
+
+                assert(jcp.bcast_loop_output_substep < ADDMAX);
                 add(aux_reg_output_data, aux_reg_output_data, jcp.bcast_loop_output_substep);
             }
             else {
+                assert((jcp.bcast_loop_bcast_step- (num_substeps - 1) * jcp.bcast_loop_bcast_substep) < ADDMAX);
                 add(aux1_reg_bcast_data, aux1_reg_bcast_data, jcp.bcast_loop_bcast_step
                     - (num_substeps - 1) * jcp.bcast_loop_bcast_substep);
+                assert((jcp.bcast_loop_output_step- (num_substeps - 1) * jcp.bcast_loop_output_substep) < ADDMAX);
                 add(aux_reg_output_data, aux_reg_output_data, jcp.bcast_loop_output_step
                     - (num_substeps - 1) * jcp.bcast_loop_output_substep);
             }
@@ -123,6 +130,16 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         return ZRegS(i_ur * load_loop_blk + i_load);
     };
 
+    auto bias_ofs = [=](int i_load, int i_ur){
+      if (one_of(jcp.prop_kind, forward_training, forward_inference,
+                 backward_data)){
+        std::cout << ">>> " << (i_load * jcp.bcast_dim + i_ur) << ", " << jcp.load_block * jcp.typesize_out << std::endl;
+        return (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
+      }else
+        assert(NULL); // TODO
+
+    };
+
     auto init = [=]() {
         LabelAArch64 init_done;
         LabelAArch64 init_zero;
@@ -131,17 +148,16 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         if (jcp.with_bias
             && one_of(jcp.prop_kind, forward_training, forward_inference)) {
 
-            assert(!jcp.with_bias);
-
             tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
             b(EQ, init_zero);
 
             // TODO: We need impl offset calc part in the following loop
-
             for (int i_load = 0; i_load < load_loop_blk; i_load++)
-                for (int i_ur = 0; i_ur < ur; ++i_ur)
-                    ldr(vreg_accum(i_load, i_ur), ptr(reg_bias_data));
-
+                for (int i_ur = 0; i_ur < ur; ++i_ur){
+                    assert(bias_ofs(i_load, i_ur) < ADDMAX);
+                    add(reg_bias_data_tmp, reg_bias_data, bias_ofs(i_load, i_ur));
+                    ldr(vreg_accum(i_load, i_ur), ptr(reg_bias_data_tmp));
+                }
             b(init_done);
         }
 
@@ -201,6 +217,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
                 auto r = vreg_accum_s(i_load, i_ur);
                 // TODO: 12-bit imm
+                assert(output_ofs(i_load, i_ur) < ADDMAX);
                 add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur) );
                 ldr(vreg_sum(), ptr(reg_output_data_tmp));
                 fadd(r, r, vreg_sum_s());
@@ -223,6 +240,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         auto store_output = [=](bool output_is_aligned) {
             for (int i_ur = 0; i_ur < ur; ++i_ur)
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load){
+                    assert(output_ofs(i_load, i_ur) < ADDMAX);
                     add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur));
                     str( vreg_accum(i_load, i_ur), ptr(reg_output_data_tmp));
                 }
@@ -263,6 +281,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     const int n_loads = jcp.is % jcp.fma_step;
                     for (int i_fma = 0; i_fma < jcp.fma_step; i_fma++) {
                         if (i_fma < n_loads){
+                            assert(load_ofs(i_reduce + load_scale * i_fma, i_load) < ADDMAX);
                             add(reg_load_data_tmp, aux_reg_load_data, 
                                 load_ofs(i_reduce + load_scale * i_fma, i_load));
                             ldr(vreg_load(i_load, i_fma),
@@ -274,6 +293,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
                     L(load_all);
                     for (int i_fma = 0; i_fma < jcp.fma_step; i_fma++) {
+                        assert(load_ofs(i_reduce + load_scale * i_fma, i_load) < ADDMAX);
                         add(reg_load_data_tmp, aux_reg_load_data, 
                             load_ofs(i_reduce + load_scale * i_fma, i_load));
                         ldr(vreg_load(i_load, i_fma),
@@ -282,6 +302,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     L(load_finish);
                 } else {
                     for (int i_fma = 0; i_fma < jcp.fma_step; i_fma++) {
+                        assert(load_ofs(i_reduce + load_scale * i_fma, i_load) < ADDMAX);
                         add(reg_load_data_tmp, aux_reg_load_data, 
                             load_ofs(i_reduce + load_scale * i_fma, i_load));
 
@@ -292,6 +313,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             }
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
+                assert(bcast_ofs(i_reduce, i_ur) < ADDMAX);
                 add(reg_bcast_data_tmp, aux_reg_bcast_data, bcast_ofs(i_reduce, i_ur));               
                 ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(reg_bcast_data_tmp));
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
@@ -319,7 +341,9 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     /* Input channel loop */
     L(reduce_loop); { 
         fma_block(false);
+        assert(jcp.reduce_loop_bcast_step < ADDMAX);
         add(aux_reg_bcast_data, aux_reg_bcast_data, jcp.reduce_loop_bcast_step);
+        assert(jcp.reduce_loop_load_step < ADDMAX);
         add(aux_reg_load_data, aux_reg_load_data, jcp.reduce_loop_load_step);
         subs(reduce_loop_iter, reduce_loop_iter, jcp.reduce_loop_unroll);
         b(GT, reduce_loop);
@@ -367,28 +391,30 @@ void jit_sve_1x1_conv_kernel::generate()
 
         /* Calculate weight address for next bcast_loop */
         // Added #of load_loops * #of steps in each load_loops
-        // TODO: check bit length of imm
+        assert((load_loop_blk * jcp.load_loop_load_step) < ADDMAX);
         add(reg_load_data, reg_load_data, load_loop_blk * jcp.load_loop_load_step);
 
         switch (jcp.prop_kind) {
           case forward_training:
           case forward_inference:
-              // TODO: check bit length of imm
+              assert((load_loop_blk * jcp.load_block * jcp.typesize_out)<ADDMAX);
               add(reg_bias_data, reg_bias_data,
                   load_loop_blk * jcp.load_block * jcp.typesize_out);
-              // TODO: check bit length of imm
+              assert((load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out) < ADDMAX);
               add(reg_output_data, reg_output_data,
                   load_loop_blk * jcp.bcast_dim * jcp.load_block *
                       jcp.typesize_out);
               break;
           case backward_data:
+              assert((load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out) < ADDMAX);
               add(reg_output_data, reg_output_data,
                   load_loop_blk * jcp.bcast_dim * jcp.load_block *
                       jcp.typesize_out);
               break;
           case backward_weights:
-              for (int i_load = 0; i_load < load_loop_blk; i_load++)
+              for (int i_load = 0; i_load < load_loop_blk; i_load++){
                   add(reg_output_data, reg_output_data, reg_output_stride);
+              }
               break;
           default:
               assert(!"invalid prop_kind");
@@ -478,19 +504,31 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
         const memory_desc_wrapper &weights_d, const memory_desc_wrapper &dst_d,
         const primitive_attr_t &attr, int nthreads, bool reduce_src) {
+
     if (!mayiuse(sve)) return status::unimplemented;
+
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
     const int simd_w = cpu_isa_traits<sve>::vlen / sizeof(float);
     const int ndims = src_d.ndims();
 
-    jcp.prop_kind = cd.prop_kind;
+    /* Forward_[training, inference], backward_[data, weight] */
+    jcp.prop_kind = cd.prop_kind; 
 
+#if __ARM_ARCH
+    if(!one_of(jcp.prop_kind, forward_training, forward_inference)){
+      return status::unimplemented;
+    }
+#endif // __ARM_ARCH
+    /* Check group option: if true, NCHW -> gNCHW */
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
+
+    /* Batchsize */
     jcp.mb = src_d.dims()[0];
 
+    /* Channel */
     jcp.oc_without_padding = dst_d.dims()[1] / jcp.ngroups;
-    jcp.oc = dst_d.dims()[1] / jcp.ngroups;
-    jcp.ic = src_d.dims()[1] / jcp.ngroups;
+    jcp.oc = dst_d.dims()[1] / jcp.ngroups; // output channel size
+    jcp.ic = src_d.dims()[1] / jcp.ngroups; // input channel size
 
     bool ok_to_pad_channels = true
         && jcp.ngroups == 1
@@ -500,26 +538,32 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         jcp.ic = rnd_up(jcp.ic, simd_w);
     }
 
+    /* HW */
     jcp.ih = (ndims == 3) ? 1 : src_d.dims()[2];
     jcp.iw = src_d.dims()[ndims - 1];
     jcp.oh = (ndims == 3) ? 1 : dst_d.dims()[2];
     jcp.ow = dst_d.dims()[ndims - 1];
 
+    /* Kernel HW (==1) */
     jcp.kh = (ndims == 3) ? 1 : weights_d.dims()[with_groups + 2];
     jcp.kw = weights_d.dims()[with_groups + ndims - 1];
 
+    /* Padding */
     jcp.t_pad = (ndims == 3) ? 0 : cd.padding[0][0];
     jcp.l_pad = cd.padding[0][ndims - 3];
-
+    
+    /* Stride */
     jcp.stride_h = (ndims == 3) ? 1 : cd.strides[0];
     jcp.stride_w = cd.strides[ndims - 3];
 
-    jcp.src_fmt = src_d.format();
+    jcp.src_fmt = src_d.format(); // maybe, nChw16c
+    /* Bias check */
     jcp.with_bias = pick_by_prop_kind(jcp.prop_kind, cd.bias_desc.format,
             memory_format::undef, cd.diff_bias_desc.format)
         != memory_format::undef;
 
-    jcp.os = jcp.oh * jcp.ow;
+
+    jcp.os = jcp.oh * jcp.ow; 
     jcp.is = jcp.ih * jcp.iw;
     jcp.tr_is = rnd_up(jcp.is, 4);
 
@@ -528,11 +572,17 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 
     const auto &p = attr.post_ops_;
     jcp.with_sum = p.find(primitive_kind::sum) != -1;
+
+
     const int eltwise_ind = p.find(primitive_kind::eltwise);
     jcp.with_eltwise = eltwise_ind != -1;
     if (jcp.with_eltwise) {
-        jcp.eltwise = p.entry_[eltwise_ind].eltwise;
-        if (dst_d.data_type() == data_type::s32) return status::unimplemented;
+#if __ARM_ARCH
+      return status::unimplemented;
+#else
+      jcp.eltwise = p.entry_[eltwise_ind].eltwise;
+      if (dst_d.data_type() == data_type::s32) return status::unimplemented;
+#endif // __ARM_ARCH
     }
 
     bool args_ok = true
@@ -566,7 +616,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         if (weights_d.format() != weights_format)
             return status::unimplemented;
 
-        jcp.ver = (mayiuse(avx512_core)) ? ver_avx512_core : ver_fma;
+        jcp.ver = ver_sve;
         jcp.fma_step = 1;
 
         jcp.typesize_in = sizeof(prec_traits<data_type::f32>::type);
@@ -596,17 +646,20 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     int reduce_blocking_max{ 0 };
 
     jcp.load_grp_count = 1;
-/*
+
+#if 0
     const int L1_capacity = get_cache_size(1, true) / sizeof(float);
-    const int L2_size = get_cache_size(2, true) / sizeof(float);
+    const int L2_size     = get_cache_size(2, true) / sizeof(float);
     const int L2_capacity = (L2_size * 3) / 4;
-*/
-    const int L1_capacity = 64 * 1024;
-    const int L2_size = 4 * 1024 * 1024;
-    const int L2_capacity = (L2_size * 3) / 4;
+#else
+    const int L1_capacity = 64000 / sizeof(float);
+    const int L2_size     = 8000000 / sizeof(float);
+    const int L2_capacity = (L2_size*3) / 4;
+#endif
 
     if (one_of(jcp.prop_kind, forward_training, forward_inference,
                 backward_data)) {
+
         if (one_of(jcp.prop_kind, forward_training, forward_inference)) {
             jcp.reduce_dim = jcp.ic;
             jcp.reduce_block = jcp.ic_block;
@@ -639,6 +692,20 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 = (one_of(jcp.prop_kind, forward_training, forward_inference)) ?
                 jcp.oh :
                 jcp.ih;
+
+#if __ARM_ARCH
+        max_regs = 9;
+        min_regs = 6;
+        size_treshold = 14;
+        ur_step = 1;
+        jcp.expl_bcast = true;
+
+        if (jcp.load_dim > 128 && jcp.load_dim < BIG_LOAD_DIM
+                && spatial > SMALL_SPATIAL && spatial < BIG_SPATIAL) {
+            max_regs = 6;
+            min_regs = 5;
+        }
+#else
         if (jcp.ver == ver_avx512_core && (8 * jcp.mb) / nthreads >= 1) {
             max_regs = 9;
             min_regs = 6;
@@ -659,6 +726,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
             jcp.expl_bcast = false;
             jcp.use_vmovntps = true;
         }
+#endif // __ARM_ARCH
+
         jcp.ur = 1;
         for (int ur_w = max_regs; ur_w >= min_regs; ur_w -= ur_step) {
             if ((spatial >= size_treshold && spatial % ur_w == 0)
@@ -703,7 +772,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         int nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
         int nb_load = div_up(jcp.load_dim, jcp.load_block);
 
-        if (jcp.ver == ver_avx512_core && jcp.expl_bcast) {
+        if (jcp.ver == ver_sve && jcp.expl_bcast) {
             if (jcp.load_dim <= BIG_LOAD_DIM && spatial > SMALL_SPATIAL
                     && spatial < BIG_SPATIAL)
                 reduce_blocking = nstl::min(jcp.reduce_dim, 80);
@@ -764,7 +833,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         int load_size = jcp.load_dim * jcp.reduce_dim;
         int bcast_size = jcp.mb * jcp.ngroups * jcp.bcast_dim * jcp.reduce_dim;
 
-        if (jcp.ver == ver_avx512_core && nthreads <= 28 && jcp.mb < nthreads
+        if (jcp.ver == ver_sve && nthreads <= 28 && jcp.mb < nthreads
                 && nb_load * nb_bcast > nthreads) {
             // Some heuristic here
             float calc_koef = 0.01, best_cost = FLT_MAX;
@@ -809,7 +878,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 //                nthreads, jcp.load_grp_count, 2 * jcp.load_grp_count, false);
         }
 
-        if (jcp.ver == ver_avx512_core && jcp.expl_bcast && jcp.bcast_dim <= 64
+        if (jcp.ver == ver_sve && jcp.expl_bcast && jcp.bcast_dim <= 64
                 && load_size >= L2_size) {
             jcp.load_grp_count = nstl::max(jcp.load_grp_count, 4);
         } else if (jcp.bcast_dim <= 49 && jcp.mb <= nthreads
@@ -969,6 +1038,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
     jcp.nb_load = div_up(jcp.load_dim, jcp.load_block);
     jcp.nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
+
+    std::cout << "jit_sve_check: success" << std::endl;
     return status::success;
 }
 

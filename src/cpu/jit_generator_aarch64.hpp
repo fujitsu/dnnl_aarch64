@@ -158,14 +158,12 @@ inline unsigned int get_cache_size(int level, bool per_core = true) {
     // Currently, if XByak is not able to fetch the cache topology
     // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
     if (cpu.getDataCacheLevels() == 0) {
-        const int L1_cache_per_core = 32000;
-        const int L2_cache_per_core = 512000;
-        const int L3_cache_per_core = 1024000;
+        const int L1_cache_per_core = 64000;
+        const int L2_cache_per_core = 8000000;
         int num_cores = per_core ? 1 : mkldnn_get_max_threads();
         switch (l) {
-        case (0): return L1_cache_per_core * num_cores;
-        case (1): return L2_cache_per_core * num_cores;
-        case (2): return L3_cache_per_core * num_cores;
+        case (0): return L1_cache_per_core;
+        case (1): return L2_cache_per_core / num_cores;
         default: return 0;
         }
     }
