@@ -208,14 +208,10 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
     };
 
-    auto output_ofs = [=](int i_load, int i_ur, bool store_flag){
+    auto output_ofs = [=](int i_load, int i_ur){
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
                  backward_data)){
         int ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out; // load_block -> reduce_block?
-
-        if (store_flag)
-          ofs = ofs >> 16;
-
         if( ofs >= ADDMAX){
           mov( reg_tmp_ofs, ofs & 0xffff);
           movk( reg_tmp_ofs, ofs >> 16, 16);
@@ -240,7 +236,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         for (int i_ur = 0; i_ur < ur; ++i_ur)
             for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
                 auto r = vreg_accum_s(i_load, i_ur);
-                add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur, false) );
+                add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur) );
                 ldr(vreg_sum(), ptr(reg_output_data_tmp));
                 fadd(r, r, vreg_sum_s());
             }
@@ -262,7 +258,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         auto store_output = [=](bool output_is_aligned) {
             for (int i_ur = 0; i_ur < ur; ++i_ur)
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load){
-                    add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur, true));
+                    add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur));
                     str( vreg_accum(i_load, i_ur), ptr(reg_output_data_tmp));
                 }
         };
@@ -481,8 +477,8 @@ void jit_sve_1x1_conv_kernel::generate()
     LabelAArch64 load_loop_blk[7];
 
     // # of unrolling in the OC field ??
-    //static const int ur_cases_bcast[] = { 2, 5, 6, 9, 14, 32 };
-    static const int ur_cases_bcast[] = { 2 };
+    static const int ur_cases_bcast[] = { 2, 5, 6, 9, 14, 32 };
+    //static const int ur_cases_bcast[] = { 2, 5 };
 
     const int size_ur_cases = sizeof(ur_cases_bcast);
     const int *ur_cases = ur_cases_bcast;
