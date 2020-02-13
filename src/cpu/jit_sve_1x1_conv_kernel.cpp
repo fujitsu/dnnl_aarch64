@@ -778,7 +778,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 #endif // __ARM_ARCH
 
         jcp.ur = 1;
-#if 0 // honda
+
         for (int ur_w = max_regs; ur_w >= min_regs; ur_w -= ur_step) {
             if ((spatial >= size_treshold && spatial % ur_w == 0)
                     || (spatial < size_treshold && jcp.os % ur_w == 0)) {
@@ -799,7 +799,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 }
             }
         }
-#endif
+
         jcp.reduce_loop_unroll = jcp.reduce_block;
         jcp.reduce_loop_bcast_step
                 = jcp.reduce_loop_unroll * jcp.bcast_dim * jcp.typesize_in;
