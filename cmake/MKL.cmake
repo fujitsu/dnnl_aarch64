@@ -25,6 +25,10 @@ set(MKL_cmake_included true)
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
 
+include_directories(AFTER "/opt/FJSVxtclanga/tcsds-1.2.20/include")
+append(CMAKE_C_FLAGS "-L/fefs01/ai/honda/lib -lcblas")
+append(CMAKE_CXX_FLAGS "-L/fefs01/ai/honda/lib -lcblas")
+
 # set SKIP_THIS_MKL to true if given configuration is not supported
 function(maybe_skip_this_mkl LIBNAME)
     # Optimism...
