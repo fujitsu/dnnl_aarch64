@@ -563,11 +563,13 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     /* Forward_[training, inference], backward_[data, weight] */
     jcp.prop_kind = cd.prop_kind; 
 
-#if __ARM_ARCH
+    // TODO: impl rtus driver
+    if(reduce_src)
+      return status::unimplemented;
+    // TODO: impl backward
     if(!one_of(jcp.prop_kind, forward_training, forward_inference)){
       return status::unimplemented;
     }
-#endif // __ARM_ARCH
     /* Check group option: if true, NCHW -> gNCHW */
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
 
@@ -626,7 +628,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     const int eltwise_ind = p.find(primitive_kind::eltwise);
     jcp.with_eltwise = eltwise_ind != -1;
     if (jcp.with_eltwise) {
-#if __ARM_ARCH
+#ifdef __ARM_ARCH
       return status::unimplemented;
 #else
       jcp.eltwise = p.entry_[eltwise_ind].eltwise;
@@ -742,7 +744,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 jcp.oh :
                 jcp.ih;
 
-#if __ARM_ARCH
+#ifdef __ARM_ARCH
         max_regs = 9;
         min_regs = 6;
         size_treshold = 14;
@@ -1088,6 +1090,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
     jcp.nb_load = div_up(jcp.load_dim, jcp.load_block);
     jcp.nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
+
 #if 0
     std::cout << "jit_sve_check: success" << std::endl; // honda
     std::cout << "#weight: " << weights_d.ndims() << " " << weights_d.dims()[0] << " " << weights_d.dims()[1] << " " << weights_d.dims()[2] << std::endl;
