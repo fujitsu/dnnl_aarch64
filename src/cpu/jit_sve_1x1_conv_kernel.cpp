@@ -130,11 +130,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         return ZRegS(i_ur * load_loop_blk + i_load);
     };
 
-    auto bias_ofs = [=](int i_load, int i_ur){
+    auto bias_ofs = [=](int i_load){
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
                  backward_data)){
-        int ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
-        if( ((i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out) >= ADDMAX){
+        int ofs = jcp.typesize_out * jcp.oc_block * i_load;
+        if( ofs >= ADDMAX){
           mov( reg_tmp_ofs, ofs & 0xffff);
           movk( reg_tmp_ofs, ofs >> 16, 16);
         }else{
@@ -160,7 +160,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             // TODO: We need impl offset calc part in the following loop
             for (int i_load = 0; i_load < load_loop_blk; i_load++)
                 for (int i_ur = 0; i_ur < ur; ++i_ur){
-                    add(reg_bias_data_tmp, reg_bias_data, bias_ofs(i_load, i_ur));
+                    add(reg_bias_data_tmp, reg_bias_data, bias_ofs(i_load));
                     ldr(vreg_accum(i_load, i_ur), ptr(reg_bias_data_tmp));
                 }
             b(init_done);
@@ -208,11 +208,14 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
     };
 
-    auto output_ofs = [=](int i_load, int i_ur){
+    auto output_ofs = [=](int i_load, int i_ur, bool store_flag){
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
                  backward_data)){
-        int ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
-        ofs = ofs >> 16;
+        int ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out; // load_block -> reduce_block?
+
+        if (store_flag)
+          ofs = ofs >> 16;
+
         if( ofs >= ADDMAX){
           mov( reg_tmp_ofs, ofs & 0xffff);
           movk( reg_tmp_ofs, ofs >> 16, 16);
@@ -237,7 +240,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         for (int i_ur = 0; i_ur < ur; ++i_ur)
             for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
                 auto r = vreg_accum_s(i_load, i_ur);
-                add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur) );
+                add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur, false) );
                 ldr(vreg_sum(), ptr(reg_output_data_tmp));
                 fadd(r, r, vreg_sum_s());
             }
@@ -259,7 +262,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         auto store_output = [=](bool output_is_aligned) {
             for (int i_ur = 0; i_ur < ur; ++i_ur)
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load){
-                    add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur));
+                    add(reg_output_data_tmp, aux_reg_output_data, output_ofs(i_load, i_ur, true));
                     str( vreg_accum(i_load, i_ur), ptr(reg_output_data_tmp));
                 }
         };
@@ -480,8 +483,6 @@ void jit_sve_1x1_conv_kernel::generate()
     // # of unrolling in the OC field ??
     //static const int ur_cases_bcast[] = { 2, 5, 6, 9, 14, 32 };
     static const int ur_cases_bcast[] = { 2 };
-
-    std::cout << "ur " << jcp.ur << std::endl; // honda
 
     const int size_ur_cases = sizeof(ur_cases_bcast);
     const int *ur_cases = ur_cases_bcast;
@@ -781,7 +782,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 #endif // __ARM_ARCH
 
         jcp.ur = 1;
-#if 0
+#if 0 // honda
         for (int ur_w = max_regs; ur_w >= min_regs; ur_w -= ur_step) {
             if ((spatial >= size_treshold && spatial % ur_w == 0)
                     || (spatial < size_treshold && jcp.os % ur_w == 0)) {
