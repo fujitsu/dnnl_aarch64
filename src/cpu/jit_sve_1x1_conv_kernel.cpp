@@ -1088,13 +1088,13 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
     jcp.nb_load = div_up(jcp.load_dim, jcp.load_block);
     jcp.nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
-
+#if 0
     std::cout << "jit_sve_check: success" << std::endl; // honda
     std::cout << "#weight: " << weights_d.ndims() << " " << weights_d.dims()[0] << " " << weights_d.dims()[1] << " " << weights_d.dims()[2] << std::endl;
     std::cout << "#src: " << src_d.ndims() << " " << src_d.dims()[0] << " " << src_d.dims()[1] << " " << src_d.dims()[2] << std::endl;
     std::cout << "#dst: " << dst_d.ndims() << " " << dst_d.dims()[0] << " " << dst_d.dims()[1] << " " << dst_d.dims()[2] << std::endl;
     std::cout << "#jcp: " << jcp.mb << " " << jcp.ic << " " << jcp.oc << " " << jcp.ih << " " << jcp.iw << " " << jcp.oh << " " << jcp.ow << std::endl;
-
+#endif
     return status::success;
 }
 
