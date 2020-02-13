@@ -177,6 +177,21 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
         kernel_->jit_ker(&p);
     };
 
+    std::cout << "p.input "; // honda
+    for( int ii = 0; ii < 16; ii++){
+      std::cout << src[ii + 16] << " "; // honda
+    }
+    std::cout << std::endl; // honda
+
+    std::cout << "p.wei "; // honda
+    for( int ii = 0; ii < 16; ii++){
+      std::cout << weights[(ii<<4) + 1] << " "; // honda
+    }
+    std::cout << std::endl; // honda
+
+
+    std::cout << "p.output[16] " << dst[16] << std::endl; // honda
+
     if (jcp.loop_order == loop_rlb) {
         for (int icb = 0; icb < nb_ic; icb += nb_ic_blocking) {
             init_reduce(icb);
@@ -248,6 +263,9 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
     } else {
         assert(!"unsupported loop order");
     }
+
+    std::cout << "p.output[16] " << dst[16] << std::endl; // honda
+
 }
 
 

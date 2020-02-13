@@ -212,6 +212,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
                  backward_data)){
         int ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
+        ofs = ofs >> 16;
         if( ofs >= ADDMAX){
           mov( reg_tmp_ofs, ofs & 0xffff);
           movk( reg_tmp_ofs, ofs >> 16, 16);
@@ -387,6 +388,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
     store();
 }
+
 void jit_sve_1x1_conv_kernel::generate()
 {
     preamble();
@@ -416,6 +418,7 @@ void jit_sve_1x1_conv_kernel::generate()
 
     if (one_of(jcp.prop_kind, forward_training, forward_inference))
         mov(reg_relu_ns, reinterpret_cast<size_t>(&jcp.eltwise.alpha));
+
     if (jcp.prop_kind == backward_weights)
         ldr(reg_output_stride, ptr(param1, GET_OFF(output_stride)));
 
@@ -474,8 +477,11 @@ void jit_sve_1x1_conv_kernel::generate()
 
     LabelAArch64 load_loop_blk[7];
 
-    // # of unrolling in the OC field
-    static const int ur_cases_bcast[] = { 2, 5, 6, 9, 14, 32 };
+    // # of unrolling in the OC field ??
+    //static const int ur_cases_bcast[] = { 2, 5, 6, 9, 14, 32 };
+    static const int ur_cases_bcast[] = { 2 };
+
+    std::cout << "ur " << jcp.ur << std::endl; // honda
 
     const int size_ur_cases = sizeof(ur_cases_bcast);
     const int *ur_cases = ur_cases_bcast;
@@ -557,7 +563,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
     const int simd_w = cpu_isa_traits<sve>::vlen / sizeof(float);
     const int ndims = src_d.ndims();
-
     /* Forward_[training, inference], backward_[data, weight] */
     jcp.prop_kind = cd.prop_kind; 
 
@@ -776,6 +781,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 #endif // __ARM_ARCH
 
         jcp.ur = 1;
+#if 0
         for (int ur_w = max_regs; ur_w >= min_regs; ur_w -= ur_step) {
             if ((spatial >= size_treshold && spatial % ur_w == 0)
                     || (spatial < size_treshold && jcp.os % ur_w == 0)) {
@@ -796,7 +802,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 }
             }
         }
-
+#endif
         jcp.reduce_loop_unroll = jcp.reduce_block;
         jcp.reduce_loop_bcast_step
                 = jcp.reduce_loop_unroll * jcp.bcast_dim * jcp.typesize_in;
@@ -1086,7 +1092,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.nb_load = div_up(jcp.load_dim, jcp.load_block);
     jcp.nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
 
-    std::cout << "jit_sve_check: success" << std::endl;
+    std::cout << "jit_sve_check: success" << std::endl; // honda
     std::cout << "#weight: " << weights_d.ndims() << " " << weights_d.dims()[0] << " " << weights_d.dims()[1] << " " << weights_d.dims()[2] << std::endl;
     std::cout << "#src: " << src_d.ndims() << " " << src_d.dims()[0] << " " << src_d.dims()[1] << " " << src_d.dims()[2] << std::endl;
     std::cout << "#dst: " << dst_d.ndims() << " " << dst_d.dims()[0] << " " << dst_d.dims()[1] << " " << dst_d.dims()[2] << std::endl;
