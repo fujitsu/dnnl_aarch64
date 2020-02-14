@@ -1,12 +1,12 @@
 [submodule "third_party/xbyak"]
 	path = third_party/xbyak
-	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/xbyak.git
+	url = ssh://git@localhost:10336/postk_dl/xbyak.git
 [submodule "third_party/xbyak_aarch64"]
 	path = third_party/xbyak_aarch64
-	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/xbyak_aarch64.git
+	url = ssh://git@localhost:10336/postk_dl/xbyak_aarch64.git
 [submodule "third_party/mbuild"]
 	path = third_party/mbuild
-	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/mbuild.git
+	url = ssh://git@localhost:10336/postk_dl/mbuild.git
 [submodule "third_party/xed"]
 	path = third_party/xed
-	url = http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/xed.git
+	url = ssh://git@localhost:10336/postk_dl/xed.git

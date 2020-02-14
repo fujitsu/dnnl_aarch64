@@ -1273,16 +1273,16 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         preamble(); // Base on ABI specification, save calle-saved
                     // registers.
 		if (prb_.scale_type == scale_type_t::COMMON) {
-		  ldr(reg_tmp, Xbyak::Xbyak_aarch64::ptr(abi_param1, static_cast<int32_t>(offsetof(call_param_t, scale))));
+		  ldr(reg_tmp, Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, scale))));
 		  ld1( {xmm_scale.s4 }, Xbyak::Xbyak_aarch64::ptr(reg_tmp));
         } else if (prb_.scale_type == scale_type_t::MANY) {
-	  ldr(reg_ptr_scale, Xbyak::Xbyak_aarch64::ptr(abi_param1, static_cast<int32_t>(offsetof(call_param_t, scale))));
+	  ldr(reg_ptr_scale, Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, scale))));
         }
         ldr(reg_ptr_in,
-	    Xbyak::Xbyak_aarch64::ptr(abi_param1, static_cast<int32_t>(offsetof(call_param_t, in)))); // Store base address of input data to a
+	    Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, in)))); // Store base address of input data to a
                             // register.
         ldr(reg_ptr_out,
-	    Xbyak::Xbyak_aarch64::ptr(abi_param1, static_cast<int32_t>(offsetof(call_param_t, out)))); // Store base address of output data to a
+	    Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, out)))); // Store base address of output data to a
                              // register.
 #undef PARAM
 

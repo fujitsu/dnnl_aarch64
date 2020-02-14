@@ -41,6 +41,10 @@
 #define AVX512_CORE_BF16 \
     "Intel AVX-512 with Intel DL Boost and bfloat16 support"
 
+#ifdef DNNL_AARCH64
+#define SVE "ARM Scalable Vector Extension"
+#endif
+
 namespace mkldnn {
 namespace impl {
 
@@ -96,6 +100,9 @@ const char *get_isa_info() {
     if (mayiuse(avx2))             return AVX2;
     if (mayiuse(avx))              return AVX;
     if (mayiuse(sse42))            return SSE42;
+#ifdef DNNL_AARCH64
+    if (mayiuse(sve))              return SVE;
+#endif
     return ISA_ANY;
 }
 

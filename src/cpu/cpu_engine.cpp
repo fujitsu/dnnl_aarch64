@@ -41,6 +41,11 @@
 #include "cpu/gemm_convolution.hpp"
 #include "cpu/gemm_bf16_convolution.hpp"
 #include "cpu/gemm_x8s8s32x_convolution.hpp"
+
+//#ifdef __ARM_ARCH
+#include "cpu/jit_sve_1x1_convolution.hpp"
+//#endif // #ifndef __ARM_ARCH
+
 #include "cpu/ref_convolution.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_deconvolution.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
@@ -110,11 +115,17 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx512_common_dw_convolution_fwd_t),
     INSTANCE(jit_avx512_common_dw_convolution_bwd_data_t),
     INSTANCE(jit_avx512_common_dw_convolution_bwd_weights_t),
+#ifndef __ARM_ARCH
     INSTANCE(jit_avx512_common_1x1_convolution_fwd_f32_t),
     INSTANCE(jit_avx512_common_1x1_convolution_bwd_data_f32_t),
     INSTANCE(jit_avx512_common_1x1_convolution_bwd_weights_t),
     INSTANCE(jit_avx512_common_1x1_convolution_fwd_s16s16s32_t),
     INSTANCE(jit_avx512_common_1x1_convolution_bwd_data_s16s16s32_t),
+#else //#ifndef __ARM_ARCH
+    INSTANCE(jit_sve_1x1_convolution_fwd_f32_t),
+    INSTANCE(jit_sve_1x1_convolution_bwd_data_f32_t),
+    INSTANCE(jit_sve_1x1_convolution_bwd_weights_t),
+#endif //#ifndef __ARM_ARCH
     INSTANCE(jit_avx512_core_fp32_wino_conv_2x3_fwd_t),
     INSTANCE(jit_avx512_core_fp32_wino_conv_4x3_fwd_t),
     INSTANCE(jit_avx512_core_fp32_wino_conv_4x3_bwd_data_t),

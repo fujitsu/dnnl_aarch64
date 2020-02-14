@@ -198,7 +198,8 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
     (isa == avx512_mic ? prefix STRINGIFY(avx512_mic) : \
     (isa == avx512_mic_4ops ? prefix STRINGIFY(avx512_mic_4ops) : \
     (isa == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
-    prefix suffix_if_any))))))))
+    (isa == sve ? prefix STRINGIFY(sve) : \
+    prefix suffix_if_any)))))))))
 
 }
 }
