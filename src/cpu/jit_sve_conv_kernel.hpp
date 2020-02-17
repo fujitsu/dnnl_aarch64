@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef JIT_AVX512_COMMON_CONV_KERNEL_F32_HPP
-#define JIT_AVX512_COMMON_CONV_KERNEL_F32_HPP
+#ifndef JIT_SVE_CONV_KERNEL_F32_HPP
+#define JIT_SVE_CONV_KERNEL_F32_HPP
 
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
@@ -30,25 +30,25 @@ namespace impl {
 namespace cpu {
 
 template<typename Vmm>
-struct _jit_avx512_common_conv_fwd_kernel : public jit_generator {
+struct _jit_sve_conv_fwd_kernel : public jit_generator {
 
-    _jit_avx512_common_conv_fwd_kernel(jit_conv_conf_t ajcp,
+    _jit_sve_conv_fwd_kernel(jit_conv_conf_t ajcp,
             const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
     {
         if (jcp.with_eltwise)
-            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
+            eltwise_injector_ = new jit_uni_eltwise_injector_f32<sve>(
                     this, jcp.eltwise);
 
         generate();
         jit_ker_ = (void (*)(jit_conv_call_s *))getCode();
     }
 
-    ~_jit_avx512_common_conv_fwd_kernel() {
+    ~_jit_sve_conv_fwd_kernel() {
         delete eltwise_injector_;
     }
 
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(_jit_avx512_common_conv_fwd_kernel)
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(_jit_sve_conv_fwd_kernel)
 
     jit_conv_conf_t jcp;
     const primitive_attr_t &attr_;
@@ -128,7 +128,7 @@ private:
     Xbyak::Reg64 imm_addr64 = r15;
     Vmm vmm_wei = Vmm(31);
 
-    jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
+    jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);
@@ -183,9 +183,9 @@ private:
     }
 };
 
-struct jit_avx512_common_conv_fwd_kernel {
+struct jit_sve_conv_fwd_kernel {
 
-    jit_avx512_common_conv_fwd_kernel(jit_conv_conf_t ajcp,
+    jit_sve_conv_fwd_kernel(jit_conv_conf_t ajcp,
         const primitive_attr_t &attr) :
         jit_ker(nullptr),
         zmm_kernel_(nullptr),
@@ -194,13 +194,13 @@ struct jit_avx512_common_conv_fwd_kernel {
         switch (ch_block) {
         case 16:
             zmm_kernel_ =
-                new _jit_avx512_common_conv_fwd_kernel<Xbyak::Zmm>(
+                new _jit_sve_conv_fwd_kernel<Xbyak::Zmm>(
                     ajcp, attr);
             jit_ker = zmm_kernel_->jit_ker_;
             return;
         case 4:
             xmm_kernel_ =
-                new _jit_avx512_common_conv_fwd_kernel<Xbyak::Xmm>(
+                new _jit_sve_conv_fwd_kernel<Xbyak::Xmm>(
                     ajcp, attr);
             jit_ker = xmm_kernel_->jit_ker_;
             return;
@@ -209,7 +209,7 @@ struct jit_avx512_common_conv_fwd_kernel {
         }
     }
 
-    ~jit_avx512_common_conv_fwd_kernel() {
+    ~jit_sve_conv_fwd_kernel() {
         delete xmm_kernel_;
         delete zmm_kernel_;
     }
@@ -232,19 +232,19 @@ struct jit_avx512_common_conv_fwd_kernel {
         const jit_conv_conf_t &jcp);
 
     void(*jit_ker)(jit_conv_call_s *);
-    _jit_avx512_common_conv_fwd_kernel<Xbyak::Zmm> *zmm_kernel_;
-    _jit_avx512_common_conv_fwd_kernel<Xbyak::Xmm> *xmm_kernel_;
+    _jit_sve_conv_fwd_kernel<Xbyak::Zmm> *zmm_kernel_;
+    _jit_sve_conv_fwd_kernel<Xbyak::Xmm> *xmm_kernel_;
 };
 
-struct jit_avx512_common_conv_bwd_data_kernel_f32: public jit_generator {
+struct jit_sve_conv_bwd_data_kernel_f32: public jit_generator {
 
-    jit_avx512_common_conv_bwd_data_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
+    jit_sve_conv_bwd_data_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
     {
         generate();
         jit_ker = (void (*)(jit_conv_call_s *))getCode();
     }
 
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_conv_bwd_data_kernel_f32)
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sve_conv_bwd_data_kernel_f32)
 
     static status_t init_conf(jit_conv_conf_t &jcp,
             const convolution_desc_t &cd,
@@ -357,16 +357,16 @@ private:
     }
 };
 
-struct jit_avx512_common_conv_bwd_weights_kernel_f32 : public jit_generator {
+struct jit_sve_conv_bwd_weights_kernel_f32 : public jit_generator {
 
-    jit_avx512_common_conv_bwd_weights_kernel_f32(jit_conv_conf_t ajcp)
+    jit_sve_conv_bwd_weights_kernel_f32(jit_conv_conf_t ajcp)
         : jcp(ajcp)
     {
         generate();
         jit_ker = (void (*)(jit_conv_call_s *))getCode();
     }
 
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_conv_bwd_weights_kernel_f32)
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sve_conv_bwd_weights_kernel_f32)
 
     static status_t init_conf(jit_conv_conf_t &jcp,
             const convolution_desc_t &cd, cpu_memory_t::pd_t &src_pd,
