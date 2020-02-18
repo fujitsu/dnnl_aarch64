@@ -82,6 +82,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::prepare_output(int ur_w)
 {
     for (int k = 0; k < jcp.nb_oc_blocking; k++)
         for (int j = 0; j < ur_w; j++) {
+/*
             Vmm vmm = vmm_out(j, k);
             vpxord(vmm, vmm, vmm);
             if (!is_owb_prefetching(jcp)) {
@@ -89,6 +90,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::prepare_output(int ur_w)
                 mic_prefetcht1(EVEX_compress_addr_safe(reg_out_prf,
                             aux_output_offset, reg_out_long_offt));
             }
+*/
         }
 }
 
@@ -97,6 +99,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
 {
     Label no_update_label, store_label, eltwise_label;
 
+/*
     mov(reg_channel, ptr[param1 + GET_OFF(channel)]);
     if (jcp.with_bias) {
         mov(reg_bias, ptr[param1 + GET_OFF(bias)]);
@@ -176,6 +179,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
                 mic_prefetcht0(EVEX_compress_addr_safe(reg_out_prf,
                             aux_output_offset, reg_out_long_offt));
         }
+*/
 }
 
 template<typename Vmm>
@@ -204,7 +208,7 @@ void _jit_sve_conv_fwd_kernel<Zmm>::compute_loop_4fma_1st(int ur_w,
         mov(aux_reg_ker, reg_ker);
         mov(aux_reg_inp_prf, reg_inp_prf);
     }
-
+/*
     size_t max_input_offset = (size_t)jcp.typesize_in
         * ((size_t)(kw + ur_w * stride_w - pad_l)
                 + (size_t)ic_block * iw * ih * jcp.id);
@@ -298,6 +302,7 @@ void _jit_sve_conv_fwd_kernel<Zmm>::compute_loop_4fma_1st(int ur_w,
     }
 
     if (max_input_offset > INT_MAX) pop(reg_inp_prf);
+*/
 }
 
 template<typename Vmm>
@@ -326,6 +331,7 @@ void _jit_sve_conv_fwd_kernel<Zmm>::compute_loop_4fma(int ur_w,
 
     assert(jcp.oc % jcp.nb_oc_blocking == 0);
 
+/*
     auto kernel_offset = [=](int ocb, int ic, int ki) {
         int blk_idx = ocb * jcp.nb_ic * jcp.kh * jcp.kw * jcp.kd + ki;
         int blk_offset = blk_idx * jcp.oc_block * jcp.ic_block;
@@ -553,6 +559,7 @@ void _jit_sve_conv_fwd_kernel<Zmm>::compute_loop_4fma(int ur_w,
         pop(reg_out);
         pop(reg_out_prf);
     }
+*/
 }
 
 template<typename Vmm>
@@ -589,7 +596,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma(int ur_w,
             = (prf_ker || prf_inp) ? nstl::max(1, num_fmas / num_prfs) : 1;
     int prf_inst_trigger = (num_fmas % prf_inst_spacing) / 2;
     int inp_mul = !jcp.is_1stconv ? ic_block : 1;
-
+/*
     if (one_of(jcp.ndims, 3, 4)) {
         mov(aux_reg_inp, reg_inp);
         mov(aux_reg_ker, reg_ker);
@@ -731,6 +738,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma(int ur_w,
         pop(reg_out_prf);
     }
     if (max_input_offset > INT_MAX) pop(reg_inp_prf);
+*/
 }
 
 template<typename Vmm>
@@ -757,6 +765,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
                 * (!jcp.is_1stconv ? 1 : (size_t)jcp.iw * jcp.ih * jcp.id));
     };
 
+/*
     if (one_of(jcp.ndims, 3, 4)) {
         mov(aux_reg_inp, reg_inp);
         mov(aux_reg_ker, reg_ker);
@@ -833,6 +842,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
         pop(reg_out);
     }
+*/
 }
 
 template<typename Vmm>
@@ -857,8 +867,8 @@ void _jit_sve_conv_fwd_kernel<Zmm>::compute_loop_vnni(
     size_t max_input_offset = (size_t)jcp.typesize_in
                 * jcp.ic_block * jcp.iw * jcp.ih * jcp.id;
     assert(reg_inp_prf == reg_long_offt);
+/*
     if (max_input_offset > INT_MAX) push(reg_inp_prf);
-
 
     if (one_of(jcp.ndims, 3, 4)) {
         mov(aux_reg_inp, reg_inp);
@@ -975,14 +985,15 @@ void _jit_sve_conv_fwd_kernel<Zmm>::compute_loop_vnni(
         pop(reg_out_prf);
     }
     if (max_input_offset > INT_MAX) pop(reg_inp_prf);
+*/
 }
 
 template<typename Vmm>
 void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop(int ur_w,
         int pad_l, int pad_r)
 {
+/*
     if (jcp.ndims == 5) push(reg_oi);
-
     prepare_output(ur_w);
 
     Label skip_compute_loop;
@@ -1023,6 +1034,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop(int ur_w,
     L(skip_compute_loop);
     store_output(ur_w);
     if (jcp.ndims == 5) pop(reg_oi);
+*/
 }
 
 template<typename Vmm>
@@ -1044,7 +1056,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
     int inp_shift = jcp.typesize_in * ur_w * stride_w * inp_mult;
     int inp_shift_pad_second_block = -1 * jcp.typesize_in * l_pad * inp_mult;
     int out_shift = jcp.typesize_out * ur_w * jcp.oc_block;
-
+/*
     preamble();
     mov(reg_inp, ptr[param1 + GET_OFF(src)]);
     mov(reg_out, ptr[param1 + GET_OFF(dst)]);
@@ -1244,7 +1256,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
         L(end_label);
     }
     postamble();
-
+*/
 #if 0
     if (jcp.with_eltwise)
         eltwise_injector_->prepare_table();
@@ -2657,21 +2669,7 @@ status_t jit_sve_conv_bwd_data_kernel_f32::init_conf(
     int n_oi = jcp.iw / jcp.ur_w;
     if (r_overflow1 > 0) n_oi--;
 
-    if ((mayiuse(avx512_mic_4ops) || mayiuse(avx512_core_vnni))
-           && jcp.stride_w == 1 && jcp.stride_h == 1
-           && diff_dst_d.data_type() == data_type::s16
-           && weights_d.data_type() == data_type::s16
-           && diff_src_d.data_type() == data_type::s32) {
-        if (weights_d.format() != (with_groups ? gOIhw8o16i2o : OIhw8o16i2o))
-            return status::unimplemented;
-        if (mayiuse(avx512_mic_4ops)) {
-            jcp.ver = ver_4vnni;
-        } else {
-            jcp.ver = ver_vnni;
-        }
-        jcp.typesize_in = sizeof(int16_t);
-        jcp.typesize_out = sizeof(int32_t);
-    } else if (mayiuse(sve)
+    if (mayiuse(sve)
          && diff_dst_d.data_type() == data_type::f32
          && weights_d.data_type() == data_type::f32
          && diff_src_d.data_type() == data_type::f32) {
@@ -4971,17 +4969,7 @@ status_t jit_sve_conv_bwd_weights_kernel_f32::init_conf(
             jcp.ic = rnd_up(jcp.ic, jcp.ic_block);
         jcp.nb_ic = jcp.ic / jcp.ic_block;
         jcp.src_fmt = src_d.format();
-        if ((mayiuse(avx512_mic_4ops) || mayiuse(avx512_core_vnni))
-            && mkldnn_thr_syncable()
-            && one_of(ndims, 3, 4)
-            && jcp.stride_w == 1
-            && everyone_is(0, jcp.dilate_d, jcp.dilate_h, jcp.dilate_w)
-            && ((src_d.data_type() == data_type::s16
-            && diff_weights_d.data_type() == data_type::s32
-            && diff_dst_d.data_type() == data_type::s16))) {
-            if (mayiuse(avx512_core_vnni)) jcp.ver = ver_vnni;
-            else jcp.ver = ver_4vnni;
-        } else if ((mayiuse(avx512_mic) || mayiuse(avx512_core))
+        if ((mayiuse(avx512_core))
                 && utils::everyone_is(data_type::f32,
                     src_d.data_type(), diff_weights_d.data_type(),
                     diff_dst_d.data_type())) {
