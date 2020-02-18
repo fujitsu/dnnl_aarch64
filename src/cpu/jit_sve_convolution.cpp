@@ -114,6 +114,7 @@ inline void jit_conv_3d_ker_pipeline_ow_thr(jit_conv_ker_t ker,
         ker(&p);
 }
 
+#if 0
 void jit_conv_2d_ker_bwd_w_pipeline(jit_conv_ker_t ker, jit_conv_call_s &p,
         const void *src, const void *dst, const void *filt, const void *bias,
         int channel, int os_index_begin, int os_index_end,
@@ -153,6 +154,8 @@ void jit_conv_3d_ker_bwd_w_pipeline(jit_conv_ker_t ker, jit_conv_call_s &p,
     if (p.src)
         ker(&p);
 }
+#endif // #if 0
+
 #define wht_blk_off(d, g, ...) \
         (pd()->with_groups() \
          ? (d).blk_off((g), __VA_ARGS__) \
@@ -529,6 +532,7 @@ template struct jit_sve_convolution_fwd_t<data_type::f32>;
 template struct jit_sve_convolution_fwd_t<data_type::s16,
         data_type::s16, data_type::s32>;
 
+#if 0
 template <data_type_t diff_dst_type, data_type_t wei_type,
           data_type_t diff_src_type>
 void jit_sve_convolution_bwd_data_t<diff_dst_type, wei_type,
@@ -1781,6 +1785,7 @@ void jit_sve_convolution_bwd_weights_t<src_type, diff_dst_type,
 template struct jit_sve_convolution_bwd_weights_t<data_type::f32>;
 template struct jit_sve_convolution_bwd_weights_t<data_type::s16,
     data_type::s16, data_type::s32>;
+#endif // #if 0
 
 }
 }

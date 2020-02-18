@@ -243,7 +243,7 @@ struct jit_sve_conv_fwd_kernel {
     _jit_sve_conv_fwd_kernel<Xbyak::Zmm> *zmm_kernel_;
     _jit_sve_conv_fwd_kernel<Xbyak::Xmm> *xmm_kernel_;
 };
-
+/*
 struct jit_sve_conv_bwd_data_kernel_f32: public jit_generator {
 
     jit_sve_conv_bwd_data_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
@@ -455,6 +455,7 @@ private:
     static void balance(const jit_conv_conf_t &j, int &nthr, int &nthr_mb,
             int &nthr_g, int &nthr_oc_b, int &nthr_ic_b);
 };
+*/
 
 }
 }

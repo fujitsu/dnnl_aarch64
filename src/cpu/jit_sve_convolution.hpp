@@ -128,6 +128,7 @@ private:
     jit_sve_conv_fwd_kernel *kernel_;
 };
 
+/*
 template <impl::data_type_t diff_dst_type,
           impl::data_type_t wei_type = diff_dst_type,
           impl::data_type_t diff_src_type = diff_dst_type>
@@ -387,6 +388,7 @@ private:
     cpu_accumulator_1d_t<diff_weights_type> *acc_ker_;
     cpu_reducer_t<diff_weights_type> *reducer_bias_;
 };
+*/
 
 }
 }

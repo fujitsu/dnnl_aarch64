@@ -136,6 +136,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
 
     L(eltwise_label);
     if (jcp.with_eltwise) {
+        assert(!jcp.with_eltwise);
+#if 0
         cmp(reg_channel, jcp.nb_ic - 1);
         jl(store_label, T_NEAR);
 
@@ -159,6 +161,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
                             k * jcp.ur_w + ur_w);
             }
         }
+#endif //#if 0
     }
 
     L(store_label);
@@ -1242,8 +1245,10 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
     }
     postamble();
 
+#if 0
     if (jcp.with_eltwise)
         eltwise_injector_->prepare_table();
+#endif
 }
 
 bool jit_sve_conv_fwd_kernel::post_ops_ok(
@@ -1826,6 +1831,7 @@ void jit_sve_conv_fwd_kernel::init_scratchpad(
         scratchpad.book(key_conv_padded_bias, jcp.typesize_out * jcp.oc);
 }
 
+#if 0
 void jit_sve_conv_bwd_data_kernel_f32::prepare_output(int ur_w)
 {
     for (int k = 0; k < jcp.nb_ic_blocking; k++) {
@@ -3993,7 +3999,7 @@ bool jit_sve_conv_bwd_weights_kernel_f32
     //      Loop over OW blocks -- emit_fma_block()
     //      (Supports both fully unrolled and partially unrolled versions to
     //      reduce code size)
-    //          Loop over OW block -- emit_fma_step()
+    //          Loop over OW block -- emit_step()
 
     int max_working_set_size = 128 * 1024;
     int pad_ow = (jcp.ver == ver_4vnni || jcp.ver == ver_vnni)? jcp.tr_ow
@@ -5238,6 +5244,7 @@ void jit_sve_conv_bwd_weights_kernel_f32::balance(
     assert(nthr_ <= max_threads);
     assert(IMPLICATION(!mkldnn_thr_syncable(), nthr_mb_ == 1));
 }
+#endif // #if 0
 
 template struct  _jit_sve_conv_fwd_kernel<Zmm>;
 template struct  _jit_sve_conv_fwd_kernel<Xmm>;
