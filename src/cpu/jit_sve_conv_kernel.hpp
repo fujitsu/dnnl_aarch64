@@ -21,9 +21,11 @@
 #include "memory_tracking.hpp"
 
 #include "cpu_memory.hpp"
-#include "jit_generator.hpp"
+#include "jit_generator_aarch64.hpp"
 #include "jit_primitive_conf.hpp"
-#include "jit_uni_eltwise.hpp"
+//#include "jit_uni_eltwise.hpp"
+
+using namespace Xbyak::Xbyak_aarch64;
 
 namespace mkldnn {
 namespace impl {
@@ -36,9 +38,11 @@ struct _jit_sve_conv_fwd_kernel : public jit_generator {
             const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
     {
+        /*
         if (jcp.with_eltwise)
             eltwise_injector_ = new jit_uni_eltwise_injector_f32<sve>(
                     this, jcp.eltwise);
+        */
 
         generate();
         jit_ker_ = (void (*)(jit_conv_call_s *))getCode();
@@ -128,7 +132,11 @@ private:
     Xbyak::Reg64 imm_addr64 = r15;
     Vmm vmm_wei = Vmm(31);
 
+#if 0
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
+#else
+    void *eltwise_injector_;
+#endif
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);
