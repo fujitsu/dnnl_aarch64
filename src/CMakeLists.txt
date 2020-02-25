@@ -35,6 +35,7 @@ file(GLOB_RECURSE HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/xbyak/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/include/xbyak_translator_for_aarch64/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_aarch64/xbyak_aarch64/*.h
     )
 file(GLOB_RECURSE SOURCES
@@ -49,7 +50,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/common
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/xbyak
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/include/xbyak_translator_for_aarch64
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_aarch64/xbyak_aarch64
     )
 

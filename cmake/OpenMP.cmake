@@ -22,7 +22,7 @@ if(OpenMP_cmake_included)
 endif()
 set(OpenMP_cmake_included true)
 include("cmake/Threading.cmake")
-include("cmake/MKL.cmake")
+#include("cmake/MKL.cmake")
 
 set(MKLDNN_USES_INTEL_OPENMP FALSE)
 
