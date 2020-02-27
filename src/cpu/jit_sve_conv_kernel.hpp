@@ -112,23 +112,8 @@ private:
     reg64_t reg_long_offt     = x11; //r11;
     reg64_t reg_out_long_offt = x14; //r14;
 
-    inline Vmm vmm_ker(int i_ic) {
-        assert(i_ic < 4);
-        return Vmm(ker_reg_base_idx + i_ic);
-    }
 
-    inline Vmm vmm_out(int i_ur, int i_oc) {
-        int idx = i_ur + i_oc * jcp.ur_w;
-        assert(idx < ker_reg_base_idx);
-        return Vmm(idx);
-    }
-
-    inline Vmm vmm_inp(int i_ic, int nb_x_blocking) {
-        int idx = i_ic + nb_x_blocking * jcp.ur_w;
-        assert(idx < 31);
-        return Vmm(idx);
-    }
-
+ 
     reg64_t imm_addr64 = x15; //r15;
     Vmm vmm_wei = Vmm(31);
 
@@ -142,9 +127,6 @@ private:
     inline void store_output(int ur_w);
     inline void compute_loop_fma(int ur_w, int pad_l, int pad_r);
     inline void compute_loop_fma_core(int ur_w, int pad_l, int pad_r);
-    inline void compute_loop_vnni(int ur_w, int pad_l, int pad_r);
-    inline void compute_loop_4fma(int ur_w, int pad_l, int pad_r);
-    inline void compute_loop_4fma_1st(int ur_w, int pad_l, int pad_r);
     inline void compute_loop(int ur_w, int pad_l, int pad_r);
 
     void generate();
@@ -172,10 +154,9 @@ private:
     }
 
     inline int get_kernel_offset(int ki,int ic,int n_oc_block,int ker_number) {
-        int scale = (jcp.ver == ver_4vnni || jcp.ver == ver_vnni) ? 2 : 1;
         return jcp.typesize_in * jcp.oc_block
             * (n_oc_block * jcp.nb_ic * jcp.ic_block * jcp.kh * jcp.kw * jcp.kd
-                    + (ic + ker_number) * scale + ki * jcp.ic_block);
+                    + (ic + ker_number) + ki * jcp.ic_block);
     }
 
     inline int get_ow_start(int ki, int pad_l) {
