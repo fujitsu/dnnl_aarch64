@@ -38,11 +38,11 @@ struct _jit_sve_conv_fwd_kernel : public jit_generator_aarch64 {
             const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
     {
-        /*
+#if 0
         if (jcp.with_eltwise)
             eltwise_injector_ = new jit_uni_eltwise_injector_f32<sve>(
                     this, jcp.eltwise);
-        */
+#endif
 
         generate();
         jit_ker_ = (void (*)(jit_conv_call_s *))getCode32();
@@ -64,6 +64,8 @@ private:
         typesize = sizeof(float),
         ker_reg_base_idx = 28,
     };
+
+    const Xbyak::Xbyak_aarch64::PReg reg_p_all_ones  = p1;
 
     reg64_t param             = abi_param1_aarch64;
     reg64_t reg_inp           = x8; //r8;
@@ -115,7 +117,6 @@ private:
 
  
     reg64_t imm_addr64 = x15; //r15;
-    Vmm vmm_wei = Vmm(31);
 
 #if 0
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
@@ -125,7 +126,6 @@ private:
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);
-    inline void compute_loop_fma(int ur_w, int pad_l, int pad_r);
     inline void compute_loop_fma_core(int ur_w, int pad_l, int pad_r);
     inline void compute_loop(int ur_w, int pad_l, int pad_r);
 
