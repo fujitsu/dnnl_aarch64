@@ -67,6 +67,10 @@ private:
 
     const Xbyak::Xbyak_aarch64::PReg reg_p_all_ones  = p1;
 
+    /* ----------------------------------- */
+    reg64_t reg_tmp_addr      = x30;
+    /* ----------------------------------- */
+
     reg64_t param             = abi_param1_aarch64;
     reg64_t reg_inp           = x8; //r8;
     reg64_t reg_ker           = x9; //r9;

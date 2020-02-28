@@ -35,6 +35,12 @@
     ldr(X, ptr(sp)); \
     add(sp, sp, 8);
 
+#define PRFWMAX    32
+#define LDRMAX    256
+#define LDRWMAX   253
+#define ADDMAX   4096
+#define MOVMAX  65536
+
 
 namespace mkldnn {
 namespace impl {
@@ -168,7 +174,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         for (int k = 0; k < jcp.nb_oc_blocking; k++) {
             int bias_offset = jcp.typesize_out * k * jcp.oc_block;
             for (int j = 0; j < ur_w; j++) {
-                ldr(zreg_tmp(), ptr(reg_bias, bias_offset));
+                assert((bias_offset>>6)<LDRMAX);
+                ldr(zreg_tmp(), ptr(reg_bias, bias_offset>>6));
                 fadd(zreg_out_s(j,k), zreg_out_s(j,k), zreg_tmp_s());
             }
             //mic_prefetcht1(EVEX_compress_addr(reg_bias, bias_offset + 64));
@@ -200,7 +207,9 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         for (int j = 0; j < ur_w; j++) {
             size_t aux_output_offset = (size_t)typesize *
                 ((size_t)k * jcp.od * jcp.oh * jcp.ow + j) * jcp.oc_block;
-            str(zreg_out(j, k), ptr(reg_out, static_cast<int32_t>(aux_output_offset)));
+
+            assert( (aux_output_offset >> 6) < LDRMAX );
+            str(zreg_out(j, k), ptr(reg_out, static_cast<int32_t>(aux_output_offset >> 6)));
         }
 
 }
@@ -275,6 +284,49 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
         return ZRegS(31);
     };
 
+    auto bcast_load = [=](int jj, int nb_oc_block, int aux_input_offset){
+        if( ((aux_input_offset & 0x3) ==0) && 
+                (aux_input_offset < LDRWMAX)){
+            ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
+                    ptr(aux_reg_inp, static_cast<int32_t>(aux_input_offset)));
+        }else if( aux_input_offset < ADDMAX){
+            add(reg_tmp_addr, aux_reg_inp, aux_input_offset);
+            ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_tmp_addr));
+        }else if( aux_input_offset < MOVMAX ){
+            mov(reg_tmp_addr, aux_input_offset);
+            add(reg_tmp_addr, aux_reg_inp, reg_tmp_addr);
+            ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_tmp_addr));
+        }else{
+            mov(reg_tmp_addr, aux_input_offset&0xffff);
+            movk(reg_tmp_addr, aux_input_offset>>16, 16);
+            add(reg_tmp_addr, aux_reg_inp, reg_tmp_addr);
+            ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_tmp_addr));
+        }
+
+    };
+
+    auto wei_load = [=](int aux_kernel_offset){
+        int ofs = aux_kernel_offset;
+        if( ((ofs>>6) < LDRMAX) && ((ofs&0x3f) == 0)){
+            ofs = ofs >>6;
+            ld1r(zreg_wei(), reg_p_all_ones,
+                    ptr(aux_reg_inp, static_cast<int32_t>(ofs)));
+        }else if( ofs < ADDMAX){
+            add(reg_tmp_addr, aux_reg_inp, ofs);
+            ld1r(zreg_wei(), reg_p_all_ones, ptr(reg_tmp_addr));
+        }else if( ofs < MOVMAX ){
+            mov(reg_tmp_addr, ofs);
+            add(reg_tmp_addr, aux_reg_inp, reg_tmp_addr);
+            ld1r(zreg_wei(), reg_p_all_ones, ptr(reg_tmp_addr));
+        }else{
+            mov(reg_tmp_addr, ofs&0xffff);
+            movk(reg_tmp_addr, ofs>>16, 16);
+            add(reg_tmp_addr, aux_reg_inp, reg_tmp_addr);
+            ld1r(zreg_wei(), reg_p_all_ones, ptr(reg_tmp_addr));
+        }
+
+    };
+
 
     L(kh_label);
     {
@@ -286,9 +338,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
                     for (int jj = jj_start; jj < jj_end; jj++) {
                         size_t aux_input_offset = input_offset(jj, ic, ki);
 
-                        ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
-                              ptr(aux_reg_inp, static_cast<int32_t>(aux_input_offset)));
-
+                        bcast_load(jj, nb_oc_block, aux_input_offset);
                     }
                 }
                 for (int ii = 0; ii < nb_oc_block; ii++) {
@@ -296,8 +346,9 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
                         * (ii * jcp.nb_ic * jcp.kh * jcp.kw * jcp.kd * ic_block
                         * oc_block + ki * ic_block * oc_block + ic * oc_block);
 
-                    if (jj_end - jj_start > 0)
-                        ldr(zreg_wei(), ptr(aux_reg_ker, static_cast<int32_t>(aux_kernel_offset)));
+                    if (jj_end - jj_start > 0){
+                        wei_load(aux_kernel_offset);
+                    }
 
                     for (int jj = jj_start; jj < jj_end; jj++)
                         if (jcp.kernel_kind == expl_bcast)
@@ -361,7 +412,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop(int ur_w,
             assert(NULL);
         else
             if (jcp.kernel_kind == embd_bcast && jcp.nb_oc_blocking == 1)
-                assert(NULL);
+                assert(jcp.kernel_kind != embd_bcast);
             else
                 compute_loop_fma_core(ur_w, pad_l, pad_r);
     else
@@ -918,11 +969,14 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
         unsigned int ker_total_size = ker_inp_size + ker_out_size
             + ker_wei_size;
 
+#ifdef __ARM_ARCH
+        bool embd_bcast_condition = false;
+#else
         bool embd_bcast_condition = true
             && (jcp.kw == 3 && jcp.ow <= 28 && ker_total_size < L1_cache_size)
             && !(jcp.kw == 3 && jcp.ow == 13 && jcp.ic >= 192)
             && !(jcp.kw == 3 && jcp.ow == 28 && jcp.ic >= 512);
-
+#endif
         if (jcp.mb == 1) {
             unsigned int inp_size = jcp.mb * div_up(jcp.ih, jcp.stride_h)
                     * div_up(jcp.iw, jcp.stride_w) * jcp.ic;
@@ -962,6 +1016,7 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
             }
         }
 
+#ifndef __ARM_ARCH        
         if (jcp.kw > 3
                 || (jcp.stride_w == 1 && jcp.stride_h == 1
                            && embd_bcast_condition)
@@ -981,7 +1036,9 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
                 jcp.nb_oc_blocking = try_nb_oc_blocking;
                 jcp.ur_w = nstl::min(jcp.ow, 31 / (jcp.nb_oc_blocking + 1));
             }
-        } else {
+        } else 
+#endif // ifndef __ARM_ARCH
+        {
             jcp.kernel_kind = expl_bcast;
             jcp.nb_ic_blocking = 1;
             if (IMPLICATION(jcp.is_1stconv, jcp.mb > 1)) {
