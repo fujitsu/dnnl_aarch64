@@ -3,7 +3,7 @@
 ```
 git clone http://kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/dnnl_aarch64.git
 cd dnnl_aarch64/
-git checkout 4_add_xbyak_aarch64_to_v0.21.2
+git checkout fjdev
 git submodule init
 git submodule update
 cd third_party/
