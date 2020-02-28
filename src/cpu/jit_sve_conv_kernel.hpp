@@ -93,13 +93,13 @@ private:
     reg64_t aux_reg_ker_d     = x9; //r9;
     reg64_t aux_reg_inp_d     = x18; //rbx;
     reg64_t aux_reg_inp_d_prf = x13; //r13;
-    reg64_t aux_reg_ker_d_prf = abi_not_param1_aarch64;
+    reg64_t aux_reg_ker_d_prf = x24; //abi_not_param1_aarch64;
     reg64_t reg_ki            = x10; //r10;
 
     reg64_t reg_kj            = x19; //rax;
     reg64_t reg_relu_ns       = x19; //rax;
     reg64_t reg_oi            = x20; //rbx;
-    reg64_t reg_kh            = abi_not_param1_aarch64;
+    reg64_t reg_kh            = x24; //abi_not_param1_aarch64;
 
     reg64_t reg_tmp           = x21; //rbp;
 
@@ -113,7 +113,7 @@ private:
     reg64_t reg_binp          = x19; //rax;
     reg64_t reg_bout          = x11; //r11;
     reg64_t aux1_reg_inp      = x20; //rbx;
-    reg64_t aux_reg_out       = abi_not_param1_aarch64;
+    reg64_t aux_reg_out       = x24; //abi_not_param1_aarch64;
 
     reg64_t reg_long_offt     = x11; //r11;
     reg64_t reg_out_long_offt = x14; //r14;
