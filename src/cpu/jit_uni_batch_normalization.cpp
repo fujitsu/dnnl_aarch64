@@ -450,6 +450,9 @@ struct jit_bnorm_t: public jit_generator {
                 }
                 add(reg_soff, factor * vlen_spat_data_);
                 sub(reg_ctr, factor);
+#ifdef XBYAK_TRANSLATE_AARCH64
+		CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
+#endif
                 jnz(label);
             }
             if (is_spatial_thr_) {
@@ -606,6 +609,9 @@ struct jit_bnorm_t: public jit_generator {
                     uni_vmovups(vmmword[reg_rbuf1 + reg_roff], Vmm(0));
                     add(reg_roff, reg_coff_max);
                     sub(reg_ctr, 1);
+#ifdef XBYAK_TRANSLATE_AARCH64
+		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
+#endif
                     jnz(mean_reduction_thrs);
                 }
                 uni_vdivps(Vmm(1), Vmm(1), vchan_size);
@@ -663,6 +669,9 @@ struct jit_bnorm_t: public jit_generator {
                     uni_vaddps(Vmm(1), Vmm(1), vmmword[reg_rbuf1 + reg_roff]);
                     add(reg_roff, reg_coff_max);
                     sub(reg_ctr, 1);
+#ifdef XBYAK_TRANSLATE_AARCH64
+		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
+#endif
                     jnz(var_reduction_thrs);
                 }
                 uni_vdivps(Vmm(1), Vmm(1), vchan_size);
@@ -1011,6 +1020,9 @@ struct jit_bnorm_t: public jit_generator {
                     uni_vaddps(Vmm(1), Vmm(1), vmmword[reg_rbuf2 + reg_roff]);
                     add(reg_roff, reg_coff_max);
                     sub(reg_ctr, 1);
+#ifdef XBYAK_TRANSLATE_AARCH64
+		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
+#endif
                     jnz(sh_reduction_thrs);
                 }
                 uni_vmulps(Vmm(0), Vmm(0), vsqrtvar);

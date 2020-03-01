@@ -286,6 +286,8 @@ public:
 	CodeGeneratorAArch64::mov(x1, x3);
 	CodeGeneratorAArch64::mov(x8, x4);
 	CodeGeneratorAArch64::mov(x9, x5);
+
+	CodeGeneratorAArch64::mov(x4, CodeGeneratorAArch64::sp);
 #else //#ifdef XBYAK_TRANSLATE_AARCH64
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len); // subtract by imm
@@ -294,10 +296,10 @@ public:
         }
         for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
             push(Xbyak::Reg64(abi_save_gpr_regs[i]));
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
         if (mayiuse(avx512_common)) {
             mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
         }
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
     }
 
     void mic_prefetcht0(Xbyak::Address a) {
