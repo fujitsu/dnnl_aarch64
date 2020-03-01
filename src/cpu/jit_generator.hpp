@@ -274,8 +274,8 @@ public:
 
 
 	CodeGeneratorAArch64::ptrue(P_ALL_ONE.b);
-	CodeGeneratorAArch64::ptrue(P_MSB_384.b, xa::VL128);
-	CodeGeneratorAArch64::ptrue(P_MSB_256.b, xa::VL256);
+	CodeGeneratorAArch64::ptrue(P_MSB_384.b, xa::VL16);
+	CodeGeneratorAArch64::ptrue(P_MSB_256.b, xa::VL32);
 	CodeGeneratorAArch64::not_(P_MSB_384.b, P_ALL_ONE/xa::T_z, P_MSB_384.b);
 	CodeGeneratorAArch64::not_(P_MSB_256.b, P_ALL_ONE/xa::T_z, P_MSB_256.b);
 
