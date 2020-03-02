@@ -8,7 +8,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
   )
 
 if(NOT EXISTS "/.dockerenv")
-    find_package(Threads REQUIRED)
+#    find_package(Threads REQUIRED)
 endif()
 
 add_library(${TARGET_NAME} STATIC ${MAIN_SRC})

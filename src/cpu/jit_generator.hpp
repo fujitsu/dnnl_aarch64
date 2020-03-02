@@ -257,7 +257,7 @@ public:
 
     void preamble() {
 #ifdef XBYAK_TRANSLATE_AARCH64
-        assert(!(num_abi_save_gpr_regs % 2));
+        assert(!(num_abi_save_gpr_regs_aarch64 % 2));
 
         stp(x29, x30,
                 xa::pre_ptr(CodeGeneratorAArch64::sp,
@@ -269,11 +269,28 @@ public:
             CodeGeneratorAArch64::st4((v12.d - v15.d)[0],
                     xa::post_ptr(x29, vreg_len_preserve * 4));
         }
-        for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
-            stp(xa::XReg(abi_save_gpr_regs[i]),
-                    xa::XReg(abi_save_gpr_regs[i + 1]),
+        for (size_t i = 0; i < num_abi_save_gpr_regs_aarch64; i += 2) {
+            stp(xa::XReg(abi_save_gpr_regs_aarch64[i]),
+                    xa::XReg(abi_save_gpr_regs_aarch64[i + 1]),
                     post_ptr(x29, xreg_len * 2));
         }
+
+
+	CodeGeneratorAArch64::ptrue(P_ALL_ONE.b);
+	CodeGeneratorAArch64::ptrue(P_MSB_384.b, xa::VL16);
+	CodeGeneratorAArch64::ptrue(P_MSB_256.b, xa::VL32);
+	CodeGeneratorAArch64::not_(P_MSB_384.b, P_ALL_ONE/xa::T_z, P_MSB_384.b);
+	CodeGeneratorAArch64::not_(P_MSB_256.b, P_ALL_ONE/xa::T_z, P_MSB_256.b);
+
+	/* arg values are passed different registers between x86_64 and aarch64. */
+	CodeGeneratorAArch64::mov(x7, x0);
+	CodeGeneratorAArch64::mov(x6, x1);
+	CodeGeneratorAArch64::mov(x2, x2);
+	CodeGeneratorAArch64::mov(x1, x3);
+	CodeGeneratorAArch64::mov(x8, x4);
+	CodeGeneratorAArch64::mov(x9, x5);
+
+	CodeGeneratorAArch64::mov(x4, CodeGeneratorAArch64::sp);
 #else //#ifdef XBYAK_TRANSLATE_AARCH64
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len); // subtract by imm
@@ -282,10 +299,10 @@ public:
         }
         for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
             push(Xbyak::Reg64(abi_save_gpr_regs[i]));
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
         if (mayiuse(avx512_common)) {
             mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
         }
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
     }
 
     void mic_prefetcht0(Xbyak::Address a) {
@@ -312,12 +329,16 @@ public:
 #ifdef XBYAK_TRANSLATE_AARCH64
         CodeGeneratorAArch64::add(x29, CodeGeneratorAArch64::sp, xreg_len * 2);
 
-        if (vreg_to_preserve) {
+	CodeGeneratorAArch64::eor(P_ALL_ONE.b, P_ALL_ONE/xa::T_z, P_ALL_ONE.b, P_ALL_ONE.b);
+	CodeGeneratorAArch64::eor(P_MSB_384.b, P_MSB_384/xa::T_z, P_MSB_384.b, P_MSB_384.b);
+	CodeGeneratorAArch64::eor(P_MSB_256.b, P_MSB_256/xa::T_z, P_MSB_256.b, P_MSB_256.b);
+
+	if (vreg_to_preserve) {
             ld4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve * 4));
             ld4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve * 4));
         }
 
-        for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
+        for (size_t i = 0; i < num_abi_save_gpr_regs_aarch64; i += 2) {
             ldp(xa::XReg(abi_save_gpr_regs_aarch64[i]),
                     xa::XReg(abi_save_gpr_regs_aarch64[i + 1]),
                     xa::post_ptr(x29, xreg_len * 2));
@@ -326,7 +347,7 @@ public:
         ldp(x29, x30,
                 xa::post_ptr(CodeGeneratorAArch64::sp,
                         static_cast<int64_t>(preserved_stack_size)));
-        ret();
+	CodeGeneratorAArch64::ret();
 #else //#ifdef XBYAK_TRANSLATE_AARCH64
         for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
             pop(Xbyak::Reg64(abi_save_gpr_regs[num_abi_save_gpr_regs - 1 - i]));
@@ -938,9 +959,11 @@ public:
             counter++;
 
             FILE *fp = mkldnn_fopen(fname, "w+");
-            // Failure to dump code is not fatal
+
+	    std::cout << "dump size=" << getSize() << std::endl;
+	    // Failure to dump code is not fatal
             if (fp) {
-                size_t unused = fwrite(code, getSize(), 1, fp);
+                size_t unused = fwrite(code, getSize()*4, 1, fp);
                 UNUSED(unused);
                 fclose(fp);
             }

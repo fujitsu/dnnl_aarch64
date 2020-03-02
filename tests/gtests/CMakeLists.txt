@@ -42,6 +42,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpu
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak/xbyak
+		    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak/translator/include/xbyak_translator_for_aarch64
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak_aarch64/xbyak_aarch64
                     )
 
