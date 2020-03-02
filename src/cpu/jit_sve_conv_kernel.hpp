@@ -27,6 +27,12 @@
 
 using namespace Xbyak::Xbyak_aarch64;
 
+#define PRFWMAX    32
+#define LDRMAX    256
+#define LDRWMAX   253
+#define ADDMAX   4096
+#define MOVMAX  65536
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -69,6 +75,7 @@ private:
 
     /* ----------------------------------- */
     reg64_t reg_tmp_addr      = x30;
+    reg64_t reg_tmp           = x21; //rbp;
     /* ----------------------------------- */
 
     reg64_t param             = abi_param1_aarch64;
@@ -101,7 +108,6 @@ private:
     reg64_t reg_oi            = x20; //rbx;
     reg64_t reg_kh            = x24; //abi_not_param1_aarch64;
 
-    reg64_t reg_tmp           = x21; //rbp;
 
     reg64_t reg_ic_loop       = x22; //rdx;
     reg64_t reg_inp_loop      = x23; //rsi;
@@ -121,6 +127,23 @@ private:
 
  
     reg64_t imm_addr64 = x15; //r15;
+
+    void add_imm(reg64_t out, reg64_t in, int value){
+        
+        if(value < ADDMAX){
+            assert(value < ADDMAX);
+            add(out, in, value);
+        }else if(value < MOVMAX){
+            mov(reg_tmp, value);
+            add(out, in, reg_tmp);
+        }else{
+            mov(reg_tmp, value&0xffff);
+            movk(reg_tmp, value>>16, 16);
+            add(out, in, reg_tmp);
+        }
+    }
+
+
 
 #if 0
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
@@ -148,13 +171,12 @@ private:
     }
 
     inline size_t get_input_offset(int ki, int ic, int oi, int pad_l) {
-        size_t scale = (jcp.ver == ver_4vnni || jcp.ver == ver_vnni) ? 2 : 1;
         size_t iw_str = !jcp.is_1stconv ? jcp.ic_block : 1;
         size_t ic_str = !jcp.is_1stconv ? 1 : (size_t)jcp.iw * jcp.ih * jcp.id;
         return (size_t)jcp.typesize_in
                 * ((size_t)(ki * (jcp.dilate_w + 1) + oi * jcp.stride_w - pad_l)
                                   * iw_str
-                          + scale * ic * ic_str);
+                          + ic * ic_str);
     }
 
     inline int get_kernel_offset(int ki,int ic,int n_oc_block,int ker_number) {

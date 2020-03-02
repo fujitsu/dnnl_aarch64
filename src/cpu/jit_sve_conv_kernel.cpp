@@ -35,11 +35,6 @@
     ldr(X, ptr(sp)); \
     add(sp, sp, 8);
 
-#define PRFWMAX    32
-#define LDRMAX    256
-#define LDRWMAX   253
-#define ADDMAX   4096
-#define MOVMAX  65536
 
 
 namespace mkldnn {
@@ -174,10 +169,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
     for (int k = 0; k < jcp.nb_oc_blocking; k++)
         for (int j = 0; j < ur_w; j++) {
             size_t aux_output_offset = get_output_offset(j, k);
-
-            mov(reg_out_long_offt, aux_output_offset&0xffff);
-            movk(reg_out_long_offt, aux_output_offset >> 16, 16);
-            add(reg_out_long_offt, reg_out_long_offt, reg_out);
+            add_imm(reg_out_long_offt, reg_out, aux_output_offset);
             ldr(zreg_tmp(), ptr(reg_out_long_offt));
             fadd(zreg_out_s(j, k), zreg_out_s(j, k), zreg_tmp_s());
         }
@@ -385,7 +377,6 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
     };
 
-
     L(kh_label);
     {
         for (int ki = 0; ki < kw; ki++) {
@@ -417,17 +408,21 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
                 }
             }
         }
-        add(aux_reg_ker, aux_reg_ker, shift_kernel_ptr);
-        add(aux_reg_inp, aux_reg_inp, shift_input_ptr);
+        //assert(shift_kernel_ptr < ADDMAX);
+        //assert(shift_input_ptr < ADDMAX);
+        add_imm(aux_reg_ker, aux_reg_ker, shift_kernel_ptr);
+        add_imm(aux_reg_inp, aux_reg_inp, shift_input_ptr);
         sub(reg_kj, reg_kj, 1); //dec(reg_kj);
         cmp(reg_kj, 0);
         b(GT, kh_label);
     }
 
     if (jcp.ndims == 5) {
-        add(aux_reg_inp_d, aux_reg_inp_d,
+        //assert((typesize * (jcp.dilate_d + 1) * jcp.ih * jcp.iw * inp_mul) < ADDMAX);
+        //assert(( typesize * jcp.kw * jcp.kh * jcp.oc_block* jcp.ic_block ) < ADDMAX);
+        add_imm(aux_reg_inp_d, aux_reg_inp_d,
                 typesize * (jcp.dilate_d + 1) * jcp.ih * jcp.iw * inp_mul);
-        add(aux_reg_ker_d, aux_reg_ker_d, typesize * jcp.kw * jcp.kh * jcp.oc_block
+        add_imm(aux_reg_ker_d, aux_reg_ker_d, typesize * jcp.kw * jcp.kh * jcp.oc_block
                 * jcp.ic_block);
 
         sub(reg_kj, reg_kj, 1); //dec(reg_ki);
@@ -536,50 +531,50 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
             mov(reg_inp_prf, reg_inp);
             mov(reg_out_prf, reg_out);
             if (n_oi == 0) {
-                add(reg_inp_prf, reg_inp_prf,inp_shift_pad);
-                add(reg_out_prf, reg_out_prf, out_shift);
+                add_imm(reg_inp_prf, reg_inp_prf,inp_shift_pad);
+                add_imm(reg_out_prf, reg_out_prf, out_shift);
                 compute_loop(ur_w, l_pad, r_pad1);
-                add(reg_inp, reg_inp, inp_shift_pad);
-                add(reg_out, reg_out, out_shift);
+                add_imm(reg_inp, reg_inp, inp_shift_pad);
+                add_imm(reg_out, reg_out, out_shift);
                 if (ur_w_tail != 0) {
-                    add(reg_inp_prf, reg_inp_prf, inp_shift);
-                    add(reg_out_prf, reg_out_prf, out_shift);
+                    add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
+                    add_imm(reg_out_prf, reg_out_prf, out_shift);
                     compute_loop(ur_w_tail, 0, r_pad);
                 }
             } else {
                 mov(reg_oi, 0); // 
                 if (l_pad > 0) {
-                    add(reg_inp_prf, reg_inp_prf, inp_shift_pad);
-                    add(reg_out_prf, reg_out_prf, out_shift);
+                    add_imm(reg_inp_prf, reg_inp_prf, inp_shift_pad);
+                    add_imm(reg_out_prf, reg_out_prf, out_shift);
                     compute_loop(ur_w, l_pad, 0);
-                    add(reg_inp, reg_inp,inp_shift_pad);
-                    add(reg_out, reg_out,out_shift);
-                    add(reg_oi, reg_oi, 1); // increment
+                    add_imm(reg_inp, reg_inp,inp_shift_pad);
+                    add_imm(reg_out, reg_out,out_shift);
+                    add_imm(reg_oi, reg_oi, 1); // increment
                 }
                 if ((l_pad <= 0 && n_oi > 0) || (l_pad > 0 && n_oi > 1)) {
                     Label ow_loop_label;
                     L(ow_loop_label);
                     {
-                        add(reg_inp_prf, reg_inp_prf, inp_shift);
-                        add(reg_out_prf, reg_out_prf, out_shift);
+                        add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
+                        add_imm(reg_out_prf, reg_out_prf, out_shift);
                         compute_loop(ur_w, 0, 0);
-                        add(reg_inp, reg_inp, inp_shift);
-                        add(reg_out, reg_out, out_shift);
-                        add(reg_oi, reg_oi, 1); //inc(reg_oi);
+                        add_imm(reg_inp, reg_inp, inp_shift);
+                        add_imm(reg_out, reg_out, out_shift);
+                        add_imm(reg_oi, reg_oi, 1); //inc(reg_oi);
                         cmp(reg_oi, n_oi);
                         b(LT, ow_loop_label);
                     }
                 }
                 if (r_pad1 > 0) {
-                    add(reg_inp_prf, reg_inp_prf, inp_shift);
-                    add(reg_out_prf, reg_out_prf, out_shift);
+                    add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
+                    add_imm(reg_out_prf, reg_out_prf, out_shift);
                     compute_loop(ur_w, 0, r_pad1);
-                    add(reg_inp, reg_inp, inp_shift);
-                    add(reg_out, reg_out, out_shift);
+                    add_imm(reg_inp, reg_inp, inp_shift);
+                    add_imm(reg_out, reg_out, out_shift);
                 }
                 if (ur_w_tail != 0) {
-                    add(reg_inp_prf, reg_inp_prf, inp_shift);
-                    add(reg_out_prf, reg_out_prf, out_shift);
+                    add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
+                    add_imm(reg_out_prf, reg_out_prf, out_shift);
                     compute_loop(ur_w_tail, 0, r_pad);
                 }
             }
@@ -623,11 +618,11 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
 
         if (l_pad > 0) {
             ldr(reg_ker_prf, ptr(param1, GET_OFF(filt_prf)));
-            add(reg_inp_prf, reg_inp_prf, inp_shift_pad);
-            add(reg_out_prf, reg_out_prf, out_shift);
+            add_imm(reg_inp_prf, reg_inp_prf, inp_shift_pad);
+            add_imm(reg_out_prf, reg_out_prf, out_shift);
             compute_loop(ur_w, l_pad, 0);
-            add(reg_inp, reg_inp, inp_shift_pad);
-            add(reg_out, reg_out, out_shift);
+            add_imm(reg_inp, reg_inp, inp_shift_pad);
+            add_imm(reg_out, reg_out, out_shift);
             sub(reg_oi, reg_oi, 1); // decrement
         }
         b(oi_loop_label);
@@ -638,8 +633,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
 
         if (l_pad > 0) {
             // just to consider left padding, not compute
-            add(reg_inp, reg_inp, inp_shift_pad_second_block);
-            add(reg_inp_prf, reg_inp_prf, inp_shift_pad_second_block);
+            add_imm(reg_inp, reg_inp, inp_shift_pad_second_block);
+            add_imm(reg_inp_prf, reg_inp_prf, inp_shift_pad_second_block);
         }
 
         // set number of iteration for oi-loop
@@ -658,11 +653,11 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
             cmp(reg_oi, 0);
             b(LE, oi_loop_end_label);
 
-            add(reg_inp_prf, reg_inp_prf, inp_shift);
-            add(reg_out_prf, reg_out_prf, out_shift);
+            add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
+            add_imm(reg_out_prf, reg_out_prf, out_shift);
             compute_loop(ur_w, 0, 0);
-            add(reg_inp, reg_inp, inp_shift);
-            add(reg_out, reg_out, out_shift);
+            add_imm(reg_inp, reg_inp, inp_shift);
+            add_imm(reg_out, reg_out, out_shift);
             sub(reg_oi, reg_oi, 1); // dec(reg_oi);
             b(oi_loop_start_label);
         L(oi_loop_end_label);
@@ -690,11 +685,11 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
         // last oi block with right padding
         L(last_oi_label);
         ldr(reg_ker_prf, ptr(param1, GET_OFF(filt_prf)));
-        add(reg_inp_prf, reg_inp_prf, inp_shift);
-        add(reg_out_prf, reg_out_prf, out_shift);
+        add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
+        add_imm(reg_out_prf, reg_out_prf, out_shift);
         compute_loop(ur_w, 0, r_pad1);
-        add(reg_inp, reg_inp, inp_shift);
-        add(reg_out, reg_out, out_shift);
+        add_imm(reg_inp, reg_inp, inp_shift);
+        add_imm(reg_out, reg_out, out_shift);
 
         ldr(reg_owb, ptr(param1, GET_OFF(owb)));
         cmp(reg_owb, jcp.nb_ow - 1); // last ow_block?
@@ -703,8 +698,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
         L(tail_label);
         ldr(reg_ker_prf, ptr(param1, GET_OFF(filt_prf)));
         if (ur_w_tail != 0) {
-            add(reg_inp_prf, reg_inp_prf, inp_shift);
-            add(reg_out_prf, reg_out_prf, out_shift);
+            add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
+            add_imm(reg_out_prf, reg_out_prf, out_shift);
             compute_loop(ur_w_tail, 0, r_pad);
         }
         L(end_label);
