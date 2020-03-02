@@ -104,6 +104,11 @@ enable_testing()
 
 include_directories(include)
 
+#for CBLAS
+#include_directories(AFTER "/opt/FJSVxtclanga/tcsds-1.2.20/include")
+#append(CMAKE_C_FLAGS "-L/fefs01/ai/honda/lib -lcblas")
+#append(CMAKE_CXX_FLAGS "-L/fefs01/ai/honda/lib -lcblas")
+
 if(XBYAK_TRANSLATE_AARCH64)
     append(CMAKE_C_FLAGS "-DXBYAK_TRANSLATE_AARCH64")
     append(CMAKE_CXX_FLAGS "-DXBYAK_TRANSLATE_AARCH64")
