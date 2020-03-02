@@ -129,9 +129,9 @@ private:
     reg64_t imm_addr64 = x15; //r15;
 
     void add_imm(reg64_t out, reg64_t in, int value){
-        
+     
+      if( value >= 0){   
         if(value < ADDMAX){
-            assert(value < ADDMAX);
             add(out, in, value);
         }else if(value < MOVMAX){
             mov(reg_tmp, value);
@@ -141,6 +141,20 @@ private:
             movk(reg_tmp, value>>16, 16);
             add(out, in, reg_tmp);
         }
+      }else{
+        int val = -1 * value;
+        if(val < ADDMAX){
+            sub(out, in, val);
+        }else if(val < MOVMAX){
+            mov(reg_tmp, val);
+            sub(out, in, reg_tmp);
+        }else{
+            mov(reg_tmp, val&0xffff);
+            movk(reg_tmp, val>>16, 16);
+            sub(out, in, reg_tmp);
+        }
+
+      }
     }
 
 
