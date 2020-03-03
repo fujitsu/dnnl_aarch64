@@ -424,11 +424,8 @@ status_t cpu_engine_t::submit(primitive_t *p, event_t *e,
     /* FIXME: this should live in primitive execute function... */
     if (mkldnn_verbose()->level) {
         double ms = get_msec();
-        //for (int i =0; i < 100; i++){
-            p->execute(e);
-        //}
+        p->execute(e);
         ms = get_msec() - ms;
-        //ms = (get_msec() - ms) /100.0;
         printf("mkldnn_verbose,exec,%s,%g\n", p->pd()->info(), ms);
         fflush(0);
     } else {
