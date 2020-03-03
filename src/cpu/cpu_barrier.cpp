@@ -57,6 +57,7 @@ void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
     }
 
     code.lock(); code.xadd(code.ptr[reg_ctx + BAR_CTR_OFF], reg_tmp);
+    //    code.CodeGeneratorAArch64::dmb(Xbyak_aarch64::SY);
     code.add(reg_tmp, 1);
     code.cmp(reg_tmp, reg_nthr);
     code.pop(reg_tmp); /* restore previous sense */
@@ -64,16 +65,19 @@ void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
 
     /* the last thread {{{ */
     code.mov(code.qword[reg_ctx + BAR_CTR_OFF], 0); // reset ctx
+    //    code.CodeGeneratorAArch64::dmb(Xbyak_aarch64::SY);
 
     // notify waiting threads
     code.not_(reg_tmp);
     code.mov(code.ptr[reg_ctx + BAR_SENSE_OFF], reg_tmp);
+    //    code.CodeGeneratorAArch64::dmb(Xbyak_aarch64::SY);
     code.jmp(barrier_exit_restore_label);
     /* }}} the last thread */
 
     code.CodeGenerator::L(spin_label);
     code.pause();
     code.cmp(reg_tmp, code.ptr[reg_ctx + BAR_SENSE_OFF]);
+    code.CodeGeneratorAArch64::dmb(Xbyak_aarch64::SY);
     code.je(spin_label);
 
     code.CodeGenerator::L(barrier_exit_restore_label);
