@@ -130,7 +130,6 @@ private:
 
     void add_imm(reg64_t out, reg64_t in, int value){
      
-      if(value == 0) return;
 
       if( value >= 0){   
         if(value < ADDMAX){
