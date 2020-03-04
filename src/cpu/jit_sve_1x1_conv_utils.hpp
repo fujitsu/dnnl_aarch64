@@ -242,45 +242,54 @@ struct rtus_driver_t: public jit_generator_aarch64 {
         } else {
             ldr(reg_v, ptr(reg_ws));
             str(reg_v, ptr(reg_cur_src));
-            for (int w = 1; w < stride_w_; ++w)
-                str(reg_zero, ptr(reg_cur_src + w * vlen_));
+            for (int w = 1; w < stride_w_; ++w){
+                int ofs = w * vlen_;
+                ofs = ofs>>6;
+                assert( ofs < 256 );
+                ldr(reg_zero, ptr(reg_cur_src, ofs));
+            }
         }
 
-        add(reg_ws, vlen_);
-        add(reg_cur_src, stride_w_ * vlen_);
+        add_imm(reg_ws, reg_ws, vlen_);
+        add(reg_cur_src, reg_cur_src, stride_w_ * vlen_);
 
         // for 1d or stride_h=1 convolutions the loop over h should be skipped
         if (!(src_step_icb_ == iw_ || src_step_h_ == iw_)) {
             Label skip_h_step;
-            add(reg_cur_iw, stride_w_);
+            add_imm(reg_cur_iw, stride_w_);
             cmp(reg_cur_iw, iw_);
-            jl(skip_h_step);
+            b(LT, skip_h_step);
 
             if (src_to_ws_) {
-                add(reg_cur_src, (src_step_h_ - iw_) * vlen_);
+                add_imm(reg_cur_src, (src_step_h_ - iw_) * vlen_);
             } else {
-                Xbyak::Reg64 reg_cur_src_fin = reg_cur_iw; /* just reuse */
+                reg64_t reg_cur_src_fin = reg_cur_iw; /* just reuse */
                 mov(reg_cur_src_fin, reg_cur_src);
-                add(reg_cur_src_fin, (src_step_h_ - iw_) * vlen_);
+                add_imm(reg_cur_src_fin, (src_step_h_ - iw_) * vlen_);
                 Label ih_loop;
                 L(ih_loop);
 
-                for (int w = 0; w < stride_w_; ++w)
-                    vmovups(ptr[reg_cur_src + w * vlen_], reg_zero);
+                for (int w = 0; w < stride_w_; ++w){
+                    int ofs = w * vlen_;
+                    ofs = ofs>>6;
+                    assert( ofs < 256 );
 
-                add(reg_cur_src, stride_w_ * vlen_);
+                    str(reg_zero, ptr(reg_cur_src, ofs));
+                }
+
+                add_imm(reg_cur_src, stride_w_ * vlen_);
                 cmp(reg_cur_src, reg_cur_src_fin);
-                jl(ih_loop);
+                b(LT, ih_loop);
             }
-            xor_(reg_cur_iw, reg_cur_iw);
+            mov(reg_cur_iw, 0);
             L(skip_h_step);
         }
-
-        sub(reg_cur_os, vlen_);
-        jnz(is_loop);
+        assert(vlen_ < 4096);
+        subs(reg_cur_os, reg_cur_os, vlen_);
+        b(NE, is_loop);
 
         /* restore dst */
-        sub(reg_ws, reg_os);
+        sub(reg_ws, reg_ws, reg_os);
     }
 
     void generate() {
