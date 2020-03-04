@@ -319,6 +319,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
     };
     auto zreg_inp_s = [=](int i_ic, int nb_x_blocking){
         int idx = i_ic + nb_x_blocking * jcp.ur_w;
+        //printf("idx, %d = i_ic, %d, nb_x_blocking, %d, ur_w, %d\n",
+        //        idx, i_ic, nb_x_blocking, jcp.ur_w);   
         assert(idx < 31);
         return ZRegS(idx);
     };
@@ -908,7 +910,7 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
         return status::unimplemented;
     }
 
-    jcp.ur_w = nstl::min(jcp.ow, regs); // ur_w is min(output channel, regs=28)
+    jcp.ur_w = nstl::min(jcp.ow, regs); // ur_w is min(output width, regs=28)
     // TODO (Tanya): currently applied to Segnet convolutions only.
     // Need to try for other topologies
     if (jcp.ow > 150 && jcp.ur_w < regs/2)
@@ -1096,7 +1098,7 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
         {
             jcp.kernel_kind = expl_bcast;
             jcp.nb_ic_blocking = 1;
-            if (IMPLICATION(jcp.is_1stconv, jcp.mb > 1)) {
+            if (IMPLICATION(jcp.is_1stconv, jcp.mb >= 1)) {
                 float best_thr_eff = 0.f;
                 int best_nb_oc_blocking = 1;
                 for (int i = nstl::min(jcp.nb_oc, 5); i > 0; i--) {
