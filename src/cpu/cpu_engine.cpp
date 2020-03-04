@@ -26,15 +26,26 @@
 
 #include "cpu/rnn/ref_rnn.hpp"
 
-#include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
+#ifdef __ARM_ARCH
+
+#include "cpu/jit_sve_1x1_convolution.hpp"
+#include "cpu/jit_sve_convolution.hpp"
+
+#else
+
+#include "cpu/jit_avx2_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_1x1_convolution.hpp"
+#include "cpu/jit_avx512_core_bf16_1x1_convolution.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
+
+#endif // #ifndef __ARM_ARCH
+
 #include "cpu/jit_avx512_core_fp32_wino_conv_4x3.hpp"
 #include "cpu/jit_avx512_common_convolution_winograd.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_convolution.hpp"
 #include "cpu/jit_avx512_core_bf16_convolution.hpp"
-#include "cpu/jit_avx512_core_bf16_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_convolution.hpp"
-#include "cpu/jit_avx2_1x1_convolution.hpp"
 #include "cpu/jit_sse42_1x1_convolution.hpp"
 #include "cpu/jit_avx2_convolution.hpp"
 #include "cpu/jit_sse42_convolution.hpp"
@@ -42,14 +53,9 @@
 #include "cpu/gemm_bf16_convolution.hpp"
 #include "cpu/gemm_x8s8s32x_convolution.hpp"
 
-//#ifdef __ARM_ARCH
-#include "cpu/jit_sve_1x1_convolution.hpp"
-#include "cpu/jit_sve_convolution.hpp"
-//#endif // #ifndef __ARM_ARCH
 
 #include "cpu/ref_convolution.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_deconvolution.hpp"
-#include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
 #include "cpu/ref_deconvolution.hpp"
 #include "cpu/ref_shuffle.hpp"
 #include "cpu/jit_uni_eltwise.hpp"

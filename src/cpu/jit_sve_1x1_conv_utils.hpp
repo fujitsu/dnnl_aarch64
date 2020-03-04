@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef JIT_UNI_1x1_CONV_UTILS_HPP
-#define JIT_UNI_1x1_CONV_UTILS_HPP
+#ifndef JIT_SVE_1x1_CONV_UTILS_HPP
+#define JIT_SVE_1x1_CONV_UTILS_HPP
 
 #include "memory_tracking.hpp"
 #include "mkldnn_thread.hpp"
@@ -23,7 +23,7 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
-#include "jit_generator.hpp"
+#include "jit_generator_aarch64.hpp"
 
 #define push(X); \
   sub(sp, sp, 8); \
@@ -33,14 +33,15 @@
   ldr(X, ptr(sp)); \
   add(sp, sp, 8);
 
-
-
+#define ADDMAX 4096
+#define MOVMAX 65536
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
 using namespace mkldnn::impl::utils;
+using namespace Xbyak::Xbyak_aarch64;
 
 struct reduce_to_unit_stride_t {
     convolution_desc_t conv_d_;
@@ -141,19 +142,21 @@ struct rtus_driver_t: public jit_generator_aarch64 {
 
     const Xbyak::Xbyak_aarch64::PReg reg_p_all_ones  = p1;
 
-    reg64_t   reg_ws          = x16 // abi_param1;
-    reg64_t   reg_src         = x17 // abi_not_param1;
-    reg64_t   reg_icb         = x18 // rdx;
-    reg64_t   reg_os          = x19 // r11;
-    reg64_t   reg_iw_start    = x20 // r8;
+    reg64_t   reg_ws          = x16; // abi_param1;
+    reg64_t   reg_src         = x17; // abi_not_param1;
+    reg64_t   reg_icb         = x18; // rdx;
+    reg64_t   reg_os          = x19; // r11;
+    reg64_t   reg_iw_start    = x20; // r8;
 
-    reg64_t   reg_cur_os      = x21 // rax;
-    reg64_t   reg_cur_iw      = x22 // r9;
-    reg64_t   reg_cur_src     = x23 // r10;
+    reg64_t   reg_cur_os      = x21; // rax;
+    reg64_t   reg_cur_iw      = x22; // r9;
+    reg64_t   reg_cur_src     = x23; // r10;
+
+    reg64_t   reg_tmp         = x24; // r10;
 
 
-    zreg_t reg_zero;
-    zreg_t reg_v;
+    zreg_t reg_zero = ZReg(0);
+    zreg_t reg_v = ZReg(1);
 
     int iw_, stride_w_;
     int src_step_h_, src_step_icb_, ws_step_icb_, vlen_, vlen_shift_;
@@ -195,26 +198,27 @@ struct rtus_driver_t: public jit_generator_aarch64 {
         , src_step_icb_(src_step_icb), ws_step_icb_(ws_step_icb)
         , src_to_ws_(src_to_ws), typesize_(typesize)
     {
-        using namespace Xbyak::Xbyak_aarch64;
-
+/*
         auto Vreg = [=](int idx, int typesize) {
-            Zreg res;
+            ZReg res;
             switch (isa) {
             case sve:
                 switch (typesize) {
                 case 4: res = ZReg(idx); break;
-                case 2: assert(!"Not supported (256-bit) ver rtus"); break;
-                case 1: assert(!"Not supported (128-bit) ver rtus"); break;
+                case 2: assert(!"Not supported 16-bit ver rtus"); break;
+                case 1: assert(!"Not supported 8-bit ver rtus"); break;
                 default:
                     assert(!"Not supported typesize");
                 }
+            default:
+              assert(!"Not supported vector type");
             }
             return res;
         };
 
-        reg_zero = Zreg(0, typesize);
-        reg_v = Zreg(1, typesize);
-
+        reg_zero = Vreg(0, typesize);
+        reg_v = Vreg(1, typesize);
+*/
         vlen_ = reg_v.getBit() / 8;
         vlen_shift_ = 0;
 
@@ -222,18 +226,17 @@ struct rtus_driver_t: public jit_generator_aarch64 {
         while (tvlen > 1) {
             tvlen /= 2;
             vlen_shift_++;
-         }
+        }
         generate();
     }
 
     void loop_is() {
-        using namespace Xbyak::Xbyak_aarch64;
 
         mov(reg_cur_src, reg_src);
         mov(reg_cur_iw, reg_iw_start);
         mov(reg_cur_os, reg_os);
 
-        Label is_loop;
+        LabelAArch64 is_loop;
         L(is_loop);
 
         if (src_to_ws_) {
@@ -246,27 +249,27 @@ struct rtus_driver_t: public jit_generator_aarch64 {
                 int ofs = w * vlen_;
                 ofs = ofs>>6;
                 assert( ofs < 256 );
-                ldr(reg_zero, ptr(reg_cur_src, ofs));
+                str(reg_zero, ptr(reg_cur_src, ofs));
             }
         }
 
         add_imm(reg_ws, reg_ws, vlen_);
-        add(reg_cur_src, reg_cur_src, stride_w_ * vlen_);
+        add_imm(reg_cur_src, reg_cur_src, stride_w_ * vlen_);
 
         // for 1d or stride_h=1 convolutions the loop over h should be skipped
         if (!(src_step_icb_ == iw_ || src_step_h_ == iw_)) {
-            Label skip_h_step;
-            add_imm(reg_cur_iw, stride_w_);
+            LabelAArch64 skip_h_step;
+            add_imm(reg_cur_iw, reg_cur_iw, stride_w_);
             cmp(reg_cur_iw, iw_);
             b(LT, skip_h_step);
 
             if (src_to_ws_) {
-                add_imm(reg_cur_src, (src_step_h_ - iw_) * vlen_);
+                add_imm(reg_cur_src, reg_cur_src, (src_step_h_ - iw_) * vlen_);
             } else {
                 reg64_t reg_cur_src_fin = reg_cur_iw; /* just reuse */
                 mov(reg_cur_src_fin, reg_cur_src);
-                add_imm(reg_cur_src_fin, (src_step_h_ - iw_) * vlen_);
-                Label ih_loop;
+                add_imm(reg_cur_src_fin, reg_cur_src_fin, (src_step_h_ - iw_) * vlen_);
+                LabelAArch64 ih_loop;
                 L(ih_loop);
 
                 for (int w = 0; w < stride_w_; ++w){
@@ -277,7 +280,7 @@ struct rtus_driver_t: public jit_generator_aarch64 {
                     str(reg_zero, ptr(reg_cur_src, ofs));
                 }
 
-                add_imm(reg_cur_src, stride_w_ * vlen_);
+                add_imm(reg_cur_src, reg_cur_src, stride_w_ * vlen_);
                 cmp(reg_cur_src, reg_cur_src_fin);
                 b(LT, ih_loop);
             }
@@ -293,8 +296,8 @@ struct rtus_driver_t: public jit_generator_aarch64 {
     }
 
     void generate() {
-        using namespace Xbyak::Xbyak_aarch64;
         assert( isa == sve );
+        ptrue( reg_p_all_ones.b );
 
 #if defined(_WIN32)
         assert(reg_src == abi_not_param1 && abi_not_param1 == rdi);
@@ -302,14 +305,14 @@ struct rtus_driver_t: public jit_generator_aarch64 {
 #endif
 
 #define READ_PARAM(what) \
-        ldr(reg_ ## what, ptr(abi_param1, static_cast<int32_t>(offsetof(call_params_t, what))))
+        ldr(reg_ ## what, ptr(param1, static_cast<int32_t>(offsetof(call_params_t, what))))
 
         READ_PARAM(src);
         READ_PARAM(icb);
         READ_PARAM(os);
         READ_PARAM(iw_start);
 
-        assert(reg_ws == abi_param1);
+        //assert(reg_ws == param1);
         READ_PARAM(ws); /* reg_ws should always be read the last */
 #undef  READ_PARAM
 
@@ -327,25 +330,24 @@ struct rtus_driver_t: public jit_generator_aarch64 {
                 }
             case 64 /*zmm*/:
                 {
-                ZReg zreg_z(reg_zero.getIdx());
-                fmov(zreg_g);
+                Xbyak::Xbyak_aarch64::ZRegS zreg_zs(reg_zero.getIdx());
+                fmov(zreg_zs);
                 break;
                 }
             default: assert(!"rtus kernel failure");
             }
         }
 
-        Label icb_loop;
+        LabelAArch64 icb_loop;
         L(icb_loop);
 
-        ptrue( reg_p_all_ones.b );
 
         loop_is();
 
         add_imm(reg_ws, reg_ws, ws_step_icb_ * vlen_);
         add_imm(reg_src, reg_src, src_step_icb_ * vlen_);
 
-        subs(reg_icb, reg_icb); //dec(reg_icb);
+        subs(reg_icb, reg_icb, 1); //dec(reg_icb);
         b(NE, icb_loop);
 
 #if defined(_WIN32)
@@ -354,8 +356,9 @@ struct rtus_driver_t: public jit_generator_aarch64 {
 
         uni_vzeroupper(); // jit_generator_aarch64 
         ret();
-        this->ker_ = reinterpret_cast<decltype(ker_)>(const_cast<uint8_t*>(
-                    this->getCode()));
+        //this->ker_ = reinterpret_cast<decltype(ker_)>(const_cast<uint8_t*>(
+        //            this->getCode32()));
+        this->ker_ = reinterpret_cast<decltype(ker_)>(this->getCode32());
     }
 };
 

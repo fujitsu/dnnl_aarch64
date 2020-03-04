@@ -27,7 +27,7 @@
 #include "cpu_memory.hpp"
 //#include "cpu_barrier.hpp"
 
-//#include "jit_sve_1x1_conv_utils.hpp"
+#include "jit_sve_1x1_conv_utils.hpp"
 #include "jit_sve_1x1_conv_kernel.hpp"
 
 #define GET_OFF(field) static_cast<int32_t>(offsetof(jit_1x1_conv_call_s, field))
@@ -564,8 +564,9 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.prop_kind = cd.prop_kind; 
 
     // TODO: impl rtus driver
-    if(reduce_src)
-      return status::unimplemented;
+    //if(reduce_src)
+    //  return status::unimplemented;
+
     // TODO: impl backward
     if(!one_of(jcp.prop_kind, forward_training, forward_inference)){
       return status::unimplemented;

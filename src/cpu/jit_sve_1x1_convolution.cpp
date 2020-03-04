@@ -167,7 +167,7 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
                 + _icb * jcp.is * jcp.ic_block;
             if (ocb == ocb_start) {
                 rp.src = src + data_blk_off(src_d, n, _icb, ih, iw);
-                assert(NULL);
+                //assert(NULL);
                 rtus_driver_->ker_(&rp);
             }
             p.bcast_data = rp.ws;
