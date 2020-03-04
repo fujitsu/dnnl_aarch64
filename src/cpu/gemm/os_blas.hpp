@@ -47,9 +47,9 @@
 #define USE_MKL_PACKED_GEMM 0
 #define USE_MKL_IGEMM 0
 
-//#if !defined(USE_CBLAS) 
-//#define USE_CBLAS
-//#endif
+#if !defined(USE_CBLAS) 
+#define USE_CBLAS
+#endif
 
 #if defined(_SX)
 /* TODO: _SX should also define USE_CBLAS in case the later is available */
