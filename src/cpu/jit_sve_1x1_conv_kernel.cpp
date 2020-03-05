@@ -72,7 +72,7 @@ void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
             if (i < num_substeps - 1) {
                 assert(jcp.bcast_loop_bcast_substep < ADDMAX);
                 add(aux1_reg_bcast_data, aux1_reg_bcast_data, jcp.bcast_loop_bcast_substep);
-
+  
                 assert(jcp.bcast_loop_output_substep < ADDMAX);
                 add(aux_reg_output_data, aux_reg_output_data, jcp.bcast_loop_output_substep);
             }

@@ -118,6 +118,7 @@ inline void rtus_prepare_space_info(conv_pd_t *self,
             conv_prop_agnostic_src_d(self->desc())->data_type);
 
     self->rtus_.space_per_thread_ = factor * jcp.is * jcp.ic_block;
+
     scratchpad.book(memory_tracking::names::key_conv_rtus_space,
             typesize * max_threads * self->rtus_.space_per_thread_);
 }
@@ -155,8 +156,8 @@ struct rtus_driver_t: public jit_generator_aarch64 {
     reg64_t   reg_tmp         = x24; // r10;
 
 
-    zreg_t reg_zero = ZReg(0);
-    zreg_t reg_v = ZReg(1);
+    zreg_t reg_zero           = ZReg(0);
+    zreg_t reg_v              = ZReg(1);
 
     int iw_, stride_w_;
     int src_step_h_, src_step_icb_, ws_step_icb_, vlen_, vlen_shift_;
@@ -297,7 +298,10 @@ struct rtus_driver_t: public jit_generator_aarch64 {
 
     void generate() {
         assert( isa == sve );
-        ptrue( reg_p_all_ones.b );
+
+        preamble();
+
+        //ptrue( reg_p_all_ones.b );
 
 #if defined(_WIN32)
         assert(reg_src == abi_not_param1 && abi_not_param1 == rdi);
@@ -355,9 +359,9 @@ struct rtus_driver_t: public jit_generator_aarch64 {
 #endif
 
         uni_vzeroupper(); // jit_generator_aarch64 
-        ret();
-        //this->ker_ = reinterpret_cast<decltype(ker_)>(const_cast<uint8_t*>(
-        //            this->getCode32()));
+
+        postamble();
+
         this->ker_ = reinterpret_cast<decltype(ker_)>(this->getCode32());
     }
 };
