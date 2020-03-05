@@ -35,23 +35,16 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     option(XBYAK_TRANSLATE_AARCH64
         "enables translating JIT code from x86_64 to AArch64 architecture."
         ON) # disabled by default on AArch64 CPU
+    option(XBYAK_XED_LIB_ARCH_IS_AARCH64
+        "select architecture of libxed"
+        ON)
 else()
     option(XBYAK_TRANSLATE_AARCH64
         "enables translating JIT code from x86_64 to AArch64 architecture."
         OFF) # disabled by default on x86_64 CPU
-endif()
-
-if(EXISTS "/.dockerenv")
-    option(XBYAK_XED_LIB_ARCH_IS_AARCH64
-        "select architecture of libxed"
-        ON)
-    message(STATUS "detect docker environment")
-else()
     option(XBYAK_XED_LIB_ARCH_IS_AARCH64
         "select architecture of libxed"
         OFF)
-    message(STATUS "NOT detect docker environment")
 endif()
-
 
 message(STATUS "XBYAK_TRANSLATE_AARCH64=${XBYAK_TRANSLATE_AARCH64}")

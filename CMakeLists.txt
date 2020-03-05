@@ -97,6 +97,7 @@ include("cmake/SDL.cmake")
 include("cmake/Doxygen.cmake")
 include("cmake/profiling.cmake")
 include("cmake/version.cmake")
+include("cmake/BLAS.cmake")
 include("cmake/jit_aarch64.cmake")
 include("cmake/translate.cmake")
 
