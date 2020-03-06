@@ -181,7 +181,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     };
 
 
-    auto bcast_load = [=] (int i_reduce, int i_ur){
+    auto bcast_load = [=] (int i_reduce, int i_ur, int prev_ofs){
 
       int ofs;
 
@@ -200,19 +200,45 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
       if( ((ofs&0x3) == 0) && (ofs < LDRWMAX)){
         ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(aux_reg_bcast_data, static_cast<int32_t>(ofs)));
-      }else if( ofs < ADDMAX){
-        add(reg_bcast_data_tmp, aux_reg_bcast_data, ofs);
-        ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(reg_bcast_data_tmp));
-      }else if( ofs < MOVMAX ){
-        mov(reg_bcast_data_tmp, ofs);
-        add(reg_bcast_data_tmp, aux_reg_bcast_data, reg_bcast_data_tmp);
-        ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(reg_bcast_data_tmp));
       }else{
-        mov(reg_bcast_data_tmp, ofs&0xffff);
-        movk(reg_bcast_data_tmp, ofs>>16, 16);
-        add(reg_bcast_data_tmp, aux_reg_bcast_data, reg_bcast_data_tmp);
-        ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(reg_bcast_data_tmp));
+        if((prev_ofs != -1) && ((ofs - prev_ofs)>0) &&((ofs - prev_ofs) < LDRMAX) && (((ofs-prev_ofs)&0x3) == 0)){
+          ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(reg_prev_bcast_addr, static_cast<int32_t>((ofs-prev_ofs))));
+        }else{
+          if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
+            ofs = ofs - prev_ofs;
+            if( ofs < ADDMAX){
+              add(reg_prev_bcast_addr, reg_prev_bcast_addr, ofs);
+            }else if( ofs < MOVMAX ){
+              mov(reg_tmp_ofs, ofs);
+              add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_ofs);
+            }else{
+              mov( reg_tmp_ofs, ofs&0xffff);
+              movk( reg_tmp_ofs, ofs>>16, 16);
+              add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_ofs);
+            }
+
+          }else{
+            if( ofs < ADDMAX){
+              add(reg_prev_bcast_addr, aux_reg_bcast_data, ofs);
+            }else if( ofs < MOVMAX ){
+              mov(reg_tmp_ofs, ofs);
+              add(reg_prev_bcast_addr, aux_reg_bcast_data, reg_tmp_ofs);
+            }else{
+              mov( reg_tmp_ofs, ofs&0xffff);
+              movk( reg_tmp_ofs, ofs>>16, 16);
+              add(reg_prev_bcast_addr, aux_reg_bcast_data, reg_tmp_ofs);
+            }
+          }
+          prev_ofs = (i_reduce == jcp.reduce_loop_unroll)
+                      ? (jcp.bcast_dim + i_ur) * jcp.reduce_loop_unroll
+                      : i_ur * jcp.reduce_loop_unroll + i_reduce;
+          prev_ofs = jcp.typesize_in * prev_ofs;
+
+          ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(reg_prev_bcast_addr));
+        }
       }
+
+      return prev_ofs;
 
     };
 
@@ -394,6 +420,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         assert(jcp.reduce_loop_unroll % jcp.fma_step == 0);
 
         int reduce_step = jcp.fma_step;
+        int prev_bcast_ofs = -1;
 
         for (int i_reduce = 0; i_reduce < jcp.reduce_loop_unroll;
                 i_reduce += reduce_step) { // IC
@@ -432,7 +459,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             }
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
-                bcast_load(i_reduce, i_ur);
+                prev_bcast_ofs = bcast_load(i_reduce, i_ur, prev_bcast_ofs);
 
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
                     fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
