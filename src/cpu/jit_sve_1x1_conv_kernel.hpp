@@ -107,8 +107,6 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
     reg64_t reg_bias_data_tmp       = x23; // Bias
     reg64_t reg_tmp                 = x24; // tmp for add_imm
     reg64_t reg_tmp_ofs             = x24; // tmp_ofs (for load, bcast, output, bias_ofs, generate())
-    reg64_t reg_tmp_rlbs            = x25; // tmp reduce_loop_bcast_step
-    reg64_t reg_tmp_rlls            = x26; // tmp reduce_loop_load_step
 
     /* Workload */
     reg64_t reg_load_loop_work      = x27;

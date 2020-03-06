@@ -425,30 +425,14 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     subs(reduce_loop_iter, reduce_loop_iter, jcp.reduce_loop_unroll);
     b(LE, reduce_loop_tail);
 
-    if(jcp.reduce_loop_bcast_step >= ADDMAX){
-      mov(reg_tmp_rlbs, jcp.reduce_loop_bcast_step & 0xffff);
-      movk(reg_tmp_rlbs, jcp.reduce_loop_bcast_step >> 16, 16);
-    }
-    if(jcp.reduce_loop_load_step >= ADDMAX){
-      mov(reg_tmp_rlls, jcp.reduce_loop_load_step & 0xffff);
-      movk(reg_tmp_rlls, jcp.reduce_loop_load_step >> 16, 16);
-    }
 
     /* Input channel loop */
     L(reduce_loop); { 
         fma_block(false);
 
-        if( jcp.reduce_loop_bcast_step >= ADDMAX ){
-          add(aux_reg_bcast_data, aux_reg_bcast_data, reg_tmp_rlbs);
-        }else{
-          add(aux_reg_bcast_data, aux_reg_bcast_data, jcp.reduce_loop_bcast_step);
-        }
+        add_imm(aux_reg_bcast_data, aux_reg_bcast_data, jcp.reduce_loop_bcast_step);
 
-        if(jcp.reduce_loop_load_step >= ADDMAX ){
-          add(aux_reg_load_data, aux_reg_load_data, reg_tmp_rlls);
-        }else{
-          add(aux_reg_load_data, aux_reg_load_data, jcp.reduce_loop_load_step);
-        }
+        add_imm(aux_reg_load_data, aux_reg_load_data, jcp.reduce_loop_load_step);
         assert(jcp.reduce_loop_unroll < 4096);
         subs(reduce_loop_iter, reduce_loop_iter, jcp.reduce_loop_unroll);
         b(GT, reduce_loop);
@@ -498,39 +482,19 @@ void jit_sve_1x1_conv_kernel::generate()
 
         /* Calculate weight address for next bcast_loop */
         // Added #of load_loops * #of steps in each load_loops
-        if((load_loop_blk * jcp.load_loop_load_step) >= ADDMAX){
-          mov(reg_tmp_ofs, (load_loop_blk * jcp.load_loop_load_step) & 0xffff);
-          movk(reg_tmp_ofs, (load_loop_blk * jcp.load_loop_load_step) >> 16, 16);
-        }else{
-          mov(reg_tmp_ofs, (load_loop_blk * jcp.load_loop_load_step));
-        }
-        add(reg_load_data, reg_load_data, reg_tmp_ofs);
+        add_imm(reg_load_data, reg_load_data, load_loop_blk * jcp.load_loop_load_step);
 
         switch (jcp.prop_kind) {
           case forward_training:
           case forward_inference:
 
-              if((load_loop_blk * jcp.load_block * jcp.typesize_out) >= ADDMAX){
-                mov(reg_tmp_ofs, (load_loop_blk * jcp.load_block * jcp.typesize_out) & 0xffff);
-                movk(reg_tmp_ofs,  (load_loop_blk * jcp.load_block * jcp.typesize_out) >> 16, 16);
-              }else{
-                mov(reg_tmp_ofs, (load_loop_blk * jcp.load_block * jcp.typesize_out));
-              }
-              add(reg_bias_data, reg_bias_data,reg_tmp_ofs);
+              add_imm(reg_bias_data, reg_bias_data, load_loop_blk * jcp.load_block * jcp.typesize_out);
 
-              if((load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out) >= ADDMAX){
-                mov(reg_tmp_ofs, (load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out) & 0xffff);
-                movk(reg_tmp_ofs,  (load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out) >> 16, 16);
-              }else{
-                mov(reg_tmp_ofs, (load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out));
-              }
-              add(reg_output_data, reg_output_data, reg_tmp_ofs);
+              add_imm(reg_output_data, reg_output_data, load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out);
               break;
           case backward_data:
-              assert((load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out) < ADDMAX);
-              add(reg_output_data, reg_output_data,
-                  load_loop_blk * jcp.bcast_dim * jcp.load_block *
-                      jcp.typesize_out);
+              add_imm(reg_output_data, reg_output_data, 
+                        load_loop_blk * jcp.bcast_dim * jcp.load_block * jcp.typesize_out);
               break;
           case backward_weights:
               for (int i_load = 0; i_load < load_loop_blk; i_load++){
