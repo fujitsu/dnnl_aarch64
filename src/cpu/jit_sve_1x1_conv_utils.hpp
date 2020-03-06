@@ -199,7 +199,7 @@ struct rtus_driver_t: public jit_generator_aarch64 {
         , src_step_icb_(src_step_icb), ws_step_icb_(ws_step_icb)
         , src_to_ws_(src_to_ws), typesize_(typesize)
     {
-/*
+#if 0
         auto Vreg = [=](int idx, int typesize) {
             ZReg res;
             switch (isa) {
@@ -219,7 +219,7 @@ struct rtus_driver_t: public jit_generator_aarch64 {
 
         reg_zero = Vreg(0, typesize);
         reg_v = Vreg(1, typesize);
-*/
+#endif
         vlen_ = reg_v.getBit() / 8;
         vlen_shift_ = 0;
 
@@ -301,8 +301,6 @@ struct rtus_driver_t: public jit_generator_aarch64 {
 
         preamble();
 
-        //ptrue( reg_p_all_ones.b );
-
 #if defined(_WIN32)
         assert(reg_src == abi_not_param1 && abi_not_param1 == rdi);
         push(rdi);
@@ -316,7 +314,6 @@ struct rtus_driver_t: public jit_generator_aarch64 {
         READ_PARAM(os);
         READ_PARAM(iw_start);
 
-        //assert(reg_ws == param1);
         READ_PARAM(ws); /* reg_ws should always be read the last */
 #undef  READ_PARAM
 

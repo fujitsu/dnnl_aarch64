@@ -429,10 +429,19 @@ status_t cpu_engine_t::submit(primitive_t *p, event_t *e,
         event_vector &prerequisites) {
     /* FIXME: this should live in primitive execute function... */
     if (mkldnn_verbose()->level) {
+        int num_loops = 1;
+        char *param;
+        
+        param = getenv("NUM_EXE_LOOPS");
+        if(param != NULL){
+            num_loops = atoi(param) > 0 ? atoi(param) : 1;
+        }
         double ms = get_msec();
-        p->execute(e);
-        ms = get_msec() - ms;
-        printf("mkldnn_verbose,exec,%s,%g\n", p->pd()->info(), ms);
+        for(int i = 0; i < num_loops; i++){
+            p->execute(e);
+        }
+        ms = (get_msec() - ms) / num_loops;
+        printf("mkldnn_verbose,exec,%s,%g, <- ave. of %d times\n", p->pd()->info(), ms, num_loops);
         fflush(0);
     } else {
         p->execute(e);
