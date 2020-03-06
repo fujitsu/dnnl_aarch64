@@ -356,16 +356,13 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
                     if( ofs < ADDMAX){
                         add(reg_prev_bcast_addr, reg_prev_bcast_addr, ofs);
-                        ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
                     }else if( ofs < MOVMAX ){
                         mov(reg_tmp_addr, ofs);
                         add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_addr);
-                        ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
                     }else{
                         mov(reg_tmp_addr, ofs&0xffff);
                         movk(reg_tmp_addr, ofs>>16, 16);
                         add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_addr);
-                        ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
                     }
 
                 }else{
@@ -373,19 +370,17 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
                     if( ofs < ADDMAX){
                         add(reg_prev_bcast_addr, aux_reg_inp, ofs);
-                        ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
                     }else if( ofs < MOVMAX ){
                         mov(reg_tmp_addr, ofs);
                         add(reg_prev_bcast_addr, aux_reg_inp, reg_tmp_addr);
-                        ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
                     }else{
                         mov(reg_tmp_addr, ofs&0xffff);
                         movk(reg_tmp_addr, ofs>>16, 16);
                         add(reg_prev_bcast_addr, aux_reg_inp, reg_tmp_addr);
-                        ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
                     }
                 }
 
+                ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
 
                 prev_ofs = aux_input_offset;
             }

@@ -241,51 +241,99 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       }
     };
 
-    auto out_load = [=](int i_load, int i_ur){
+    auto out_load = [=](int i_load, int i_ur, int prev_ofs){
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
                  backward_data)){
         int ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
+
         if((ofs>>6) < LDRMAX){
           ldr(vreg_sum(), ptr(aux_reg_output_data, static_cast<int32_t>(ofs>>6)));
-        }else if( ofs < ADDMAX){
-          add(reg_output_data_tmp, aux_reg_output_data, ofs);
-          ldr(vreg_sum(), ptr(reg_output_data_tmp));
-        }else if( ofs < MOVMAX){
-          mov( reg_tmp_ofs, ofs);
-          add(reg_output_data_tmp, aux_reg_output_data, reg_tmp_ofs);
-          ldr(vreg_sum(), ptr(reg_output_data_tmp));
         }else{
-          mov( reg_tmp_ofs, ofs & 0xffff);
-          movk( reg_tmp_ofs, ofs >> 16, 16);
-          add(reg_output_data_tmp, aux_reg_output_data, reg_tmp_ofs);
-          ldr(vreg_sum(), ptr(reg_output_data_tmp));
+          if((prev_ofs != -1) && ((ofs - prev_ofs)>0) &&(((ofs - prev_ofs)>>6) < LDRMAX)){
+            ldr(vreg_sum(), ptr(reg_prev_out_addr, static_cast<int32_t>((ofs - prev_ofs)>>6)));
+          }else{
+            if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
+              ofs = ofs - prev_ofs;
+              if( ofs < ADDMAX){
+                add(reg_prev_out_addr, reg_prev_out_addr, ofs);
+              }else if( ofs < MOVMAX){
+                mov( reg_tmp_ofs, ofs);
+                add( reg_prev_out_addr, reg_prev_out_addr, reg_tmp_ofs);
+              }else{
+                mov( reg_tmp_ofs, ofs & 0xffff);
+                movk( reg_tmp_ofs, ofs >> 16, 16);
+                add( reg_prev_out_addr, reg_prev_out_addr, reg_tmp_ofs);
+              }
+            }else{
+              if( ofs < ADDMAX){
+                add(reg_prev_out_addr, aux_reg_output_data, ofs);
+              }else if( ofs < MOVMAX){
+                mov( reg_tmp_ofs, ofs);
+                add( reg_prev_out_addr, aux_reg_output_data, reg_tmp_ofs);
+              }else{
+                mov( reg_tmp_ofs, ofs & 0xffff);
+                movk( reg_tmp_ofs, ofs >> 16, 16);
+                add( reg_prev_out_addr, aux_reg_output_data, reg_tmp_ofs);
+              }
+            }
+
+            ldr(vreg_sum(), ptr(reg_prev_out_addr));
+
+            prev_ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
+          }
         }
-        
+       
+        return prev_ofs;
+
       }else
         assert(NULL); // TODO
 
     };
 
-    auto out_str = [=](int i_load, int i_ur){
+    auto out_str = [=](int i_load, int i_ur, int prev_ofs){
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
                  backward_data)){
         int ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
+
         if((ofs>>6) < LDRMAX){
           str(vreg_accum(i_load, i_ur), ptr(aux_reg_output_data, static_cast<int32_t>(ofs>>6)));
-        }else if( ofs < ADDMAX){
-          add(reg_output_data_tmp, aux_reg_output_data, ofs);
-          str(vreg_accum(i_load, i_ur), ptr(reg_output_data_tmp));
-        }else if( ofs < MOVMAX){
-          mov( reg_tmp_ofs, ofs);
-          add(reg_output_data_tmp, aux_reg_output_data, reg_tmp_ofs);
-          str(vreg_accum(i_load, i_ur), ptr(reg_output_data_tmp));
         }else{
-          mov( reg_tmp_ofs, ofs & 0xffff);
-          movk( reg_tmp_ofs, ofs >> 16, 16);
-          add(reg_output_data_tmp, aux_reg_output_data, reg_tmp_ofs);
-          str(vreg_accum(i_load, i_ur), ptr(reg_output_data_tmp));
+          if((prev_ofs != -1) && ((ofs - prev_ofs)>0) &&(((ofs - prev_ofs)>>6) < LDRMAX)){
+            str(vreg_accum(i_load, i_ur), ptr(reg_prev_out_addr, static_cast<int32_t>((ofs-prev_ofs)>>6)));
+          }else{
+            if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
+              ofs = ofs - prev_ofs;
+              if( ofs < ADDMAX){
+                add( reg_prev_out_addr, reg_prev_out_addr, ofs);
+              }else if( ofs < MOVMAX){
+                mov( reg_tmp_ofs, ofs);
+                add( reg_prev_out_addr, reg_prev_out_addr, reg_tmp_ofs);
+              }else{
+                mov( reg_tmp_ofs, ofs & 0xffff);
+                movk( reg_tmp_ofs, ofs >> 16, 16);
+                add( reg_prev_out_addr, reg_prev_out_addr, reg_tmp_ofs);
+              }
+
+            }else{
+              if( ofs < ADDMAX){
+                add( reg_prev_out_addr, aux_reg_output_data, ofs);
+              }else if( ofs < MOVMAX){
+                mov( reg_tmp_ofs, ofs);
+                add( reg_prev_out_addr, aux_reg_output_data, reg_tmp_ofs);
+              }else{
+                mov( reg_tmp_ofs, ofs & 0xffff);
+                movk( reg_tmp_ofs, ofs >> 16, 16);
+                add( reg_prev_out_addr, aux_reg_output_data, reg_tmp_ofs);
+              }
+            }
+            str(vreg_accum(i_load, i_ur), ptr(reg_prev_out_addr));
+            prev_ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
+          }
+
         }
-        
+
+        return prev_ofs;
+
       }else
         assert(NULL); // TODO
 
@@ -299,10 +347,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             b(NE, store_noadd);
         }
 
+        int prev_ofs = -1;
         for (int i_ur = 0; i_ur < ur; ++i_ur)
             for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
                 auto r = vreg_accum_s(i_load, i_ur);
-                out_load(i_load, i_ur);       
+                prev_ofs = out_load(i_load, i_ur, prev_ofs);       
                 fadd(r, r, vreg_sum_s());
             }
 
@@ -321,9 +370,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         }
 
         auto store_output = [=](bool output_is_aligned) {
+        
+            int prev_ofs = -1;
             for (int i_ur = 0; i_ur < ur; ++i_ur)
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load){
-                    out_str(i_load, i_ur);
+                    prev_ofs = out_str(i_load, i_ur, prev_ofs);
                 }
         };
 
