@@ -241,25 +241,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       }
     };
 
-
-
-    auto output_ofs = [=](int i_load, int i_ur){
-      if (one_of(jcp.prop_kind, forward_training, forward_inference,
-                 backward_data)){
-        int ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out; // load_block -> reduce_block?
-        if( ofs >= ADDMAX){
-          mov( reg_tmp_ofs, ofs & 0xffff);
-          movk( reg_tmp_ofs, ofs >> 16, 16);
-        }else{
-          mov( reg_tmp_ofs, ofs);
-        }
-        return reg_tmp_ofs;
-       
-      }else
-        assert(NULL); // TODO
-
-    };
-
     auto out_load = [=](int i_load, int i_ur){
       if (one_of(jcp.prop_kind, forward_training, forward_inference,
                  backward_data)){
@@ -418,7 +399,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
     mov(aux_reg_bcast_data, aux1_reg_bcast_data);
     init();
-    ptrue( reg_p_all_ones.b );
 
     mov(reduce_loop_iter, reg_reduce_loop_work);
     assert(jcp.reduce_loop_unroll < 4096);
@@ -448,6 +428,7 @@ void jit_sve_1x1_conv_kernel::generate()
 {
     preamble();
 
+    ptrue( reg_p_all_ones.b );
     /* Pointers indicate weight, input, and output data */
     ldr(reg_bcast_data,   ptr(param1, GET_OFF(bcast_data)));    // Input
     ldr(reg_load_data,    ptr(param1, GET_OFF(load_data)));     // Weight
