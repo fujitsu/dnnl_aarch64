@@ -342,7 +342,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
             ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
                     ptr(aux_reg_inp, static_cast<int32_t>(aux_input_offset)));
         }else{
-            if( (prev_ofs != -1) &&
+            if( (prev_ofs != -1) && 
+                ((aux_input_offset - prev_ofs)>0) &&
                 ((aux_input_offset - prev_ofs) < LDRMAX) && 
                 (((aux_input_offset - prev_ofs)& 0x3) ==0)){
                 
