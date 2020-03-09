@@ -319,7 +319,8 @@ public:
 #endif
 
     void uni_vzeroupper() {
-        assert(NULL);
+        if (mayiuse(avx) && !mayiuse(avx512_mic))
+          assert(NULL);
     }
 
     void postamble() {
@@ -327,7 +328,7 @@ public:
 
         if (vreg_to_preserve) {
             ld4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve*4));
-	  ld4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
+	          ld4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
         }
 
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {

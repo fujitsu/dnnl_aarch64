@@ -336,24 +336,57 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
         return ZRegS(31);
     };
 
-    auto bcast_load = [=](int jj, int nb_oc_block, int aux_input_offset){
+    auto bcast_load = [&](int jj, int nb_oc_block, int aux_input_offset, int prev_ofs, int jj_end){
         if( ((aux_input_offset & 0x3) ==0) && 
                 (aux_input_offset < LDRWMAX)){
             ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
                     ptr(aux_reg_inp, static_cast<int32_t>(aux_input_offset)));
-        }else if( aux_input_offset < ADDMAX){
-            add(reg_tmp_addr, aux_reg_inp, aux_input_offset);
-            ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_tmp_addr));
-        }else if( aux_input_offset < MOVMAX ){
-            mov(reg_tmp_addr, aux_input_offset);
-            add(reg_tmp_addr, aux_reg_inp, reg_tmp_addr);
-            ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_tmp_addr));
         }else{
-            mov(reg_tmp_addr, aux_input_offset&0xffff);
-            movk(reg_tmp_addr, aux_input_offset>>16, 16);
-            add(reg_tmp_addr, aux_reg_inp, reg_tmp_addr);
-            ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_tmp_addr));
+            if( (prev_ofs != -1) &&
+                ((aux_input_offset - prev_ofs) < LDRMAX) && 
+                (((aux_input_offset - prev_ofs)& 0x3) ==0)){
+                
+                ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
+                        ptr(reg_prev_bcast_addr, static_cast<int32_t>(aux_input_offset - prev_ofs)));
+
+            }else{
+                int ofs;
+                if((prev_ofs != -1) && ((aux_input_offset - prev_ofs)>0)){
+                    ofs = aux_input_offset - prev_ofs;
+
+                    if( ofs < ADDMAX){
+                        add(reg_prev_bcast_addr, reg_prev_bcast_addr, ofs);
+                    }else if( ofs < MOVMAX ){
+                        mov(reg_tmp_addr, ofs);
+                        add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_addr);
+                    }else{
+                        mov(reg_tmp_addr, ofs&0xffff);
+                        movk(reg_tmp_addr, ofs>>16, 16);
+                        add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_addr);
+                    }
+
+                }else{
+                    ofs = aux_input_offset;
+
+                    if( ofs < ADDMAX){
+                        add(reg_prev_bcast_addr, aux_reg_inp, ofs);
+                    }else if( ofs < MOVMAX ){
+                        mov(reg_tmp_addr, ofs);
+                        add(reg_prev_bcast_addr, aux_reg_inp, reg_tmp_addr);
+                    }else{
+                        mov(reg_tmp_addr, ofs&0xffff);
+                        movk(reg_tmp_addr, ofs>>16, 16);
+                        add(reg_prev_bcast_addr, aux_reg_inp, reg_tmp_addr);
+                    }
+                }
+
+                ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
+
+                prev_ofs = aux_input_offset;
+            }
         }
+
+        return prev_ofs;
 
     };
 
@@ -382,14 +415,15 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
     L(kh_label);
     {
         for (int ki = 0; ki < kw; ki++) {
+            int prev_ofs = -1;
+
             int jj_start = get_ow_start(ki, pad_l);
             int jj_end = get_ow_end(ur_w, ki, pad_r);
             for (int ic = 0; ic < ic_block; ic++) {
                 if (jcp.kernel_kind == expl_bcast) {
                     for (int jj = jj_start; jj < jj_end; jj++) {
                         size_t aux_input_offset = input_offset(jj, ic, ki);
-
-                        bcast_load(jj, nb_oc_block, aux_input_offset);
+                        prev_ofs = bcast_load(jj, nb_oc_block, aux_input_offset, prev_ofs, jj_end);
                     }
                 }
                 for (int ii = 0; ii < nb_oc_block; ii++) {

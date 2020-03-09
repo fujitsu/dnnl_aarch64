@@ -27,7 +27,7 @@
 #include "cpu_reducer.hpp"
 
 #include "jit_sve_1x1_conv_kernel.hpp"
-#include "jit_uni_1x1_conv_utils.hpp"
+#include "jit_sve_1x1_conv_utils.hpp"
 #include "jit_transpose_src_utils.hpp"
 
 namespace mkldnn {
