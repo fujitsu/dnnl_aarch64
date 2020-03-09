@@ -319,12 +319,14 @@ public:
 #endif
 
     void uni_vzeroupper() {
-        if (mayiuse(avx) && !mayiuse(avx512_mic))
+        if (mayiuse(avx) && !mayiuse(avx512_mic) && !mayiuse(sve)){
           assert(NULL);
+
+        }
     }
 
     void postamble() {
-      add(x29, sp, xreg_len * 2);
+        add(x29, sp, xreg_len * 2);
 
         if (vreg_to_preserve) {
             ld4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve*4));
@@ -334,9 +336,9 @@ public:
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
             ldp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i]),
                     Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x29, xreg_len*2));
-	}
+        }
 
-	ldp(x29, x30, post_ptr(sp, static_cast<int64_t>(preserved_stack_size)));
+        ldp(x29, x30, post_ptr(sp, static_cast<int64_t>(preserved_stack_size)));
         ret();
     }
 #else
