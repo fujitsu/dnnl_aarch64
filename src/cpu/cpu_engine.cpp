@@ -26,15 +26,26 @@
 
 #include "cpu/rnn/ref_rnn.hpp"
 
-#include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
+#ifdef __ARM_ARCH
+
+#include "cpu/jit_sve_1x1_convolution.hpp"
+#include "cpu/jit_sve_convolution.hpp"
+
+#else
+
+#include "cpu/jit_avx2_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_1x1_convolution.hpp"
+#include "cpu/jit_avx512_core_bf16_1x1_convolution.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
+
+#endif // #ifndef __ARM_ARCH
+
 #include "cpu/jit_avx512_core_fp32_wino_conv_4x3.hpp"
 #include "cpu/jit_avx512_common_convolution_winograd.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_convolution.hpp"
 #include "cpu/jit_avx512_core_bf16_convolution.hpp"
-#include "cpu/jit_avx512_core_bf16_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_convolution.hpp"
-#include "cpu/jit_avx2_1x1_convolution.hpp"
 #include "cpu/jit_sse42_1x1_convolution.hpp"
 #include "cpu/jit_avx2_convolution.hpp"
 #include "cpu/jit_sse42_convolution.hpp"
@@ -42,14 +53,9 @@
 #include "cpu/gemm_bf16_convolution.hpp"
 #include "cpu/gemm_x8s8s32x_convolution.hpp"
 
-//#ifdef __ARM_ARCH
-#include "cpu/jit_sve_1x1_convolution.hpp"
-#include "cpu/jit_sve_convolution.hpp"
-//#endif // #ifndef __ARM_ARCH
 
 #include "cpu/ref_convolution.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_deconvolution.hpp"
-#include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
 #include "cpu/ref_deconvolution.hpp"
 #include "cpu/ref_shuffle.hpp"
 #include "cpu/jit_uni_eltwise.hpp"
@@ -424,10 +430,19 @@ status_t cpu_engine_t::submit(primitive_t *p, event_t *e,
         event_vector &prerequisites) {
     /* FIXME: this should live in primitive execute function... */
     if (mkldnn_verbose()->level) {
+        int num_loops = 1;
+        char *param;
+        
+        param = getenv("NUM_EXE_LOOPS");
+        if(param != NULL){
+            num_loops = atoi(param) > 0 ? atoi(param) : 1;
+        }
         double ms = get_msec();
-        p->execute(e);
-        ms = get_msec() - ms;
-        printf("mkldnn_verbose,exec,%s,%g\n", p->pd()->info(), ms);
+        for(int i = 0; i < num_loops; i++){
+            p->execute(e);
+        }
+        ms = (get_msec() - ms) / num_loops;
+        printf("mkldnn_verbose,exec,%s,%g, <- ave. of %d times\n", p->pd()->info(), ms, num_loops);
         fflush(0);
     } else {
         p->execute(e);

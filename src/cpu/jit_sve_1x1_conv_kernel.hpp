@@ -27,6 +27,12 @@
 using namespace Xbyak::Xbyak_aarch64;
 using namespace mkldnn::impl::types;
 
+#define PRFWMAX   32
+#define LDRMAX   256
+#define LDRWMAX  253
+#define ADDMAX  4096
+#define MOVMAX 65536
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -73,6 +79,7 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
 
   private:
     using reg64_t = const Xbyak::Xbyak_aarch64::XReg;
+    const Xbyak::Xbyak_aarch64::PReg reg_p_all_ones  = p1;
 
     /* Flag */
     reg64_t reg_reduce_pos_flag     = x8; 
@@ -95,12 +102,11 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
     reg64_t reg_bias_data           = x19; // bias
 
     reg64_t reg_load_data_tmp       = x20; // Weight
-    reg64_t reg_bcast_data_tmp      = x21; // Input
-    reg64_t reg_output_data_tmp     = x22; // Output
-    reg64_t reg_bias_data_tmp       = x23; // Bias
-    reg64_t reg_tmp_ofs             = x24; // tmp_ofs (for load, bcast, output, bias_ofs, generate())
-    reg64_t reg_tmp_rlbs            = x25; // tmp reduce_loop_bcast_step
-    reg64_t reg_tmp_rlls            = x26; // tmp reduce_loop_load_step
+    reg64_t reg_prev_bcast_addr     = x21; // Input
+    reg64_t reg_bias_data_tmp       = x22; // Bias
+    reg64_t reg_tmp                 = x23; // tmp for add_imm
+    reg64_t reg_tmp_ofs             = x23; // tmp_ofs (for load, bcast, output, bias_ofs, generate())
+    reg64_t reg_prev_out_addr       = x24; // this reg keeps addr accessed by previous ldr or str inst
 
     /* Workload */
     reg64_t reg_load_loop_work      = x27;
@@ -109,7 +115,34 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
 
     reg64_t imm_addr64              = aux_reg_load_data;
 
-    const Xbyak::Xbyak_aarch64::PReg reg_p_all_ones  = p1;
+    void add_imm(reg64_t out, reg64_t in, int value){
+      if( value >= 0){   
+        if(value < ADDMAX){
+            add(out, in, value);
+        }else if(value < MOVMAX){
+            mov(reg_tmp, value);
+            add(out, in, reg_tmp);
+        }else{
+            mov(reg_tmp, value&0xffff);
+            movk(reg_tmp, value>>16, 16);
+            add(out, in, reg_tmp);
+        }
+      }else{
+        int val = -1 * value;
+        if(val < ADDMAX){
+            sub(out, in, val);
+        }else if(val < MOVMAX){
+            mov(reg_tmp, val);
+            sub(out, in, reg_tmp);
+        }else{
+            mov(reg_tmp, val&0xffff);
+            movk(reg_tmp, val>>16, 16);
+            sub(out, in, reg_tmp);
+        }
+
+      }
+    }
+
 
 #if 0
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
