@@ -61,7 +61,7 @@
 #include "cpu/jit_uni_eltwise.hpp"
 #include "cpu/ref_eltwise.hpp"
 #include "cpu/ref_softmax.hpp"
-//#include "cpu/jit_uni_pooling.hpp"
+#include "cpu/jit_uni_pooling.hpp"
 #include "cpu/jit_uni_i8i8_pooling.hpp"
 #include "cpu/ref_pooling.hpp"
 #include "cpu/nchw_pooling.hpp"
@@ -296,16 +296,18 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_softmax_fwd_t<f32>),
     INSTANCE(ref_softmax_bwd_t<f32>),
     /* pool */
-/*
+    /*
     INSTANCE(jit_uni_pooling_fwd_t<avx512_common, bf16>),
     INSTANCE(jit_uni_pooling_bwd_t<avx512_common, bf16>),
+    */
     INSTANCE(jit_uni_pooling_fwd_t<avx512_common, f32>),
+    /*
     INSTANCE(jit_uni_pooling_bwd_t<avx512_common, f32>),
     INSTANCE(jit_uni_pooling_fwd_t<avx, f32>),
     INSTANCE(jit_uni_pooling_bwd_t<avx, f32>),
     INSTANCE(jit_uni_pooling_fwd_t<sse42, f32>),
     INSTANCE(jit_uni_pooling_bwd_t<sse42, f32>),
-*/
+    */
     INSTANCE(nchw_pooling_fwd_t<bf16>),
     INSTANCE(nchw_pooling_bwd_t<bf16>),
     INSTANCE(nchw_pooling_fwd_t<f32>),
@@ -322,8 +324,10 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_pooling_bwd_t<bf16>),
 
     /* pool (int) */
+    /*
     INSTANCE(jit_uni_i8i8_pooling_fwd_t<avx512_core>),
     INSTANCE(jit_uni_i8i8_pooling_fwd_t<avx2>),
+    */
     INSTANCE(ref_pooling_fwd_t<s32>),
     INSTANCE(ref_pooling_fwd_t<s16, s32>),
     INSTANCE(ref_pooling_fwd_t<s8, s32>),

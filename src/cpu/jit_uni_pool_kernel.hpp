@@ -92,10 +92,11 @@ private:
             return Vmm(4);
     }
 
+    using reg64_t = const Xbyak::Reg64;
     Zmm bf16_emu_reserv_1 = Zmm(5);
     Zmm bf16_emu_reserv_2 = Zmm(6);
     Zmm bf16_emu_reserv_3 = Zmm(7);
-    Reg64 bf16_emu_reserv_4 = r11;
+    reg64_t bf16_emu_reserv_4 = r11;
     Zmm bf16_emu_reserv_5 = Zmm(8);
 
     Opmask k_index_mask = Opmask(6);
@@ -111,7 +112,6 @@ private:
     // While this is only required by the backward pass, the quirk above
     // is applied to the forward pass as well to keep things simpler.
 
-    using reg64_t = const Xbyak::Reg64;
     reg64_t reg_param      = rdi; // Always mimic the Unix ABI
     reg64_t reg_input      = r8;
     reg64_t aux_reg_input  = r9;
