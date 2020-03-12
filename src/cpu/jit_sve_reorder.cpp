@@ -462,8 +462,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         for (int off = 0; off < len;) {
 			int ur;
             const int unroll = nstl::min(32,
-                    (len - off)
-                            / simd_w); // Max # of unroll data is decided by #
+                    (len - off) / simd_w); // Max # of unroll data is decided by #
                                        // of SVE registers and their width.
 
 			// Intelのコードは、unaligmentアドレスも受け付ける命令を使っていることに注意
@@ -480,17 +479,22 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 				ur += 4;
 			}
 
+	    if(rsvdOffsetIn != ((off+ur) * itype_sz)) {
+	      add_imm(reg_tmpIn, reg_ptr_in, (off+ur) * itype_sz, reg_tmp, reg_tmp1);
+	      rsvdOffsetIn = (off+ur) * itype_sz;
+	    }
+
 			// Residual
 			if (unroll - ur >= 3) {
-				ld3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpIn, ur));
+				ld3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpIn));
 				ur += 3;
 			}
 			else if (unroll - ur >= 2) {
-				ld2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpIn, ur));
+				ld2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpIn));
 				ur += 2;
 			}
 			else if (unroll - ur >= 1) {
-				ld1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpIn, ur));
+				ld1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpIn));
 				ur += 1;
 			}
 
@@ -516,18 +520,22 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 			  st4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
 			  ur += 4;
 			}
-			
+		  if(rsvdOffsetOut != ((off+ur) * otype_sz)) {
+			  add_imm(reg_tmpOut, reg_ptr_out, (off+ur) * otype_sz, reg_tmp, reg_tmp1);
+			  rsvdOffsetOut = (off+ur) * otype_sz;
+			}
+		
 			// Residual
 			if (unroll - ur >= 3) {
-			  st3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
+			  st3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpOut));
 			  ur += 3;
 			}
 			else if (unroll - ur >= 2) {
-			  st2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
+			  st2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpOut));
 			  ur += 2;
 			}
 			else if (unroll - ur >= 1) {
-			  st1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
+			  st1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpOut));
 			  ur += 1;
 			}
 			
@@ -1237,8 +1245,8 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         if (n_jit_loops > 0)
             loop_begin(l_loop[0], reg_cnt[0], n(nfu + 0) / ldu);
 
-        const bool optimized = false || process_direct_copy_sve(d.len_unroll)
-                || process_direct_copy_simd(d.len_unroll);
+        const bool optimized = false || process_direct_copy_sve(d.len_unroll);
+                //|| process_direct_copy_simd(d.len_unroll);
                 // || process_unroll_tr8x8(d.len_unroll); // under construction
         if (!optimized)
             process_unroll_generic(d.len_unroll);
