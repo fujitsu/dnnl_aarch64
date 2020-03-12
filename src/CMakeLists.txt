@@ -155,14 +155,16 @@ if(XBYAK_TRANSLATE_AARCH64)
     if(XBYAK_XED_LIB_ARCH_IS_AARCH64)
         find_library(XED
             NAMES "xed"
-            HINTS ../third_party/build_xed_aarch64/kits/xed/lib)
+            PATHS ../third_party/build_xed_aarch64/kits/xed/lib /usr/local/lib /usr/lib /usr/local/lib64 /usr/lib64 /usr/lib/aarch64-linux-gnu
+            ENV LD_LIBRARY_PATH)
         include_directories(
             ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_aarch64/kits/xed/include
             )
     else()
         find_library(XED
             NAMES "xed"
-            HINTS ../third_party/build_xed_x86_64/kits/xed/lib)
+            PATHS ../third_party/build_xed_x86_64/kits/xed/lib /usr/local/lib /usr/lib /usr/local/lib64 /usr/lib64 /usr/lib/x86_64-linux-gnu
+            ENV LD_LIBRARY_PATH)
         include_directories(
             ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_x86_64/kits/xed/include
             )
