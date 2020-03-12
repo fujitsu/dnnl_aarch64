@@ -442,7 +442,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         using namespace data_type;
 
         const int simd_w = cpu_isa_traits<sve>::vlen / itype_sz;
-		bool isSameType = prb_.itype == prb_.otype ? true : false;
+        bool isSameType = prb_.itype == prb_.otype ? true : false;
 		//		bool isInput32bits = (prb_.itype == s32 || prb_.itype == f32) ? true : false;
 		//		bool isOutput32bits = (prb_.otype == s32 || prb_.otype == f32) ? true : false;
 		//		bool isInOut32bits = isInput32bits && isOutput32bits;
@@ -457,10 +457,10 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         if (!can_do)
             return false;
 
-		ptrue(reg_p_all_one.b); // Set all bits to 1.
+        ptrue(reg_p_all_one.b); // Set all bits to 1.
 
         for (int off = 0; off < len;) {
-			int ur;
+            int ur;
             const int unroll = nstl::min(32,
                     (len - off) / simd_w); // Max # of unroll data is decided by #
                                        // of SVE registers and their width.
@@ -469,78 +469,77 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 			// SVEの(Scalar + Imm)アドレッシングのImmはVL * (-8) ～ VL *
 			// 7の範囲
 
-	    if(rsvdOffsetIn != off * itype_sz) {
-	      add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp, reg_tmp1);
-	      rsvdOffsetIn = off * itype_sz;
-	    }
-			ur = 0;
-			while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
-				ld4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpIn, ur));
-				ur += 4;
-			}
+            if(rsvdOffsetIn != off * itype_sz) {
+                add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp, reg_tmp1);
+                rsvdOffsetIn = off * itype_sz;
+            }
+            ur = 0;
+            while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
+                ld4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpIn, ur));
+                ur += 4;
+            }
 
-	    if(rsvdOffsetIn != ((off+ur) * itype_sz)) {
-	      add_imm(reg_tmpIn, reg_ptr_in, (off+ur) * itype_sz, reg_tmp, reg_tmp1);
-	      rsvdOffsetIn = (off+ur) * itype_sz;
-	    }
+            if(rsvdOffsetIn != ((off+ur) * itype_sz)) {
+                add_imm(reg_tmpIn, reg_ptr_in, (off+ur) * itype_sz, reg_tmp, reg_tmp1);
+                rsvdOffsetIn = (off+ur) * itype_sz;
+            }
 
-			// Residual
-			if (unroll - ur >= 3) {
-				ld3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpIn));
-				ur += 3;
-			}
-			else if (unroll - ur >= 2) {
-				ld2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpIn));
-				ur += 2;
-			}
-			else if (unroll - ur >= 1) {
-				ld1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpIn));
-				ur += 1;
-			}
+            // Residual
+            if (unroll - ur >= 3) {
+                ld3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpIn));
+                ur += 3;
+            }
+            else if (unroll - ur >= 2) {
+                ld2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpIn));
+                ur += 2;
+            }
+            else if (unroll - ur >= 1) {
+                ld1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpIn));
+                ur += 1;
+            }
 
-			if (prb_.itype != prb_.otype) {
-			  for (int ur = 0; ur < unroll; ++ur) {
-			    ZRegS zs(ur);
-			    
-			    if (prb_.itype == s32 && prb_.otype == f32)
-			      fcvtzs(zs, reg_p_all_one.s, zs);
-			    else if (prb_.itype == f32 && prb_.otype == s32)
-			      scvtf(zs, reg_p_all_one.s, zs);
-			    else
-			      assert(!"unreachable");
-			  }
-			}
+            if (prb_.itype != prb_.otype) {
+                for (int ur = 0; ur < unroll; ++ur) {
+                    ZRegS zs(ur);
+                    
+                    if (prb_.itype == s32 && prb_.otype == f32)
+                        fcvtzs(zs, reg_p_all_one.s, zs);
+                    else if (prb_.itype == f32 && prb_.otype == s32)
+                        scvtf(zs, reg_p_all_one.s, zs);
+                    else
+                        assert(!"unreachable");
+                }
+            }
 
-			if(rsvdOffsetOut != off * otype_sz) {
-			  add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp, reg_tmp1);
-			  rsvdOffsetOut = off * otype_sz;
-			}
-			ur = 0;
-			while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
-			  st4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
-			  ur += 4;
-			}
-		  if(rsvdOffsetOut != ((off+ur) * otype_sz)) {
-			  add_imm(reg_tmpOut, reg_ptr_out, (off+ur) * otype_sz, reg_tmp, reg_tmp1);
-			  rsvdOffsetOut = (off+ur) * otype_sz;
-			}
+            if(rsvdOffsetOut != off * otype_sz) {
+                add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp, reg_tmp1);
+                rsvdOffsetOut = off * otype_sz;
+            }
+            ur = 0;
+            while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
+                st4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
+                ur += 4;
+            }
+            if(rsvdOffsetOut != ((off+ur) * otype_sz)) {
+                add_imm(reg_tmpOut, reg_ptr_out, (off+ur) * otype_sz, reg_tmp, reg_tmp1);
+                rsvdOffsetOut = (off+ur) * otype_sz;
+            }
 		
-			// Residual
-			if (unroll - ur >= 3) {
-			  st3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpOut));
-			  ur += 3;
-			}
-			else if (unroll - ur >= 2) {
-			  st2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpOut));
-			  ur += 2;
-			}
-			else if (unroll - ur >= 1) {
-			  st1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpOut));
-			  ur += 1;
-			}
+            // Residual
+            if (unroll - ur >= 3) {
+                st3w((ZReg(ur), ZReg(ur + 2)).s, reg_p_all_one.s, ptr(reg_tmpOut));
+                ur += 3;
+            }
+            else if (unroll - ur >= 2) {
+                st2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpOut));
+                ur += 2;
+            }
+            else if (unroll - ur >= 1) {
+                st1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpOut));
+                ur += 1;
+            }
 			
-			
-			off += unroll * simd_w;
+            off += unroll * simd_w;
         }
 
         return true;
@@ -793,11 +792,11 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 ld1(xmm.s4, addr); // load 128 bits
                 break;
             case 4:
-	    ld1((xmm.s)[0], addr); // load 32 bits
+                ld1((xmm.s)[0], addr); // load 32 bits
                 break;
             case 1: // pinsrb(xmm, addr, 0x0); break; // load 8 bits (LSB).
                     // Other bits are 0 cleared.
-	      ld1((xmm.b)[0], addr); // load 8 bits (LSB). Other bits are
+                ld1((xmm.b)[0], addr); // load 8 bits (LSB). Other bits are
                                       // 0 cleared.
                 break;
             default: assert(!"unreachable");
@@ -810,12 +809,12 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 st1(xmm.s4, addr); // load 128 bits
                 break;
             case 4:
-	      st1((xmm.s)[0], addr);
+                st1((xmm.s)[0], addr);
 	      //                mov((xmm.s4)[0], (xmm_tmp.s4)[0]); // load 32 bits
                 break;
             case 1: // pinsrb(xmm, addr, 0x0); break; // load 8 bits (LSB).
                     // Other bits are 0 cleared.
-	      st1((xmm.b)[0], addr);
+                st1((xmm.b)[0], addr);
 	      //                mov(xmm.b8[0], (xmm_tmp.b8)[0]); // load 8 bits (LSB). Other
                                                  // bits are 0 cleared.
                 break;
@@ -837,7 +836,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 can_store_xmm = false;
         const int ur_step = can_store_xmm ? 4 : 1;
 
-	DBG_MSG_JIT_REORDER(ur_step, ur_step);
+        DBG_MSG_JIT_REORDER(ur_step, ur_step);
 
         const bool interim_f32 = false
                 || utils::one_of(f32, prb_.itype, prb_.otype)
@@ -848,48 +847,47 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             /* load with stride */
             for (int ur = 0; ur < reg_unroll; ur += ur_step) {
                 for (int r = 0; r < ur_step; ++r) {
-		  int imm = i_off[ur + r] * itype_sz;
+                    int imm = i_off[ur + r] * itype_sz;
 
-		  DBG_MSG_JIT_REORDER(load with stride addr, imm);
+                    DBG_MSG_JIT_REORDER(load with stride addr, imm);
 
-		  if(rsvdOffsetIn != imm) {
-		    add_imm(reg_tmpIn, reg_ptr_in, imm, reg_tmp, reg_tmp1);
-		    rsvdOffsetIn = imm;
-		  }
+                    if(rsvdOffsetIn != imm) {
+                        add_imm(reg_tmpIn, reg_ptr_in, imm, reg_tmp, reg_tmp1);
+                        rsvdOffsetIn = imm;
+                    }
 
-		  AdrPostImm addr(reg_tmpIn, itype_sz);
+                    AdrPostImm addr(reg_tmpIn, itype_sz);
 
                     if (itype_sz == 4) {
-		      ld1((VReg(ur).s4)[r], addr);
+                        ld1((VReg(ur).s4)[r], addr);
                     } else {
-		      ld1((VReg(ur).b16)[r], addr);
+                        ld1((VReg(ur).b16)[r], addr);
                     }
-		    rsvdOffsetIn += itype_sz;
+                    rsvdOffsetIn += itype_sz;
                 }
             }
-	} else {
-	  if(i_off[0] * itype_sz != rsvdOffsetIn) {
-	    add_imm(reg_tmpIn, reg_ptr_in, i_off[0] * itype_sz, reg_tmp, reg_tmp1); // Set 0-th addresss
-	    rsvdOffsetIn = i_off[0] * itype_sz;
-	  }
-	
-	  
-	  for (int ur = 0; ur < reg_unroll; ur += load_step) {
-	    if(rsvdOffsetIn != i_off[ur] * itype_sz) { // Address is not preset.
-	      add_imm(reg_tmpIn, reg_ptr_in, i_off[ur] * itype_sz, reg_tmp, reg_tmp1);
-	      rsvdOffsetIn = i_off[ur] * itype_sz;
-	    }
+        } else {
+            if(i_off[0] * itype_sz != rsvdOffsetIn) {
+                add_imm(reg_tmpIn, reg_ptr_in, i_off[0] * itype_sz, reg_tmp, reg_tmp1); // Set 0-th addresss
+                rsvdOffsetIn = i_off[0] * itype_sz;
+            }
+
+            for (int ur = 0; ur < reg_unroll; ur += load_step) {
+                if(rsvdOffsetIn != i_off[ur] * itype_sz) { // Address is not preset.
+                    add_imm(reg_tmpIn, reg_ptr_in, i_off[ur] * itype_sz, reg_tmp, reg_tmp1);
+                    rsvdOffsetIn = i_off[ur] * itype_sz;
+                }
 	    
-	    loadPost(AdrPostImm(reg_tmpIn, load_step*itype_sz), VReg(ur), load_step*itype_sz);
-	    rsvdOffsetIn += load_step * itype_sz;
-	  }
-	}
+                loadPost(AdrPostImm(reg_tmpIn, load_step*itype_sz), VReg(ur), load_step*itype_sz);
+                rsvdOffsetIn += load_step * itype_sz;
+            }
+        }
 	
         /* xmm[:] <-- (f32)xmm[:] */
         if (interim_f32) {
-	  const int cvt_step = nstl::max(load_step, ur_step);
-	  for (int ur = 0; ur < reg_unroll; ur += cvt_step)
-	    cvt2ps(VReg(ur), VReg(ur), prb_.itype);
+            const int cvt_step = nstl::max(load_step, ur_step);
+            for (int ur = 0; ur < reg_unroll; ur += cvt_step)
+                cvt2ps(VReg(ur), VReg(ur), prb_.itype);
         }
 
         if (can_load_xmm && !can_store_xmm) {
@@ -904,19 +902,18 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                         cvt2int(VReg(ur), prb_.otype,
                                 interim_f32 ? f32 : prb_.itype);
                     for (int r = 0; r < load_step; ++r) {
-		      add_imm(reg_tmpOut, reg_ptr_out, o_off[ur + r] * otype_sz, reg_tmp, reg_tmp1);
+                        add_imm(reg_tmpOut, reg_ptr_out, o_off[ur + r] * otype_sz, reg_tmp, reg_tmp1);
 
-		      DBG_MSG_JIT_REORDER(store, o_off[ur + r] * otype_sz);
+                        DBG_MSG_JIT_REORDER(store, o_off[ur + r] * otype_sz);
 
-
-						  AdrPostImm addr(reg_tmpOut, otype_sz);
+                        AdrPostImm addr(reg_tmpOut, otype_sz);
                         if (otype_sz == 4) {
                             st1((VReg(ur).s4)[r], addr);
                         } else {
                             assert(load_step == 1);
                             st1((VReg(ur).b8)[r], addr);
                         }
-			rsvdOffsetOut += otype_sz;
+                        rsvdOffsetOut += otype_sz;
                     }
                 }
                 return;
@@ -959,15 +956,15 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                             scale_load_type = scale_load_type_t::load;
 
                     if (scale_load_type == scale_load_type_t::bcast) {
-		      if(rsvdOffsetScale != s_off[ur] * stype_sz) {
-			add_imm(reg_tmpScale, reg_ptr_scale, s_off[ur] * stype_sz, reg_tmp, reg_tmp1);
-			rsvdOffsetScale = s_off[ur] * stype_sz;
-		      }
+                        if(rsvdOffsetScale != s_off[ur] * stype_sz) {
+                            add_imm(reg_tmpScale, reg_ptr_scale, s_off[ur] * stype_sz, reg_tmp, reg_tmp1);
+                            rsvdOffsetScale = s_off[ur] * stype_sz;
+                        }
 
-		      AdrPostImm addr(reg_tmpScale, 4);
+                        AdrPostImm addr(reg_tmpScale, 4);
 
                         ld1((xmm_scale.s4)[0], addr);
-			rsvdOffsetScale += 4;
+                        rsvdOffsetScale += 4;
 
                         dup(xmm_scale.s4, (xmm_scale.s4)[0]);
                         fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
@@ -980,16 +977,16 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                             scale_load_type = scale_load_type_t::gather;
 
                     if (scale_load_type == scale_load_type_t::load) {
-		      int64_t tmpOffset = s_off[ur] * stype_sz;
-		      if(rsvdOffsetScale != tmpOffset) {
-			add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
-			rsvdOffsetScale = tmpOffset;
-		      }
+                        int64_t tmpOffset = s_off[ur] * stype_sz;
+                        if(rsvdOffsetScale != tmpOffset) {
+                            add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                            rsvdOffsetScale = tmpOffset;
+                        }
 
-		      AdrPostImm addr(reg_tmpScale, 4);
+                        AdrPostImm addr(reg_tmpScale, 4);
 
                         ld1(xmm_scale.s4, addr);
-			rsvdOffsetScale += 4;
+                        rsvdOffsetScale += 4;
                         fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
                         continue;
                     }
@@ -997,12 +994,12 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                     // load doesn't work as well
                     // so gather the scale factors one by one
                     for (int r = ur; r < ur + ur_step; ++r) {
-		      int64_t tmpOffset = s_off[r] * stype_sz;
-		      if(rsvdOffsetScale != tmpOffset) {
-			add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
-			rsvdOffsetScale = tmpOffset;
-		      }
-		      AdrPostImm addr(reg_tmpScale, 4);
+                        int64_t tmpOffset = s_off[r] * stype_sz;
+                        if(rsvdOffsetScale != tmpOffset) {
+                            add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                            rsvdOffsetScale = tmpOffset;
+                        }
+                        AdrPostImm addr(reg_tmpScale, 4);
                         ld1((xmm_scale.s4)[r - ur], addr);
                     }
                     fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
@@ -1014,14 +1011,14 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             if (prb_.beta == 1.f) {
                 for (int ur = 0; ur < reg_unroll; ur += ur_step) {
                     if (prb_.otype == f32) {
-		      int64_t tmpOffset = o_off[ur] * otype_sz;
-		      if(rsvdOffsetOut != tmpOffset) {
-			add_imm(reg_tmpOut, reg_ptr_out, tmpOffset, reg_tmp, reg_tmp1);
-			rsvdOffsetOut = tmpOffset;
-		      }
-		      AdrPostImm addr(reg_tmpOut, 4);
+                        int64_t tmpOffset = o_off[ur] * otype_sz;
+                        if(rsvdOffsetOut != tmpOffset) {
+                            add_imm(reg_tmpOut, reg_ptr_out, tmpOffset, reg_tmp, reg_tmp1);
+                            rsvdOffsetOut = tmpOffset;
+                        }
+                        AdrPostImm addr(reg_tmpOut, 4);
                         ld1(xmm_tmp.s4, addr);
-			rsvdOffsetOut += 4;
+                        rsvdOffsetOut += 4;
                         fadd(VReg(ur).s4, VReg(ur).s4, xmm_tmp.s4);
                     } else {
                         cvt2ps_addr(xmm_tmp, o_addr(o_off[ur]), prb_.otype);
@@ -1040,14 +1037,14 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 }
             } else if (prb_.scale_type == scale_type_t::MANY) {
                 for (int ur = 0; ur < reg_unroll; ur += ur_step) {
-		  int64_t tmpOffset = s_off[ur] * stype_sz;
-		  if(rsvdOffsetScale != tmpOffset) {
-		    add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
-		    rsvdOffsetScale = tmpOffset;
-		  }
-          AdrPostImm addr(reg_tmpScale, 4);
+                    int64_t tmpOffset = s_off[ur] * stype_sz;
+                    if(rsvdOffsetScale != tmpOffset) {
+                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                        rsvdOffsetScale = tmpOffset;
+                    }
+                    AdrPostImm addr(reg_tmpScale, 4);
                     ld1((xmm_tmp.s4)[0], addr);
-		    rsvdOffsetScale += 4;
+                    rsvdOffsetScale += 4;
                     /* DST[31:0] = (LSB 32 bits) * (LSB 32 bits)
                        DST[127:32] = DST[127:32] */
                     fmul(xmm_tmp.s4, VReg(ur).s4, (xmm_tmp.s4)[0]);
@@ -1059,65 +1056,64 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             assert(prb_.beta == 0.f || prb_.beta == 1.f);
             if (prb_.beta == 1.f) {
                 for (int ur = 0; ur < reg_unroll; ur += ur_step) {
-		  int64_t tmpOffset = o_off[ur] * otype_sz;
-
-		  if(rsvdOffsetOut != tmpOffset) {
-		    add_imm(reg_tmpOut, reg_ptr_out, tmpOffset, reg_tmp, reg_tmp1);
-		    rsvdOffsetOut = tmpOffset;
-		  }
+                    int64_t tmpOffset = o_off[ur] * otype_sz;
+                    if(rsvdOffsetOut != tmpOffset) {
+                        add_imm(reg_tmpOut, reg_ptr_out, tmpOffset, reg_tmp, reg_tmp1);
+                        rsvdOffsetOut = tmpOffset;
+                    }
 
 		  
-		  if (prb_.otype == f32) {
-              AdrPostImm addr(reg_tmpOut, 4);
-		    ld1((xmm_tmp.s4)[0], addr);
-		    rsvdOffsetOut += 4;
-		    fadd(xmm_tmp.s4, VReg(ur).s4, (xmm_tmp.s4));
-		    CodeGeneratorAArch64::mov((VReg(ur).s4)[0], (xmm_tmp.s4)[0]);
-		  } else {
-		    if (prb_.otype == s32) {
-                  AdrPostImm addr(reg_tmpOut, 4);
-		      ld1((xmm_tmp.s4)[0], addr);
-		      rsvdOffsetOut += 4;
-		    } else if (utils::one_of(prb_.otype, s8, u8)) {
-                AdrPostImm addr(reg_tmpOut, 1);
-		      ld1((xmm_tmp.b16)[0], addr);
-		      rsvdOffsetOut += 1;
-		    } else {
-		      assert(!"unsupported o_type");
-		    }
-		    cvt2ps(xmm_tmp, xmm_tmp, prb_.otype);
-		    CodeGeneratorAArch64::fadd(VReg(ur).s4, VReg(ur).s4, xmm_tmp.s4);
-		  }
+                    if (prb_.otype == f32) {
+                        AdrPostImm addr(reg_tmpOut, 4);
+                        ld1((xmm_tmp.s4)[0], addr);
+                        rsvdOffsetOut += 4;
+                        fadd(xmm_tmp.s4, VReg(ur).s4, (xmm_tmp.s4));
+                        CodeGeneratorAArch64::mov((VReg(ur).s4)[0], (xmm_tmp.s4)[0]);
+                    } else {
+                        if (prb_.otype == s32) {
+                            AdrPostImm addr(reg_tmpOut, 4);
+                            ld1((xmm_tmp.s4)[0], addr);
+                            rsvdOffsetOut += 4;
+                        } else if (utils::one_of(prb_.otype, s8, u8)) {
+                            AdrPostImm addr(reg_tmpOut, 1);
+                            ld1((xmm_tmp.b16)[0], addr);
+                            rsvdOffsetOut += 1;
+                        } else {
+                            assert(!"unsupported o_type");
+                        }
+                        cvt2ps(xmm_tmp, xmm_tmp, prb_.otype);
+                        CodeGeneratorAArch64::fadd(VReg(ur).s4, VReg(ur).s4, xmm_tmp.s4);
+                    }
                 }
             }
         }
 
 
-	if (prb_.otype != f32) {
-	  for (int ur = 0; ur < reg_unroll; ur += ur_step) {
-	    cvt2int(VReg(ur), prb_.otype, interim_f32 ? f32 : prb_.itype);
-	  }
-	}
+        if (prb_.otype != f32) {
+            for (int ur = 0; ur < reg_unroll; ur += ur_step) {
+                cvt2int(VReg(ur), prb_.otype, interim_f32 ? f32 : prb_.itype);
+            }
+        }
 
 	//	DBG_MSG_JIT_REORDER(store last, o_off[ur]);
 	//	DBG_MSG_JIT_REORDER(store reg, ur);
 
 
 
-	  if(o_off[0] * otype_sz != rsvdOffsetOut) {
-	    add_imm(reg_tmpOut, reg_ptr_out, o_off[0] * otype_sz, reg_tmp, reg_tmp1); // Set 0-th address
-	    rsvdOffsetOut = o_off[0] * otype_sz;
-	  }
+        if(o_off[0] * otype_sz != rsvdOffsetOut) {
+            add_imm(reg_tmpOut, reg_ptr_out, o_off[0] * otype_sz, reg_tmp, reg_tmp1); // Set 0-th address
+            rsvdOffsetOut = o_off[0] * otype_sz;
+        }
 	
-	for (int ur = 0; ur < reg_unroll; ur += ur_step) {
-	  if(rsvdOffsetOut != o_off[ur] * otype_sz) { // Address is not preset.
-	    add_imm(reg_tmpOut, reg_ptr_out, o_off[ur] * otype_sz, reg_tmp, reg_tmp1); 
-	    rsvdOffsetOut = o_off[ur] * otype_sz;
-	  }
+        for (int ur = 0; ur < reg_unroll; ur += ur_step) {
+            if(rsvdOffsetOut != o_off[ur] * otype_sz) { // Address is not preset.
+                add_imm(reg_tmpOut, reg_ptr_out, o_off[ur] * otype_sz, reg_tmp, reg_tmp1); 
+                rsvdOffsetOut = o_off[ur] * otype_sz;
+            }
 
-	  storePost(AdrPostImm(reg_tmpOut, ur_step*otype_sz), VReg(ur), ur_step * otype_sz); // Prepare next address
-	  rsvdOffsetOut += ur_step * otype_sz;
-	}
+            storePost(AdrPostImm(reg_tmpOut, ur_step*otype_sz), VReg(ur), ur_step * otype_sz); // Prepare next address
+            rsvdOffsetOut += ur_step * otype_sz;
+        }
     }
 
     void process_unroll_generic(int len) {
@@ -1142,33 +1138,33 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             }
 
 #if DEBUG_JIT_UNI_REORDER
-	    for (int i = 0; i < 2 * blk; ++i) {
-	      if (i % 16 == 0) {
-		std::cout << "i_off, ";
-	      }
-	      std::cout << i_off[i] << ", ";
-	      if (i % 16 == 15) {
-		std::cout << std::endl;
-	      }
-	    }
-	    for (int i = 0; i < 2 * blk; ++i) {
-	      if (i % 16 == 0) {
-		std::cout << "o_off, ";
-	      }
-	      std::cout << o_off[i] << ", ";
-	      if (i % 16 == 15) {
-		std::cout << std::endl;
-	      }
-	    }
-	    for (int i = 0; i < 2 * blk; ++i) {
-	      if (i % 16 == 0) {
-		std::cout << "s_off, ";
-	      }
-	      std::cout << s_off[i] << ", ";
-	      if (i % 16 == 15) {
-		std::cout << std::endl;
-	      }
-	    }
+            for (int i = 0; i < 2 * blk; ++i) {
+                if (i % 16 == 0) {
+                    std::cout << "i_off, ";
+                }
+                std::cout << i_off[i] << ", ";
+                if (i % 16 == 15) {
+                    std::cout << std::endl;
+                }
+            }
+            for (int i = 0; i < 2 * blk; ++i) {
+                if (i % 16 == 0) {
+                    std::cout << "o_off, ";
+                }
+                std::cout << o_off[i] << ", ";
+                if (i % 16 == 15) {
+                    std::cout << std::endl;
+                }
+            }
+            for (int i = 0; i < 2 * blk; ++i) {
+                if (i % 16 == 0) {
+                    std::cout << "s_off, ";
+                }
+                std::cout << s_off[i] << ", ";
+                if (i % 16 == 15) {
+                    std::cout << std::endl;
+                }
+            }
 #endif
 
             process_unroll_generic_step(reg_unroll,
@@ -1181,7 +1177,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
     }
 
     void loop_begin(LabelAArch64 &l, XReg reg_cnt, int len) {
-      CodeGeneratorAArch64::mov(reg_cnt, len);
+        CodeGeneratorAArch64::mov(reg_cnt, len);
       //      mov(reg_cnt, 1);
         L_aarch64(l);
     }
@@ -1190,31 +1186,31 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             int s_step) {
 
         bool flag = (prb_.scale_type == scale_type_t::MANY);
-		int iTmp = i_step * itype_sz;
-		int oTmp = o_step * otype_sz;
+        int iTmp = i_step * itype_sz;
+        int oTmp = o_step * otype_sz;
 
 
-		DBG_MSG_JIT_REORDER(add load addr, iTmp);
-		DBG_MSG_JIT_REORDER(add store addr, iTmp);
+        DBG_MSG_JIT_REORDER(add load addr, iTmp);
+        DBG_MSG_JIT_REORDER(add store addr, iTmp);
 
-		add_imm(reg_ptr_in, reg_ptr_in, iTmp, reg_tmp, reg_tmp1);
-		add_imm(reg_ptr_out, reg_ptr_out, oTmp, reg_tmp, reg_tmp1);
+        add_imm(reg_ptr_in, reg_ptr_in, iTmp, reg_tmp, reg_tmp1);
+        add_imm(reg_ptr_out, reg_ptr_out, oTmp, reg_tmp, reg_tmp1);
 
-		if (flag) {
-			add_imm(reg_ptr_scale, reg_ptr_scale, s_step * stype_sz, reg_tmp, reg_tmp1);
-		}
-		CodeGeneratorAArch64::sub(reg_cnt, reg_cnt, 1);
+        if (flag) {
+            add_imm(reg_ptr_scale, reg_ptr_scale, s_step * stype_sz, reg_tmp, reg_tmp1);
+        }
+        CodeGeneratorAArch64::sub(reg_cnt, reg_cnt, 1);
         cbnz(reg_cnt, l);
 
 
-		DBG_MSG_JIT_REORDER(sub load addr, iTmp*len);
-		DBG_MSG_JIT_REORDER(sub store addr, iTmp*len);
+        DBG_MSG_JIT_REORDER(sub load addr, iTmp*len);
+        DBG_MSG_JIT_REORDER(sub store addr, iTmp*len);
 
-		sub_imm(reg_ptr_in, reg_ptr_in, iTmp * len, reg_tmp, reg_tmp1);
-		sub_imm(reg_ptr_out, reg_ptr_out, oTmp * len, reg_tmp, reg_tmp1);
+        sub_imm(reg_ptr_in, reg_ptr_in, iTmp * len, reg_tmp, reg_tmp1);
+        sub_imm(reg_ptr_out, reg_ptr_out, oTmp * len, reg_tmp, reg_tmp1);
 
         if (flag) {
-			sub_imm(reg_ptr_scale, reg_ptr_scale, len * s_step * stype_sz, reg_tmp, reg_tmp1);
+            sub_imm(reg_ptr_scale, reg_ptr_scale, len * s_step * stype_sz, reg_tmp, reg_tmp1);
         }
     }
 
@@ -1229,10 +1225,10 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         const int n_jit_loops = prb_.ndims - d.ndims_full_unroll;
         assert(n_jit_loops <= ndims_jit_loop_max);
 
-	eor(reg_off_in, reg_off_in, reg_off_in);
-	eor(reg_off_out, reg_off_out, reg_off_out);
+        eor(reg_off_in, reg_off_in, reg_off_in);
+        eor(reg_off_out, reg_off_out, reg_off_out);
         if (prb_.scale_type == scale_type_t::MANY)
-	  eor(reg_off_scale, reg_off_scale, reg_off_scale);
+            eor(reg_off_scale, reg_off_scale, reg_off_scale);
 
         LabelAArch64 l_loop[3];
 
@@ -1280,24 +1276,24 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
         preamble(); // Base on ABI specification, save calle-saved
                     // registers.
-		if (prb_.scale_type == scale_type_t::COMMON) {
-		  ldr(reg_tmp, Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, scale))));
-		  ld1( {xmm_scale.s4 }, Xbyak::Xbyak_aarch64::ptr(reg_tmp));
+        if (prb_.scale_type == scale_type_t::COMMON) {
+            ldr(reg_tmp, Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, scale))));
+            ld1( {xmm_scale.s4 }, Xbyak::Xbyak_aarch64::ptr(reg_tmp));
         } else if (prb_.scale_type == scale_type_t::MANY) {
-	  ldr(reg_ptr_scale, Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, scale))));
+            ldr(reg_ptr_scale, Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, scale))));
         }
         ldr(reg_ptr_in,
-	    Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, in)))); // Store base address of input data to a
+            Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, in)))); // Store base address of input data to a
                             // register.
         ldr(reg_ptr_out,
-	    Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, out)))); // Store base address of output data to a
+            Xbyak::Xbyak_aarch64::ptr(abi_param1_aarch64, static_cast<int32_t>(offsetof(call_param_t, out)))); // Store base address of output data to a
                              // register.
 #undef PARAM
 
-	eor(reg_zero, reg_zero, reg_zero);
+        eor(reg_zero, reg_zero, reg_zero);
 
-		if (mayiuse(sve)) {
-		  eor(xmm_zero.b16, xmm_zero.b16, xmm_zero.b16); // Zero clear
+        if (mayiuse(sve)) {
+            eor(xmm_zero.b16, xmm_zero.b16, xmm_zero.b16); // Zero clear
 
             if (prb_.itype == data_type::u8
                     && prb_.otype == data_type::s8) { // Generate mask
@@ -1307,10 +1303,14 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
         impl();
 
-		postamble();
+        postamble();
 
-		ready();
+        ready();
         ker_ = (void (*)(const call_param_t *))getCode32();
+
+        rsvdOffsetIn = 0xFFFFFFFFFFFFFFFF;
+        rsvdOffsetOut = 0xFFFFFFFFFFFFFFFF;
+        rsvdOffsetScale = 0xFFFFFFFFFFFFFFFF;
 
         //        exit(1);
     }
