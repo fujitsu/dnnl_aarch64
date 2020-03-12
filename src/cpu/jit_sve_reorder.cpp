@@ -479,9 +479,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 ur += 4;
             }
 
-            if(rsvdOffsetIn != ((off+ur) * itype_sz)) {
-                add_imm(reg_tmpIn, reg_ptr_in, (off+ur) * itype_sz, reg_tmp, reg_tmp1);
-                rsvdOffsetIn = (off+ur) * itype_sz;
+            if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
+                add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
+                rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
             }
 
             // Residual
@@ -520,9 +520,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 st4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
                 ur += 4;
             }
-            if(rsvdOffsetOut != ((off+ur) * otype_sz)) {
-                add_imm(reg_tmpOut, reg_ptr_out, (off+ur) * otype_sz, reg_tmp, reg_tmp1);
-                rsvdOffsetOut = (off+ur) * otype_sz;
+            if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
+                add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
+                rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
             }
 		
             // Residual
