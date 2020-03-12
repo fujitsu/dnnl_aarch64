@@ -74,13 +74,13 @@ void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
     code.CodeGenerator::L(spin_label);
     code.pause();
     code.cmp(reg_tmp, code.ptr[reg_ctx + BAR_SENSE_OFF]);
-#ifdef XBYAK_TRANSLATE_AARCH64
-    code.CodeGeneratorAArch64::dmb(Xbyak_aarch64::SY);
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
     code.je(spin_label);
-
+#ifdef XBYAK_TRANSLATE_AARCH64
+    code.CodeGeneratorAArch64::dmb(Xbyak_aarch64::ISH);
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
     code.CodeGenerator::L(barrier_exit_restore_label);
     code.pop(reg_tmp);
+
 
     code.CodeGenerator::L(barrier_exit_label);
 #    undef BAR_CTR_OFF
