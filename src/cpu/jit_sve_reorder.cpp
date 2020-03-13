@@ -454,9 +454,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                         || (prb_.itype == f32 && prb_.otype == s32))
                 && len % simd_w == 0 && n(0) % len == 0
                 && prb_.scale_type == scale_type_t::NONE && prb_.beta == 0.f;
-        if (!can_do)
+/*        if (!can_do)
             return false;
-
+*/
         ptrue(reg_p_all_one.b); // Set all bits to 1.
 
         for (int off = 0; off < len;) {
@@ -475,10 +475,10 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             }
             ur = 0;
 #if 1
-           while ((unroll - ur >= 2) && (ur + 2 <= cpu_isa_traits<sve>::n_vregs)) {
-                ld2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpIn));
+           while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
+                ld4w((ZReg(ur).s - ZReg(ur + 3).s), reg_p_all_one.s, ptr(reg_tmpIn));
 
-                ur += 2;
+                ur += 4;
                 if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
                     add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
                     rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
@@ -539,9 +539,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             ur = 0;
 
 #if 1
-            while ((unroll - ur >= 2) && (ur + 2 <= cpu_isa_traits<sve>::n_vregs)) {
-                st2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpOut));
-                ur += 2;
+            while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
+                st4w((ZReg(ur).s - ZReg(ur + 3).s), reg_p_all_one.s, ptr(reg_tmpOut));
+                ur += 4;
                 if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
                     add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
                     rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
