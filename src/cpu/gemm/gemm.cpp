@@ -120,6 +120,7 @@ mkldnn_status_t extended_sgemm(const char *transa, const char *transb,
     }
 #endif
 
+#ifndef __ARM_ARCH
     if (mayiuse(avx512_mic)) {
         return jit_avx512_common_gemm_f32(transa, transb,
                 M, N, K, alpha, A, lda, B, ldb, beta, C, ldc, bias);
@@ -130,7 +131,9 @@ mkldnn_status_t extended_sgemm(const char *transa, const char *transb,
         return gemm_driver(transa, transb, bias ? "C" : NULL, M, N, K, alpha,
                 A, lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
                 force_jit_nocopy_gemm);
-    } else {
+    } else 
+#endif // __ARM_ARCH
+    {
         return ref_gemm<float>(transa, transb,
                 M, N, K, alpha, A, lda, B, ldb, beta, C, ldc, bias);
     }
