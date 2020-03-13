@@ -446,7 +446,11 @@ status_t cpu_engine_t::submit(primitive_t *p, event_t *e,
             p->execute(e);
         }
         ms = (get_msec() - ms) / num_loops;
-        printf("mkldnn_verbose,exec,%s,%g, <- ave. of %d times\n", p->pd()->info(), ms, num_loops);
+        if(num_loops == 1){
+            printf("mkldnn_verbose,exec,%s,%g,\n", p->pd()->info(), ms);
+        }else{
+            printf("mkldnn_verbose,exec,%s,%g, <- ave. of %d times\n", p->pd()->info(), ms, num_loops);
+        }
         fflush(0);
     } else {
         p->execute(e);
