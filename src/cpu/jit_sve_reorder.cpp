@@ -475,10 +475,10 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             }
             ur = 0;
 #if 1
-           while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
-                ld4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpIn));
+           while ((unroll - ur >= 2) && (ur + 2 <= cpu_isa_traits<sve>::n_vregs)) {
+                ld2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpIn));
 
-                ur += 4;
+                ur += 2;
                 if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
                     add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
                     rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
@@ -539,9 +539,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             ur = 0;
 
 #if 1
-            while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
-                st4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpOut));
-                ur += 4;
+            while ((unroll - ur >= 2) && (ur + 2 <= cpu_isa_traits<sve>::n_vregs)) {
+                st2w((ZReg(ur), ZReg(ur + 1)).s, reg_p_all_one.s, ptr(reg_tmpOut));
+                ur += 2;
                 if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
                     add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
                     rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
