@@ -199,7 +199,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       ofs = jcp.typesize_in * ofs;
 
       if( ((ofs&0x3) == 0) && (ofs < LDRWMAX)){
-        ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(aux_reg_bcast_data, static_cast<int32_t>(ofs)));
+        ld1rw(vreg_bcast_s(), reg_p_all_ones.b, ptr(aux_reg_bcast_data, static_cast<int32_t>(ofs)));
       }else{
         if((prev_ofs != -1) && ((ofs - prev_ofs)>0) &&((ofs - prev_ofs) < LDRMAX) && (((ofs-prev_ofs)&0x3) == 0)){
           ld1rw(vreg_bcast_s(), reg_p_all_ones, ptr(reg_prev_bcast_addr, static_cast<int32_t>((ofs-prev_ofs))));

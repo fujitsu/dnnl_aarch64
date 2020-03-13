@@ -474,6 +474,17 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 rsvdOffsetIn = off * itype_sz;
             }
             ur = 0;
+#if 1
+            while ((unroll - ur >= 1) && (ur + 1 <= cpu_isa_traits<sve>::n_vregs)) {
+                ld1w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpIn));
+
+                ur += 1;
+                if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
+                    add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
+                    rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
+                }
+            }
+#else
             while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
                 ld4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpIn, ur));
                 ur += 4;
@@ -497,7 +508,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 ld1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpIn));
                 ur += 1;
             }
-
+#endif
             if (prb_.itype != prb_.otype) {
                 for (int ur = 0; ur < unroll; ++ur) {
                     ZRegS zs(ur);
@@ -516,6 +527,19 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 rsvdOffsetOut = off * otype_sz;
             }
             ur = 0;
+
+#if 1
+            while ((unroll - ur >= 1) && (ur + 1 <= cpu_isa_traits<sve>::n_vregs)) {
+                st1w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpOut));
+                ur += 1;
+                if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
+                    add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
+                    rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
+                }
+
+            }
+
+#else
             while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
                 st4w((ZReg(ur), ZReg(ur + 3)).s, reg_p_all_one.s, ptr(reg_tmpOut, ur));
                 ur += 4;
@@ -538,7 +562,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 st1w((ZReg(ur)).s, reg_p_all_one.s, ptr(reg_tmpOut));
                 ur += 1;
             }
-			
+#endif			
             off += unroll * simd_w;
         }
 
@@ -1241,7 +1265,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         if (n_jit_loops > 0)
             loop_begin(l_loop[0], reg_cnt[0], n(nfu + 0) / ldu);
 
-        const bool optimized = false //|| process_direct_copy_sve(d.len_unroll);
+        const bool optimized = false || process_direct_copy_sve(d.len_unroll)
                ||  process_direct_copy_simd(d.len_unroll);
                //  || process_unroll_tr8x8(d.len_unroll); // under construction
         if (!optimized)
