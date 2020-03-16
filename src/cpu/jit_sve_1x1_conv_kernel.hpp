@@ -22,7 +22,7 @@
 
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
-//#include "jit_sve_eltwise.hpp"
+#include "jit_uni_eltwise.hpp"
 
 using namespace mkldnn::impl::types;
 
@@ -44,11 +44,9 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
             const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
     {
-        /*
         if (jcp.with_eltwise)
-            eltwise_injector_ = new jit_uni_eltwise_injector_f32<sve>(
+            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
                     this, jcp.eltwise);
-        */
 
         this->generate();
         jit_ker = (void (*)(jit_1x1_conv_call_s *)) this->getCode32();
@@ -146,8 +144,8 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     }
 
 
-#if 0
-    jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
+#if 1
+    jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
 #else
     void *eltwise_injector_;
 #endif
