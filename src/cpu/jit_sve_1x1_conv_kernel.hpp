@@ -20,11 +20,10 @@
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
 
-#include "jit_generator_aarch64.hpp"
+#include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
 //#include "jit_sve_eltwise.hpp"
 
-using namespace Xbyak::Xbyak_aarch64;
 using namespace mkldnn::impl::types;
 
 #define PRFWMAX   32
@@ -37,7 +36,10 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
+#define CGA64 CodeGeneratorAArch64
+namespace xa = Xbyak::Xbyak_aarch64;
+
+struct jit_sve_1x1_conv_kernel : public jit_generator {
     jit_sve_1x1_conv_kernel(jit_1x1_conv_conf_t ajcp,
             const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
@@ -78,8 +80,8 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
     void (*jit_ker)(jit_1x1_conv_call_s *);
 
   private:
-    using reg64_t = const Xbyak::Xbyak_aarch64::XReg;
-    const Xbyak::Xbyak_aarch64::PReg reg_p_all_ones  = p1;
+    using reg64_t = const xa::XReg;
+    const xa::PReg reg_p_all_ones  = p1;
 
     /* Flag */
     reg64_t reg_reduce_pos_flag     = x8; 
@@ -118,26 +120,26 @@ struct jit_sve_1x1_conv_kernel : public jit_generator_aarch64 {
     void add_imm(reg64_t out, reg64_t in, int value){
       if( value >= 0){   
         if(value < ADDMAX){
-            add(out, in, value);
+            CGA64::add(out, in, value);
         }else if(value < MOVMAX){
-            mov(reg_tmp, value);
-            add(out, in, reg_tmp);
+            CGA64::mov(reg_tmp, value);
+            CGA64::add(out, in, reg_tmp);
         }else{
-            mov(reg_tmp, value&0xffff);
-            movk(reg_tmp, value>>16, 16);
-            add(out, in, reg_tmp);
+            CGA64::mov(reg_tmp, value&0xffff);
+            CGA64::movk(reg_tmp, value>>16, 16);
+            CGA64::add(out, in, reg_tmp);
         }
       }else{
         int val = -1 * value;
         if(val < ADDMAX){
-            sub(out, in, val);
+            CGA64::sub(out, in, val);
         }else if(val < MOVMAX){
-            mov(reg_tmp, val);
-            sub(out, in, reg_tmp);
+            CGA64::mov(reg_tmp, val);
+            CGA64::sub(out, in, reg_tmp);
         }else{
-            mov(reg_tmp, val&0xffff);
-            movk(reg_tmp, val>>16, 16);
-            sub(out, in, reg_tmp);
+            CGA64::mov(reg_tmp, val&0xffff);
+            CGA64::movk(reg_tmp, val>>16, 16);
+            CGA64::sub(out, in, reg_tmp);
         }
 
       }
