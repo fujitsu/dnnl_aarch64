@@ -106,7 +106,8 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     reg64_t reg_bias_data_tmp       = x22; // Bias
     reg64_t reg_tmp                 = x23; // tmp for add_imm
     reg64_t reg_tmp_ofs             = x23; // tmp_ofs (for load, bcast, output, bias_ofs, generate())
-    reg64_t reg_prev_out_addr       = x24; // this reg keeps addr accessed by previous ldr or str inst
+    reg64_t reg_tmp_out_ofs         = x24; // tmp reg to calc bwd wei offset in out_load
+    reg64_t reg_prev_out_addr       = x25; // this reg keeps addr accessed by previous ldr or str inst
 
     /* Workload */
     reg64_t reg_load_loop_work      = x27;
