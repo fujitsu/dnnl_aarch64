@@ -25,7 +25,7 @@
 #include "utils.hpp"
 
 #include "cpu_memory.hpp"
-//#include "cpu_barrier.hpp"
+#include "cpu_barrier.hpp"
 
 #include "jit_sve_1x1_conv_utils.hpp"
 #include "jit_sve_1x1_conv_kernel.hpp"
@@ -193,7 +193,13 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     : i_ur * jcp.reduce_loop_unroll + i_reduce;
 
       }else{
-        assert(NULL); // TODO
+        if (jcp.transpose_src) {
+          const int reduce_group = i_reduce / 4;
+          const int reduce_shift = i_reduce % 4;
+          ofs = 4 * (reduce_group * jcp.ic_block + i_ur) + reduce_shift;
+        }
+        else
+          ofs = i_reduce * jcp.ic_block + i_ur;
       }
 
       ofs = jcp.typesize_in * ofs;
@@ -660,14 +666,12 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     /* Forward_[training, inference], backward_[data, weight] */
     jcp.prop_kind = cd.prop_kind; 
 
-    // TODO: impl rtus driver
-    //if(reduce_src)
-    //  return status::unimplemented;
-
     // TODO: impl backward
-    if(!one_of(jcp.prop_kind, forward_training, forward_inference)){
+    
+    if(!one_of(jcp.prop_kind, forward_training, forward_inference, backward_data)){
       return status::unimplemented;
     }
+    
     /* Check group option: if true, NCHW -> gNCHW */
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
 
@@ -726,8 +730,12 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     const int eltwise_ind = p.find(primitive_kind::eltwise);
     jcp.with_eltwise = eltwise_ind != -1;
     if (jcp.with_eltwise) {
+#if __ARM_ARCH
+      return status::unimplemented;
+#else
       jcp.eltwise = p.entry_[eltwise_ind].eltwise;
       if (dst_d.data_type() == data_type::s32) return status::unimplemented;
+#endif
     }
 
     bool args_ok = true
@@ -1055,7 +1063,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         bcast_blocking_max = bcast_blocking * 3 / 2;
         reduce_blocking_max = reduce_blocking;
 
-#if 0
+#if 1
     } else if (jcp.prop_kind == backward_weights) {
 
         jcp.use_vmovntps = false;
@@ -1208,7 +1216,7 @@ void jit_sve_1x1_conv_kernel::init_scratchpad(
         scratchpad.book(key_conv_wei_reduction,
                 jcp.typesize_out * wei_size * (jcp.nthr_mb - 1));
     }
-/*
+
     if (jcp.transpose_src) {
         const size_t tr_src_size =
             (size_t)jcp.nthr_mb * jcp.ngroups * jcp.ic * jcp.tr_is;
@@ -1216,7 +1224,7 @@ void jit_sve_1x1_conv_kernel::init_scratchpad(
         scratchpad.book(key_conv_tr_src_bctx,
                 sizeof(simple_barrier::ctx_t) * jcp.nthr);
     }
-*/
+
 }
 
 void jit_sve_1x1_conv_kernel::balance(jit_1x1_conv_conf_t &jcp,
