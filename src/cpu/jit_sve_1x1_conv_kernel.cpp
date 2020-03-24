@@ -533,7 +533,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         xa::LabelAArch64 store_noadd;
         if (!jcp.with_sum) {
-            tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
+            CGA64::tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
             CGA64::b(xa::NE, store_noadd);
         }
 
@@ -1350,7 +1350,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
 
 #if 0
-    std::cout << "jit_sve_check: success" << std::endl; // honda
+    std::cout << "jit_sve_check: success " << jcp.with_sum << " " << jcp.nb_reduce_blocking << std::endl;
     std::cout << "#weight: " << weights_d.ndims() << " " << weights_d.dims()[0] << " " << weights_d.dims()[1] << " " << weights_d.dims()[2] << std::endl;
     std::cout << "#src: " << src_d.ndims() << " " << src_d.dims()[0] << " " << src_d.dims()[1] << " " << src_d.dims()[2] << std::endl;
     std::cout << "#dst: " << dst_d.ndims() << " " << dst_d.dims()[0] << " " << dst_d.dims()[1] << " " << dst_d.dims()[2] << std::endl;
