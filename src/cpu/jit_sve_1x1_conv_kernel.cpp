@@ -316,7 +316,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         }
  
       }else{
-        //(i_load ? reg_output_stride * i_load : 0) 
         ofs = jcp.typesize_out * jcp.load_block * i_ur;
         if( i_load ){
           CGA64::mov(reg_tmp_out_ofs, i_load);
@@ -449,11 +448,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
           CGA64::mov(reg_tmp_out_ofs, i_load);
           if((ofs>>6) < LDRMAX){
             CGA64::madd(reg_tmp_out_ofs, reg_tmp_out_ofs, reg_output_stride, aux_reg_output_data);
-            CGA64::str(vreg_sum(), xa::ptr(reg_tmp_out_ofs, static_cast<int32_t>(ofs>>6)));
+            CGA64::str( vreg_accum(i_load, i_ur), xa::ptr(reg_tmp_out_ofs, static_cast<int32_t>(ofs>>6)));
           }else{
             if((prev_ofs != -1) && ((ofs - prev_ofs)>0) &&(((ofs - prev_ofs)>>6) < LDRMAX)){
               CGA64::madd(reg_tmp_out_ofs, reg_tmp_out_ofs, reg_output_stride, reg_prev_out_addr);
-              CGA64::str(vreg_sum(), xa::ptr(reg_tmp_out_ofs, static_cast<int32_t>((ofs - prev_ofs)>>6)));
+              CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(reg_tmp_out_ofs, static_cast<int32_t>((ofs - prev_ofs)>>6)));
             }else{
               if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
                 ofs = ofs - prev_ofs;
@@ -480,17 +479,17 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 }
               }
               CGA64::madd(reg_tmp_out_ofs, reg_tmp_out_ofs, reg_output_stride, reg_prev_out_addr);
-              CGA64::str(vreg_sum(), xa::ptr(reg_tmp_out_ofs));
+              CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(reg_tmp_out_ofs));
     
               prev_ofs = jcp.typesize_out * jcp.load_block * i_ur;
             }
           }
         }else{
           if((ofs>>6) < LDRMAX){
-            CGA64::str(vreg_sum(), xa::ptr(aux_reg_output_data, static_cast<int32_t>(ofs>>6)));
+            CGA64::str( vreg_accum(i_load, i_ur), xa::ptr(aux_reg_output_data, static_cast<int32_t>(ofs>>6)));
           }else{
             if((prev_ofs != -1) && ((ofs - prev_ofs)>0) &&(((ofs - prev_ofs)>>6) < LDRMAX)){
-              CGA64::str(vreg_sum(), xa::ptr(reg_prev_out_addr, static_cast<int32_t>((ofs - prev_ofs)>>6)));
+              CGA64::str( vreg_accum(i_load, i_ur), xa::ptr(reg_prev_out_addr, static_cast<int32_t>((ofs - prev_ofs)>>6)));
             }else{
               if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
                 ofs = ofs - prev_ofs;
@@ -517,7 +516,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 }
               }
     
-              CGA64::str(vreg_sum(), xa::ptr(reg_prev_out_addr));
+              CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(reg_prev_out_addr));
     
               prev_ofs = jcp.typesize_out * jcp.load_block * i_ur;
             }
@@ -825,9 +824,9 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.prop_kind = cd.prop_kind; 
 
     // TODO: impl backward_data
-    if(!one_of(jcp.prop_kind, forward_training, forward_inference, backward_data)){
-      return status::unimplemented;
-    }
+    //if(!one_of(jcp.prop_kind, forward_training, forward_inference, backward_data)){
+    //  return status::unimplemented;
+    //}
     /* Check group option: if true, NCHW -> gNCHW */
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
 
