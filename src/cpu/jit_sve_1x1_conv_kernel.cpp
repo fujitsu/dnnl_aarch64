@@ -533,7 +533,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         xa::LabelAArch64 store_noadd;
         if (!jcp.with_sum) {
-            tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
+            CGA64::tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
             CGA64::b(xa::NE, store_noadd);
         }
 
