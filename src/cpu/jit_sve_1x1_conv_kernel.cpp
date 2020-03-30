@@ -835,10 +835,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     /* Forward_[training, inference], backward_[data, weight] */
     jcp.prop_kind = cd.prop_kind; 
 
-    // TODO: impl backward_data
-    //if(!one_of(jcp.prop_kind, forward_training, forward_inference, backward_data)){
-    //  return status::unimplemented;
-    //}
     /* Check group option: if true, NCHW -> gNCHW */
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
 
