@@ -235,9 +235,21 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
               CGA64::add(reg_prev_bcast_addr, aux_reg_bcast_data, reg_tmp_ofs);
             }
           }
-          prev_ofs = (i_reduce == jcp.reduce_loop_unroll)
-                      ? (jcp.bcast_dim + i_ur) * jcp.reduce_loop_unroll
-                      : i_ur * jcp.reduce_loop_unroll + i_reduce;
+          if (one_of(jcp.prop_kind, forward_training, forward_inference,
+                 backward_data)) {
+
+            prev_ofs = (i_reduce == jcp.reduce_loop_unroll)
+                        ? (jcp.bcast_dim + i_ur) * jcp.reduce_loop_unroll
+                        : i_ur * jcp.reduce_loop_unroll + i_reduce;
+          }else{
+            if (jcp.transpose_src) {
+              const int reduce_group = i_reduce / 4;
+              const int reduce_shift = i_reduce % 4;
+              prev_ofs = 4 * (reduce_group * jcp.ic_block + i_ur) + reduce_shift;
+            }
+            else
+              prev_ofs = i_reduce * jcp.ic_block + i_ur;
+          }
           prev_ofs = jcp.typesize_in * prev_ofs;
 
           CGA64::ld1rw(vreg_bcast_s(), reg_p_all_ones, xa::ptr(reg_prev_bcast_addr));
@@ -316,7 +328,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         }
  
       }else{
-        //(i_load ? reg_output_stride * i_load : 0) 
         ofs = jcp.typesize_out * jcp.load_block * i_ur;
         if( i_load ){
           CGA64::mov(reg_tmp_out_ofs, i_load);
@@ -449,11 +460,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
           CGA64::mov(reg_tmp_out_ofs, i_load);
           if((ofs>>6) < LDRMAX){
             CGA64::madd(reg_tmp_out_ofs, reg_tmp_out_ofs, reg_output_stride, aux_reg_output_data);
-            CGA64::str(vreg_sum(), xa::ptr(reg_tmp_out_ofs, static_cast<int32_t>(ofs>>6)));
+            CGA64::str( vreg_accum(i_load, i_ur), xa::ptr(reg_tmp_out_ofs, static_cast<int32_t>(ofs>>6)));
           }else{
             if((prev_ofs != -1) && ((ofs - prev_ofs)>0) &&(((ofs - prev_ofs)>>6) < LDRMAX)){
               CGA64::madd(reg_tmp_out_ofs, reg_tmp_out_ofs, reg_output_stride, reg_prev_out_addr);
-              CGA64::str(vreg_sum(), xa::ptr(reg_tmp_out_ofs, static_cast<int32_t>((ofs - prev_ofs)>>6)));
+              CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(reg_tmp_out_ofs, static_cast<int32_t>((ofs - prev_ofs)>>6)));
             }else{
               if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
                 ofs = ofs - prev_ofs;
@@ -480,17 +491,17 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 }
               }
               CGA64::madd(reg_tmp_out_ofs, reg_tmp_out_ofs, reg_output_stride, reg_prev_out_addr);
-              CGA64::str(vreg_sum(), xa::ptr(reg_tmp_out_ofs));
+              CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(reg_tmp_out_ofs));
     
               prev_ofs = jcp.typesize_out * jcp.load_block * i_ur;
             }
           }
         }else{
           if((ofs>>6) < LDRMAX){
-            CGA64::str(vreg_sum(), xa::ptr(aux_reg_output_data, static_cast<int32_t>(ofs>>6)));
+            CGA64::str( vreg_accum(i_load, i_ur), xa::ptr(aux_reg_output_data, static_cast<int32_t>(ofs>>6)));
           }else{
             if((prev_ofs != -1) && ((ofs - prev_ofs)>0) &&(((ofs - prev_ofs)>>6) < LDRMAX)){
-              CGA64::str(vreg_sum(), xa::ptr(reg_prev_out_addr, static_cast<int32_t>((ofs - prev_ofs)>>6)));
+              CGA64::str( vreg_accum(i_load, i_ur), xa::ptr(reg_prev_out_addr, static_cast<int32_t>((ofs - prev_ofs)>>6)));
             }else{
               if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
                 ofs = ofs - prev_ofs;
@@ -517,7 +528,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 }
               }
     
-              CGA64::str(vreg_sum(), xa::ptr(reg_prev_out_addr));
+              CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(reg_prev_out_addr));
     
               prev_ofs = jcp.typesize_out * jcp.load_block * i_ur;
             }
@@ -824,10 +835,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     /* Forward_[training, inference], backward_[data, weight] */
     jcp.prop_kind = cd.prop_kind; 
 
-    // TODO: impl backward_data
-    if(!one_of(jcp.prop_kind, forward_training, forward_inference, backward_data)){
-      return status::unimplemented;
-    }
     /* Check group option: if true, NCHW -> gNCHW */
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
 
