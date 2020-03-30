@@ -132,7 +132,6 @@ private:
     reg64_t imm_addr64 = x15; //r15;
 
     void add_imm(reg64_t out, reg64_t in, int value){
-     
 
       if( value >= 0){   
         if(value < ADDMAX){
@@ -260,13 +259,13 @@ struct jit_sve_conv_fwd_kernel {
     _jit_sve_conv_fwd_kernel<Xbyak::Zmm> *zmm_kernel_;
     _jit_sve_conv_fwd_kernel<Xbyak::Xmm> *xmm_kernel_;
 };
-/*
-struct jit_sve_conv_bwd_data_kernel_f32: public jit_generator_aarch64 {
+
+struct jit_sve_conv_bwd_data_kernel_f32: public jit_generator {
 
     jit_sve_conv_bwd_data_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
     {
         generate();
-        jit_ker = (void (*)(jit_conv_call_s *))getCode();
+        jit_ker = (void (*)(jit_conv_call_s *))getCode32();
     }
 
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sve_conv_bwd_data_kernel_f32)
@@ -283,56 +282,78 @@ struct jit_sve_conv_bwd_data_kernel_f32: public jit_generator_aarch64 {
     void (*jit_ker)(jit_conv_call_s *);
 
 private:
-    using reg64_t = const Xbyak::Reg64;
+    using reg64_t = const xa::XReg;
     enum {
         typesize = sizeof(float),
         ker_reg_base_idx = 28,
     };
 
-    reg64_t param = abi_param1_aarch64;
-    reg64_t reg_dst = r8;
-    reg64_t reg_ker = r9;
-    reg64_t reg_src = r10;
+    reg64_t param             = abi_param1_aarch64;
+    reg64_t reg_dst           = x8;
+    reg64_t reg_ker           = x9;
+    reg64_t reg_src           = x10;
 
-    reg64_t reg_dst_prf = r11;
-    reg64_t reg_ker_prf = r12;
-    reg64_t reg_src_prf = r13;
+    reg64_t reg_dst_prf       = x11;
+    reg64_t reg_ker_prf       = x12;
+    reg64_t reg_src_prf       = x13;
 
-    reg64_t aux_reg_dst = r14;
-    reg64_t aux_reg_ker = r15;
+    reg64_t aux_reg_dst       = x14;
+    reg64_t aux_reg_ker       = x15;
 
-    reg64_t aux_reg_dst_prf = rsi;
-    reg64_t aux_reg_ker_prf = rdx;
+    reg64_t aux_reg_dst_prf   = x16; //rsi;
+    reg64_t aux_reg_ker_prf   = x17; //rdx;
 
-    reg64_t aux_reg_dst_d_prf = r13;
-    reg64_t aux_reg_dst_d = rbx;
-    reg64_t aux_reg_ker_d_prf = abi_not_param1;
-    reg64_t aux_reg_ker_d = r9;
-    reg64_t reg_ki = r10;
+    reg64_t aux_reg_dst_d_prf = x13;
+    reg64_t aux_reg_dst_d     = x18; //rbx;
+    reg64_t aux_reg_ker_d_prf = x19; //abi_not_param1;
+    reg64_t aux_reg_ker_d     = x9;
+    reg64_t reg_ki            = x10;
 
-    reg64_t reg_kj = rax;
-    reg64_t reg_oi = rbx;
-    reg64_t reg_kh = abi_not_param1;
+    reg64_t reg_kj            = x20; //rax;
+    reg64_t reg_oi            = x18; //rbx;
+    reg64_t reg_kh            = x19; //abi_not_param1;
 
-    reg64_t reg_channel = rsi;
+    reg64_t reg_channel       = x16; //rsi;
 
-    reg64_t reg_tmp = rbp;
-    reg64_t reg_long_offt = r14;
+    reg64_t reg_tmp           = x21; //rbp;
+    reg64_t reg_long_offt     = x14;
 
-    inline Xbyak::Zmm zmm_ker(int i_ic) {
-        assert(i_ic < 4);
-        return Xbyak::Zmm(ker_reg_base_idx + i_ic);
+    reg64_t reg_prev_bcast_addr = x27;
+    reg64_t reg_add_tmp       = x28;
+    reg64_t reg_tmp_addr      = x30;
+
+    const xa::PReg reg_p_all_ones  = p1;
+
+    void add_imm(reg64_t out, reg64_t in, int value){
+
+      if( value >= 0){   
+        if(value < ADDMAX){
+            CGA64::add(out, in, value);
+        }else if(value < MOVMAX){
+            CGA64::mov(reg_add_tmp, value);
+            CGA64::add(out, in, reg_add_tmp);
+        }else{
+            CGA64::mov(reg_add_tmp, value&0xffff);
+            CGA64::movk(reg_add_tmp, value>>16, 16);
+            CGA64::add(out, in, reg_add_tmp);
+        }
+      }else{
+        int val = -1 * value;
+        if(val < ADDMAX){
+            CGA64::sub(out, in, val);
+        }else if(val < MOVMAX){
+            CGA64::mov(reg_add_tmp, val);
+            CGA64::sub(out, in, reg_add_tmp);
+        }else{
+            CGA64::mov(reg_add_tmp, val&0xffff);
+            CGA64::movk(reg_add_tmp, val>>16, 16);
+            CGA64::sub(out, in, reg_add_tmp);
+        }
+
+      }
     }
-    inline Xbyak::Zmm zmm_inp(int i_ic, int nb_x_blocking) {
-        int idx = i_ic + nb_x_blocking * jcp.ur_w;
-        assert(idx < 31);
-        return Xbyak::Zmm(idx);
-    }
-    inline Xbyak::Zmm zmm_out(int i_ur, int i_oc) {
-        int idx = i_ur + i_oc * jcp.ur_w;
-        assert(idx < ker_reg_base_idx);
-        return Xbyak::Zmm(idx);
-    }
+
+/*
     inline void vpXdpwssd(Xbyak::Zmm zmm1, Xbyak::Zmm zmm2, reg64_t reg,
         int offset) {
         if (jcp.ver == ver_4vnni)
@@ -346,14 +367,11 @@ private:
         else
             vaddps(zmm, zmm, op);
     }
-
-    Xbyak::Zmm zmm_wei = Xbyak::Zmm(31);
+*/
+    xa::ZReg reg_wei = xa::ZReg(31);
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);
-    inline void compute_loop_4fma(int ur_w, int l_overflow, int r_overflow);
-    inline void compute_loop_vnni(int ur_w, int l_overflow, int r_overflow);
-    inline void compute_loop_fma(int ur_w, int l_overflow, int r_overflow);
     inline void compute_loop_fma_core(int ur_w, int l_overflow, int r_overflow);
     inline void compute_loop(int ur_w, int l_overflow, int r_overflow);
     void generate();
@@ -382,6 +400,7 @@ private:
     }
 };
 
+/*
 struct jit_sve_conv_bwd_weights_kernel_f32 : public jit_generator_aarch64 {
 
     jit_sve_conv_bwd_weights_kernel_f32(jit_conv_conf_t ajcp)

@@ -532,7 +532,6 @@ template struct jit_sve_convolution_fwd_t<data_type::f32>;
 template struct jit_sve_convolution_fwd_t<data_type::s16,
         data_type::s16, data_type::s32>;
 
-#if 0
 template <data_type_t diff_dst_type, data_type_t wei_type,
           data_type_t diff_src_type>
 void jit_sve_convolution_bwd_data_t<diff_dst_type, wei_type,
@@ -923,6 +922,7 @@ template struct jit_sve_convolution_bwd_data_t<data_type::f32>;
 template struct jit_sve_convolution_bwd_data_t<data_type::s16,
     data_type::s16, data_type::s32>;
 
+#if 0
 template <data_type_t src_type, data_type_t diff_dst_type,
           data_type_t diff_weights_type>
 jit_sve_convolution_bwd_weights_t<src_type, diff_dst_type,
