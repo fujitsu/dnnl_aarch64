@@ -235,9 +235,21 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
               CGA64::add(reg_prev_bcast_addr, aux_reg_bcast_data, reg_tmp_ofs);
             }
           }
-          prev_ofs = (i_reduce == jcp.reduce_loop_unroll)
-                      ? (jcp.bcast_dim + i_ur) * jcp.reduce_loop_unroll
-                      : i_ur * jcp.reduce_loop_unroll + i_reduce;
+          if (one_of(jcp.prop_kind, forward_training, forward_inference,
+                 backward_data)) {
+
+            prev_ofs = (i_reduce == jcp.reduce_loop_unroll)
+                        ? (jcp.bcast_dim + i_ur) * jcp.reduce_loop_unroll
+                        : i_ur * jcp.reduce_loop_unroll + i_reduce;
+          }else{
+            if (jcp.transpose_src) {
+              const int reduce_group = i_reduce / 4;
+              const int reduce_shift = i_reduce % 4;
+              prev_ofs = 4 * (reduce_group * jcp.ic_block + i_ur) + reduce_shift;
+            }
+            else
+              prev_ofs = i_reduce * jcp.ic_block + i_ur;
+          }
           prev_ofs = jcp.typesize_in * prev_ofs;
 
           CGA64::ld1rw(vreg_bcast_s(), reg_p_all_ones, xa::ptr(reg_prev_bcast_addr));
