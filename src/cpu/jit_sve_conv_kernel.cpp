@@ -27,13 +27,16 @@
 #define GET_OFF(field) static_cast<int32_t>(offsetof(jit_conv_call_s, field))
 #define KNx_L2_EFFECTIVE_CAPACITY ((512-64)*1024)
 
+#define CGA64 CodeGeneratorAArch64
+namespace xa = Xbyak::Xbyak_aarch64;
+
 #define push(X); \
-    sub(sp, sp, 8); \
-    str(X, ptr(sp));
+    CGA64::sub(CGA64::sp, CGA64::sp, 8); \
+    CGA64::str(X, xa::ptr(CGA64::sp));
 
 #define pop(X); \
-    ldr(X, ptr(sp)); \
-    add(sp, sp, 8);
+    CGA64::ldr(X, xa::ptr(CGA64::sp)); \
+    CGA64::add(CGA64::sp, CGA64::sp, 8);
 
 
 
@@ -45,6 +48,7 @@ using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::memory_tracking::names;
 using namespace mkldnn::impl::utils;
 using namespace Xbyak;
+
 
 namespace {
 
@@ -94,13 +98,13 @@ void _jit_sve_conv_fwd_kernel<Vmm>::prepare_output(int ur_w)
     auto zreg_out_s = [=](int i_ur, int i_oc){
         int idx = i_ur + i_oc * jcp.ur_w;
         assert(idx < ker_reg_base_idx);
-        return ZRegS(idx);
+        return xa::ZRegS(idx);
     };
 
     for (int k = 0; k < jcp.nb_oc_blocking; k++){
         for (int j = 0; j < ur_w; j++) {
 
-            fmov(zreg_out_s(j, k));
+            CGA64::fmov(zreg_out_s(j, k));
 #if 0
             if (!is_owb_prefetching(jcp)) {
                 size_t aux_output_offset = get_output_offset(j, k);
@@ -117,52 +121,52 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
 {
 
     auto zreg_tmp = [=](){
-        return ZReg(31);
+        return xa::ZReg(31);
     };
     auto zreg_tmp_s = [=](){
-        return ZRegS(31);
+        return xa::ZRegS(31);
     };
 
     auto zreg_out = [=](int i_ur, int i_oc){
         int idx = i_ur + i_oc * jcp.ur_w;
         assert(idx < ker_reg_base_idx);
-        return ZReg(idx);
+        return xa::ZReg(idx);
     };
     auto zreg_out_s = [=](int i_ur, int i_oc){
         int idx = i_ur + i_oc * jcp.ur_w;
         assert(idx < ker_reg_base_idx);
-        return ZRegS(idx);
+        return xa::ZRegS(idx);
     };
 
-    Label no_update_label, store_label, eltwise_label;
+    xa::LabelAArch64 no_update_label, store_label, eltwise_label;
 
-    ldr(reg_channel, ptr(param1, GET_OFF(channel)));
+    CGA64::ldr(reg_channel, xa::ptr(abi_param1_aarch64, GET_OFF(channel)));
     if (jcp.with_bias) {
-        ldr(reg_bias, ptr(param1, GET_OFF(bias)));
+        CGA64::ldr(reg_bias, xa::ptr(abi_param1_aarch64, GET_OFF(bias)));
     }
 
     if (!jcp.with_sum) {
-        cmp(reg_channel, 0);
-        b(EQ, no_update_label);
+        CGA64::cmp(reg_channel, 0);
+        CGA64::b(xa::EQ, no_update_label);
     }
 
     auto out_load = [=] (int aux_output_offset){
         int ofs = aux_output_offset;
         if( ((ofs>>6) < LDRMAX) && ((ofs&0x3f) == 0)){
             ofs = ofs >>6;
-            ldr(zreg_tmp(), ptr(reg_out, static_cast<int32_t>(ofs)));
-        }else if( ofs < ADDMAX){
-            add(reg_tmp_addr, reg_out, ofs);
-            ldr(zreg_tmp(), ptr(reg_tmp_addr));
-        }else if( ofs < MOVMAX ){
-            mov(reg_tmp_addr, ofs);
-            add(reg_tmp_addr, reg_out, reg_tmp_addr);
-            ldr(zreg_tmp(), ptr(reg_tmp_addr));
+            CGA64::ldr(zreg_tmp(), xa::ptr(reg_out, static_cast<int32_t>(ofs)));
         }else{
-            mov(reg_tmp_addr, ofs&0xffff);
-            movk(reg_tmp_addr, ofs>>16, 16);
-            add(reg_tmp_addr, reg_out, reg_tmp_addr);
-            ldr(zreg_tmp(), ptr(reg_tmp_addr));
+            if( ofs < ADDMAX){
+                CGA64::add(reg_tmp_addr, reg_out, ofs);
+            }else if( ofs < MOVMAX ){
+                CGA64::mov(reg_tmp_addr, ofs);
+                CGA64::add(reg_tmp_addr, reg_out, reg_tmp_addr);
+            }else{
+                CGA64::mov(reg_tmp_addr, ofs&0xffff);
+                CGA64::movk(reg_tmp_addr, ofs>>16, 16);
+                CGA64::add(reg_tmp_addr, reg_out, reg_tmp_addr);
+            }
+            CGA64::ldr(zreg_tmp(), xa::ptr(reg_tmp_addr));
         }
     };
 
@@ -170,50 +174,50 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         for (int j = 0; j < ur_w; j++) {
             size_t aux_output_offset = get_output_offset(j, k);
             add_imm(reg_out_long_offt, reg_out, aux_output_offset);
-            ldr(zreg_tmp(), ptr(reg_out_long_offt));
-            fadd(zreg_out_s(j, k), zreg_out_s(j, k), zreg_tmp_s());
+            CGA64::ldr(zreg_tmp(), xa::ptr(reg_out_long_offt));
+            CGA64::fadd(zreg_out_s(j, k), zreg_out_s(j, k), zreg_tmp_s());
         }
 
     if (!jcp.with_sum) {
-        b(eltwise_label);
+        CGA64::b(eltwise_label);
     } else {
-        cmp(reg_channel, 0);
-        b(NE, eltwise_label);
+        CGA64::cmp(reg_channel, 0);
+        CGA64::b(xa::NE, eltwise_label);
     }
 
     auto bias_load = [=] (int bias_offset){
         int ofs = bias_offset;
         if( ((ofs>>6) < LDRMAX) && ((ofs&0x3f) == 0)){
             ofs = ofs >>6;
-            ldr(zreg_tmp(), ptr(reg_bias, static_cast<int32_t>(ofs)));
-        }else if( ofs < ADDMAX){
-            add(reg_tmp_addr, reg_bias, ofs);
-            ldr(zreg_tmp(), ptr(reg_tmp_addr));
-        }else if( ofs < MOVMAX ){
-            mov(reg_tmp_addr, ofs);
-            add(reg_tmp_addr, reg_bias, reg_tmp_addr);
-            ldr(zreg_tmp(), ptr(reg_tmp_addr));
+            CGA64::ldr(zreg_tmp(), xa::ptr(reg_bias, static_cast<int32_t>(ofs)));
         }else{
-            mov(reg_tmp_addr, ofs&0xffff);
-            movk(reg_tmp_addr, ofs>>16, 16);
-            add(reg_tmp_addr, reg_bias, reg_tmp_addr);
-            ldr(zreg_tmp(), ptr(reg_tmp_addr));
+            if( ofs < ADDMAX){
+                CGA64::add(reg_tmp_addr, reg_bias, ofs);
+            }else if( ofs < MOVMAX ){
+                CGA64::mov(reg_tmp_addr, ofs);
+                CGA64::add(reg_tmp_addr, reg_bias, reg_tmp_addr);
+            }else{
+                CGA64::mov(reg_tmp_addr, ofs&0xffff);
+                CGA64::movk(reg_tmp_addr, ofs>>16, 16);
+                CGA64::add(reg_tmp_addr, reg_bias, reg_tmp_addr);
+            }
+            CGA64::ldr(zreg_tmp(), xa::ptr(reg_tmp_addr));
         }
     };
 
-    L(no_update_label);
+    CGA64::L_aarch64(no_update_label);
     if (jcp.with_bias) {
         for (int k = 0; k < jcp.nb_oc_blocking; k++) {
             int bias_offset = jcp.typesize_out * k * jcp.oc_block;
             for (int j = 0; j < ur_w; j++) {
                 bias_load(bias_offset);
-                fadd(zreg_out_s(j,k), zreg_out_s(j,k), zreg_tmp_s());
+                CGA64::fadd(zreg_out_s(j,k), zreg_out_s(j,k), zreg_tmp_s());
             }
             //mic_prefetcht1(EVEX_compress_addr(reg_bias, bias_offset + 64));
         }
     }
 
-    L(eltwise_label);
+    CGA64::L_aarch64(eltwise_label);
     if (jcp.with_eltwise) {
         assert(!jcp.with_eltwise);
 #if 0
@@ -237,23 +241,23 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         int ofs = aux_output_offset;
         if( ((ofs>>6) < LDRMAX) && ((ofs&0x3f) == 0)){
             ofs = ofs >>6;
-            str(zreg_out(j, k), ptr(reg_out, static_cast<int32_t>(ofs)));
-        }else if( ofs < ADDMAX){
-            add(reg_tmp_addr, reg_out, ofs);
-            str(zreg_out(j, k), ptr(reg_tmp_addr));
-        }else if( ofs < MOVMAX ){
-            mov(reg_tmp_addr, ofs);
-            add(reg_tmp_addr, reg_out, reg_tmp_addr);
-            str(zreg_out(j, k), ptr(reg_tmp_addr));
-        }else{
-            mov(reg_tmp_addr, ofs&0xffff);
-            movk(reg_tmp_addr, ofs>>16, 16);
-            add(reg_tmp_addr, reg_out, reg_tmp_addr);
-            str(zreg_out(j, k), ptr(reg_tmp_addr));
+            CGA64::str(zreg_out(j, k), xa::ptr(reg_out, static_cast<int32_t>(ofs)));
+        }else{ 
+            if( ofs < ADDMAX){
+                CGA64::add(reg_tmp_addr, reg_out, ofs);
+            }else if( ofs < MOVMAX ){
+                CGA64::mov(reg_tmp_addr, ofs);
+                CGA64::add(reg_tmp_addr, reg_out, reg_tmp_addr);
+            }else{
+                CGA64::mov(reg_tmp_addr, ofs&0xffff);
+                CGA64::movk(reg_tmp_addr, ofs>>16, 16);
+                CGA64::add(reg_tmp_addr, reg_out, reg_tmp_addr);
+            }
+            CGA64::str(zreg_out(j, k), xa::ptr(reg_tmp_addr));
         }
     };
 
-    L(store_label);
+    CGA64::L_aarch64(store_label);
     for (int k = 0; k < jcp.nb_oc_blocking; k++){
         for (int j = 0; j < ur_w; j++) {
             size_t aux_output_offset = (size_t)typesize *
@@ -273,7 +277,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
     int ic_block = jcp.ic_block;
     int oc_block = jcp.oc_block;
     int nb_oc_block = jcp.nb_oc_blocking;
-    Label kh_label, kd_label;
+    xa::LabelAArch64 kh_label, kd_label;
     int shift_kernel_ptr = jcp.typesize_in * jcp.kw * jcp.oc_block
         * jcp.ic_block;
     int inp_mul = !jcp.is_1stconv ? ic_block : 1;
@@ -290,65 +294,65 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
 
     if (one_of(jcp.ndims, 3, 4)) {
-        mov(aux_reg_inp, reg_inp);
-        mov(aux_reg_ker, reg_ker);
+        CGA64::mov(aux_reg_inp, reg_inp);
+        CGA64::mov(aux_reg_ker, reg_ker);
     }
 
     if (jcp.ndims == 5) {
         push(reg_out);
 
-        ldr(reg_ki, ptr(param1, GET_OFF(kd_padding)));
-        ldr(aux_reg_ker_d, ptr(param1, GET_OFF(filt)));
-        mov(aux_reg_inp_d, reg_inp);
+        CGA64::ldr(reg_ki, xa::ptr(abi_param1_aarch64, GET_OFF(kd_padding)));
+        CGA64::ldr(aux_reg_ker_d, xa::ptr(abi_param1_aarch64, GET_OFF(filt)));
+        CGA64::mov(aux_reg_inp_d, reg_inp);
 
-        L(kd_label);
-        ldr(reg_kj, ptr(param1, GET_OFF(kh_padding)));
+        CGA64::L_aarch64(kd_label);
+        CGA64::ldr(reg_kj, xa::ptr(abi_param1_aarch64, GET_OFF(kh_padding)));
     } else {
-        mov(reg_kj, reg_kh);
+        CGA64::mov(reg_kj, reg_kh);
     }
 
     if (jcp.ndims == 5) {
-        mov(aux_reg_inp, aux_reg_inp_d);
-        mov(aux_reg_ker, aux_reg_ker_d);
+        CGA64::mov(aux_reg_inp, aux_reg_inp_d);
+        CGA64::mov(aux_reg_ker, aux_reg_ker_d);
     }
 
     auto zreg_inp = [=](int i_ic, int nb_x_blocking){
         int idx = i_ic + nb_x_blocking * jcp.ur_w;
         assert(idx < 31);
-        return ZReg(idx);
+        return xa::ZReg(idx);
     };
     auto zreg_inp_s = [=](int i_ic, int nb_x_blocking){
         int idx = i_ic + nb_x_blocking * jcp.ur_w;
         //printf("idx, %d = i_ic, %d, nb_x_blocking, %d, ur_w, %d\n",
         //        idx, i_ic, nb_x_blocking, jcp.ur_w);   
         assert(idx < 31);
-        return ZRegS(idx);
+        return xa::ZRegS(idx);
     };
     auto zreg_out_s = [=](int i_ur, int i_oc){
         int idx = i_ur + i_oc * jcp.ur_w;
         assert(idx < ker_reg_base_idx);
-        return ZRegS(idx);
+        return xa::ZRegS(idx);
     };
     auto zreg_wei = [=](){
-        return ZReg(31);
+        return xa::ZReg(31);
     };
     auto zreg_wei_s = [=](){
-        return ZRegS(31);
+        return xa::ZRegS(31);
     };
 
     auto bcast_load = [&](int jj, int nb_oc_block, int aux_input_offset, int prev_ofs, int jj_end){
         if( ((aux_input_offset & 0x3) ==0) && 
                 (aux_input_offset < LDRWMAX)){
-            ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
-                    ptr(aux_reg_inp, static_cast<int32_t>(aux_input_offset)));
+            CGA64::ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
+                    xa::ptr(aux_reg_inp, static_cast<int32_t>(aux_input_offset)));
         }else{
             if( (prev_ofs != -1) && 
                 ((aux_input_offset - prev_ofs)>0) &&
                 ((aux_input_offset - prev_ofs) < LDRMAX) && 
                 (((aux_input_offset - prev_ofs)& 0x3) ==0)){
                 
-                ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
-                        ptr(reg_prev_bcast_addr, static_cast<int32_t>(aux_input_offset - prev_ofs)));
+                CGA64::ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
+                        xa::ptr(reg_prev_bcast_addr, static_cast<int32_t>(aux_input_offset - prev_ofs)));
 
             }else{
                 int ofs;
@@ -356,33 +360,32 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
                     ofs = aux_input_offset - prev_ofs;
 
                     if( ofs < ADDMAX){
-                        add(reg_prev_bcast_addr, reg_prev_bcast_addr, ofs);
+                        CGA64::add(reg_prev_bcast_addr, reg_prev_bcast_addr, ofs);
                     }else if( ofs < MOVMAX ){
-                        mov(reg_tmp_addr, ofs);
-                        add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_addr);
+                        CGA64::mov(reg_tmp_addr, ofs);
+                        CGA64::add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_addr);
                     }else{
-                        mov(reg_tmp_addr, ofs&0xffff);
-                        movk(reg_tmp_addr, ofs>>16, 16);
-                        add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_addr);
+                        CGA64::mov(reg_tmp_addr, ofs&0xffff);
+                        CGA64::movk(reg_tmp_addr, ofs>>16, 16);
+                        CGA64::add(reg_prev_bcast_addr, reg_prev_bcast_addr, reg_tmp_addr);
                     }
 
                 }else{
                     ofs = aux_input_offset;
 
                     if( ofs < ADDMAX){
-                        add(reg_prev_bcast_addr, aux_reg_inp, ofs);
+                        CGA64::add(reg_prev_bcast_addr, aux_reg_inp, ofs);
                     }else if( ofs < MOVMAX ){
-                        mov(reg_tmp_addr, ofs);
-                        add(reg_prev_bcast_addr, aux_reg_inp, reg_tmp_addr);
+                        CGA64::mov(reg_tmp_addr, ofs);
+                        CGA64::add(reg_prev_bcast_addr, aux_reg_inp, reg_tmp_addr);
                     }else{
-                        mov(reg_tmp_addr, ofs&0xffff);
-                        movk(reg_tmp_addr, ofs>>16, 16);
-                        add(reg_prev_bcast_addr, aux_reg_inp, reg_tmp_addr);
+                        CGA64::mov(reg_tmp_addr, ofs&0xffff);
+                        CGA64::movk(reg_tmp_addr, ofs>>16, 16);
+                        CGA64::add(reg_prev_bcast_addr, aux_reg_inp, reg_tmp_addr);
                     }
                 }
 
-                ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, ptr(reg_prev_bcast_addr));
-
+                CGA64::ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones, xa::ptr(reg_prev_bcast_addr));
                 prev_ofs = aux_input_offset;
             }
         }
@@ -396,24 +399,24 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
         if( ((ofs>>6) < LDRMAX) && ((ofs&0x3f) == 0)){
             ofs = ofs >>6;
-            ldr(zreg_wei(), ptr(aux_reg_ker, static_cast<int32_t>(ofs)));
-        }else if( ofs < ADDMAX){
-            add(reg_tmp_addr, aux_reg_ker, ofs);
-            ldr(zreg_wei(), ptr(reg_tmp_addr));
-        }else if( ofs < MOVMAX ){
-            mov(reg_tmp_addr, ofs);
-            add(reg_tmp_addr, aux_reg_ker, reg_tmp_addr);
-            ldr(zreg_wei(), ptr(reg_tmp_addr));
+            CGA64::ldr(zreg_wei(), xa::ptr(aux_reg_ker, static_cast<int32_t>(ofs)));
         }else{
-            mov(reg_tmp_addr, ofs&0xffff);
-            movk(reg_tmp_addr, ofs>>16, 16);
-            add(reg_tmp_addr, aux_reg_ker, reg_tmp_addr);
-            ldr(zreg_wei(), ptr(reg_tmp_addr));
+            if( ofs < ADDMAX){
+                CGA64::add(reg_tmp_addr, aux_reg_ker, ofs);
+            }else if( ofs < MOVMAX ){
+                CGA64::mov(reg_tmp_addr, ofs);
+                CGA64::add(reg_tmp_addr, aux_reg_ker, reg_tmp_addr);
+            }else{
+                CGA64::mov(reg_tmp_addr, ofs&0xffff);
+                CGA64::movk(reg_tmp_addr, ofs>>16, 16);
+                CGA64::add(reg_tmp_addr, aux_reg_ker, reg_tmp_addr);
+            }
+            CGA64::ldr(zreg_wei(), xa::ptr(reg_tmp_addr));
         }
 
     };
 
-    L(kh_label);
+    CGA64::L_aarch64(kh_label);
     {
         for (int ki = 0; ki < kw; ki++) {
             int prev_ofs = -1;
@@ -438,33 +441,29 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
                     for (int jj = jj_start; jj < jj_end; jj++)
                         if (jcp.kernel_kind == expl_bcast)
-                            fmla(zreg_out_s(jj, ii), reg_p_all_ones,
-                                    zreg_inp_s(jj, nb_oc_block), zreg_wei_s());
+                            CGA64::fmla(zreg_out_s(jj, ii), reg_p_all_ones,
+                                        zreg_inp_s(jj, nb_oc_block), zreg_wei_s());
                         else 
                             assert(NULL);
                 }
             }
         }
-        //assert(shift_kernel_ptr < ADDMAX);
-        //assert(shift_input_ptr < ADDMAX);
         add_imm(aux_reg_ker, aux_reg_ker, shift_kernel_ptr);
         add_imm(aux_reg_inp, aux_reg_inp, shift_input_ptr);
-        sub(reg_kj, reg_kj, 1); //dec(reg_kj);
-        cmp(reg_kj, 0);
-        b(GT, kh_label);
+        CGA64::sub(reg_kj, reg_kj, 1); //dec(reg_kj);
+        CGA64::cmp(reg_kj, 0);
+        CGA64::b(xa::GT, kh_label);
     }
 
     if (jcp.ndims == 5) {
-        //assert((typesize * (jcp.dilate_d + 1) * jcp.ih * jcp.iw * inp_mul) < ADDMAX);
-        //assert(( typesize * jcp.kw * jcp.kh * jcp.oc_block* jcp.ic_block ) < ADDMAX);
         add_imm(aux_reg_inp_d, aux_reg_inp_d,
                 typesize * (jcp.dilate_d + 1) * jcp.ih * jcp.iw * inp_mul);
         add_imm(aux_reg_ker_d, aux_reg_ker_d, typesize * jcp.kw * jcp.kh * jcp.oc_block
                 * jcp.ic_block);
 
-        sub(reg_kj, reg_kj, 1); //dec(reg_ki);
-        cmp(reg_ki, 0);
-        b(GT, kd_label);
+        CGA64::sub(reg_kj, reg_kj, 1); //dec(reg_ki);
+        CGA64::cmp(reg_ki, 0);
+        CGA64::b(xa::GT, kd_label);
 
         pop(reg_out);
     }
@@ -481,20 +480,20 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop(int ur_w,
     }
     prepare_output(ur_w);
 
-    Label skip_compute_loop;
+    xa::LabelAArch64 skip_compute_loop;
     if (jcp.ndims == 5) {
         if ((jcp.dilate_d >= jcp.id)
                 || (jcp.kd - 1) * (jcp.dilate_d + 1) < nstl::max(jcp.f_pad, jcp.back_pad)) {
-            ldr(reg_kj, ptr(param1, GET_OFF(kd_padding)));
-            cmp(reg_kj, 0);
-            b(LE, skip_compute_loop);
+            CGA64::ldr(reg_kj, xa::ptr(abi_param1_aarch64, GET_OFF(kd_padding)));
+            CGA64::cmp(reg_kj, 0);
+            CGA64::b(xa::LE, skip_compute_loop);
         }
     }
     if ((jcp.dilate_h >= jcp.ih)
             || (jcp.kh - 1) * (jcp.dilate_h + 1) < nstl::max(jcp.t_pad, jcp.b_pad)) {
-        ldr(reg_kj, ptr(param1, GET_OFF(kh_padding)));
-        cmp(reg_kj, 0);
-        b(LE, skip_compute_loop);
+        CGA64::ldr(reg_kj, xa::ptr(abi_param1_aarch64, GET_OFF(kh_padding)));
+        CGA64::cmp(reg_kj, 0);
+        CGA64::b(xa::LE, skip_compute_loop);
     }
 
     if (jcp.ver == ver_fma)
@@ -508,7 +507,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop(int ur_w,
     else
         assert(!"unknown convolution version");
 
-    L(skip_compute_loop);
+    CGA64::L_aarch64(skip_compute_loop);
     store_output(ur_w);
     if (jcp.ndims == 5) {
         pop(reg_oi);
@@ -537,11 +536,11 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
     int out_shift = jcp.typesize_out * ur_w * jcp.oc_block;
 
     preamble();
-    ldr(reg_inp, ptr(param1, GET_OFF(src)));
-    ldr(reg_out, ptr(param1, GET_OFF(dst)));
-    ldr(reg_ker, ptr(param1, GET_OFF(filt)));
-    ldr(reg_ker_prf, ptr(param1, GET_OFF(filt_prf)));
-    ldr(reg_kh, ptr(param1, GET_OFF(kh_padding)));
+    CGA64::ldr(reg_inp,     xa::ptr(abi_param1_aarch64, GET_OFF(src)));
+    CGA64::ldr(reg_out,     xa::ptr(abi_param1_aarch64, GET_OFF(dst)));
+    CGA64::ldr(reg_ker,     xa::ptr(abi_param1_aarch64, GET_OFF(filt)));
+    CGA64::ldr(reg_ker_prf, xa::ptr(abi_param1_aarch64, GET_OFF(filt_prf)));
+    CGA64::ldr(reg_kh,      xa::ptr(abi_param1_aarch64, GET_OFF(kh_padding)));
 
     int r_pad = nstl::max(
             0, (ow - 1) * stride_w + (kw - 1) * dilate_w - (iw + l_pad - 1));
@@ -549,9 +548,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
     int r_pad1 = (ur_w * n_oi - 1) * stride_w + (kw - 1) * dilate_w
             - (iw + l_pad - 1);
 
-
-    //TODO
-    ptrue( reg_p_all_ones.b );
+    CGA64::ptrue( reg_p_all_ones.b );
 
     if (!is_ow_threading_on(jcp)) { // nb_ow <= 1
         // nb_ow is # of output width blocks ??
@@ -561,12 +558,12 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
         if (r_pad1 > 0) n_oi--;
 
         if (ow == ur_w) {
-            ldr(reg_inp_prf, ptr(param1, GET_OFF(src_prf)));
-            ldr(reg_out_prf, ptr(param1, GET_OFF(dst_prf)));
+            CGA64::ldr(reg_inp_prf, xa::ptr(abi_param1_aarch64, GET_OFF(src_prf)));
+            CGA64::ldr(reg_out_prf, xa::ptr(abi_param1_aarch64, GET_OFF(dst_prf)));
             compute_loop(ur_w, l_pad, r_pad);
         } else {
-            mov(reg_inp_prf, reg_inp);
-            mov(reg_out_prf, reg_out);
+            CGA64::mov(reg_inp_prf, reg_inp);
+            CGA64::mov(reg_out_prf, reg_out);
             if (n_oi == 0) {
                 add_imm(reg_inp_prf, reg_inp_prf,inp_shift_pad);
                 add_imm(reg_out_prf, reg_out_prf, out_shift);
@@ -579,7 +576,7 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
                     compute_loop(ur_w_tail, 0, r_pad);
                 }
             } else {
-                mov(reg_oi, 0); // 
+                CGA64::mov(reg_oi, 0); 
                 if (l_pad > 0) {
                     add_imm(reg_inp_prf, reg_inp_prf, inp_shift_pad);
                     add_imm(reg_out_prf, reg_out_prf, out_shift);
@@ -589,8 +586,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
                     add_imm(reg_oi, reg_oi, 1); // increment
                 }
                 if ((l_pad <= 0 && n_oi > 0) || (l_pad > 0 && n_oi > 1)) {
-                    Label ow_loop_label;
-                    L(ow_loop_label);
+                    xa::LabelAArch64 ow_loop_label;
+                    CGA64::L_aarch64(ow_loop_label);
                     {
                         add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
                         add_imm(reg_out_prf, reg_out_prf, out_shift);
@@ -598,8 +595,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
                         add_imm(reg_inp, reg_inp, inp_shift);
                         add_imm(reg_out, reg_out, out_shift);
                         add_imm(reg_oi, reg_oi, 1); //inc(reg_oi);
-                        cmp(reg_oi, n_oi);
-                        b(LT, ow_loop_label);
+                        CGA64::cmp(reg_oi, n_oi);
+                        CGA64::b(xa::LT, ow_loop_label);
                     }
                 }
                 if (r_pad1 > 0) {
@@ -621,8 +618,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
         // Number of block is passed as parameter owb,
         // and padding processing depends on this number.
 
-        Label end_label, last_oi_label, middle_ow_blocks_label, tail_label;
-        Label oi_loop_label, oi_loop_start_label, oi_loop_end_label;
+        xa::LabelAArch64 end_label, last_oi_label, middle_ow_blocks_label, tail_label;
+        xa::LabelAArch64 oi_loop_label, oi_loop_start_label, oi_loop_end_label;
 
         assert(ow_block % ur_w == 0);
         int n_oi_not_last_ow_block = ow_block / ur_w;
@@ -643,30 +640,30 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
         else if (first_ow_block_padded) n_oi_first_ow_block--;
         else if (next_last_ow_block_padded) n_oi_next_last_ow_block--;
 
-        ldr(reg_owb, ptr(param1, GET_OFF(owb)));
-        cmp(reg_owb, 0); // is that the first ow-block ?
-        b(GT, middle_ow_blocks_label);
+        CGA64::ldr(reg_owb, xa::ptr(abi_param1_aarch64, GET_OFF(owb)));
+        CGA64::cmp(reg_owb, 0); // is that the first ow-block ?
+        CGA64::b(xa::GT, middle_ow_blocks_label);
 
         // the first ow block, compute left padding
 
-        mov(reg_oi, n_oi_first_ow_block);
-        mov(reg_inp_prf, reg_inp);
-        mov(reg_out_prf, reg_out);
+        CGA64::mov(reg_oi, n_oi_first_ow_block);
+        CGA64::mov(reg_inp_prf, reg_inp);
+        CGA64::mov(reg_out_prf, reg_out);
 
         if (l_pad > 0) {
-            ldr(reg_ker_prf, ptr(param1, GET_OFF(filt_prf)));
+            CGA64::ldr(reg_ker_prf, xa::ptr(abi_param1_aarch64, GET_OFF(filt_prf)));
             add_imm(reg_inp_prf, reg_inp_prf, inp_shift_pad);
             add_imm(reg_out_prf, reg_out_prf, out_shift);
             compute_loop(ur_w, l_pad, 0);
             add_imm(reg_inp, reg_inp, inp_shift_pad);
             add_imm(reg_out, reg_out, out_shift);
-            sub(reg_oi, reg_oi, 1); // decrement
+            CGA64::sub(reg_oi, reg_oi, 1); // decrement
         }
-        b(oi_loop_label);
+        CGA64::b(oi_loop_label);
 
         // middle or last ow block entry
 
-        L(middle_ow_blocks_label);
+        CGA64::L_aarch64(middle_ow_blocks_label);
 
         if (l_pad > 0) {
             // just to consider left padding, not compute
@@ -675,71 +672,71 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
         }
 
         // set number of iteration for oi-loop
-        cmp(reg_owb, jcp.nb_ow - 1); // last ow-block ?
-        mov(reg_oi, n_oi_last_ow_block);
-        b(EQ, oi_loop_label);
-        cmp(reg_owb, jcp.nb_ow - 2); // next to last ow-block ?
-        mov(reg_oi, n_oi_next_last_ow_block);
-        b(EQ, oi_loop_label);
-        mov(reg_oi, n_oi_not_last_ow_block); // other middle ow-blocks
+        CGA64::cmp(reg_owb, jcp.nb_ow - 1); // last ow-block ?
+        CGA64::mov(reg_oi, n_oi_last_ow_block);
+        CGA64::b(xa::EQ, oi_loop_label);
+        CGA64::cmp(reg_owb, jcp.nb_ow - 2); // next to last ow-block ?
+        CGA64::mov(reg_oi, n_oi_next_last_ow_block);
+        CGA64::b(xa::EQ, oi_loop_label);
+        CGA64::mov(reg_oi, n_oi_not_last_ow_block); // other middle ow-blocks
 
         // oi loop w/o padding
-        L(oi_loop_label);
-        ldr(reg_ker_prf, ptr(param1, GET_OFF(filt_prf)));
-        L(oi_loop_start_label);
-            cmp(reg_oi, 0);
-            b(LE, oi_loop_end_label);
+        CGA64::L_aarch64(oi_loop_label);
+        CGA64::ldr(reg_ker_prf, xa::ptr(abi_param1_aarch64, GET_OFF(filt_prf)));
+        CGA64::L_aarch64(oi_loop_start_label);
+            CGA64::cmp(reg_oi, 0);
+            CGA64::b(xa::LE, oi_loop_end_label);
 
             add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
             add_imm(reg_out_prf, reg_out_prf, out_shift);
             compute_loop(ur_w, 0, 0);
             add_imm(reg_inp, reg_inp, inp_shift);
             add_imm(reg_out, reg_out, out_shift);
-            sub(reg_oi, reg_oi, 1); // dec(reg_oi);
-            b(oi_loop_start_label);
-        L(oi_loop_end_label);
+            CGA64::sub(reg_oi, reg_oi, 1); // dec(reg_oi);
+            CGA64::b(oi_loop_start_label);
+        CGA64::L_aarch64(oi_loop_end_label);
 
-        ldr(reg_owb, ptr(param1, GET_OFF(owb)));
+        CGA64::ldr(reg_owb, xa::ptr(abi_param1_aarch64, GET_OFF(owb)));
 
-        cmp(reg_owb, 0); // first ow-block ?
+        CGA64::cmp(reg_owb, 0); // first ow-block ?
         if (first_ow_block_padded) {
-            b(EQ, last_oi_label);
+            CGA64::b(xa::EQ, last_oi_label);
         } else {
-            b(EQ, end_label);
+            CGA64::b(xa::EQ, end_label);
         }
-        cmp(reg_owb, jcp.nb_ow - 2); // next to last ow-block ?
-        b(LT, end_label);
+        CGA64::cmp(reg_owb, jcp.nb_ow - 2); // next to last ow-block ?
+        CGA64::b(xa::LT, end_label);
         if (next_last_ow_block_padded) {
-            b(EQ, last_oi_label);
+            CGA64::b(xa::EQ, last_oi_label);
         } else {
-            b(EQ, end_label);
+            CGA64::b(xa::EQ, end_label);
         }
         // that is last block
         if (!last_ow_block_padded) {
-            b(tail_label);
+            CGA64::b(tail_label);
         }
 
         // last oi block with right padding
-        L(last_oi_label);
-        ldr(reg_ker_prf, ptr(param1, GET_OFF(filt_prf)));
+        CGA64::L_aarch64(last_oi_label);
+        CGA64::ldr(reg_ker_prf, xa::ptr(abi_param1_aarch64, GET_OFF(filt_prf)));
         add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
         add_imm(reg_out_prf, reg_out_prf, out_shift);
         compute_loop(ur_w, 0, r_pad1);
         add_imm(reg_inp, reg_inp, inp_shift);
         add_imm(reg_out, reg_out, out_shift);
 
-        ldr(reg_owb, ptr(param1, GET_OFF(owb)));
-        cmp(reg_owb, jcp.nb_ow - 1); // last ow_block?
-        b(LT, end_label);
+        CGA64::ldr(reg_owb, xa::ptr(abi_param1_aarch64, GET_OFF(owb)));
+        CGA64::cmp(reg_owb, jcp.nb_ow - 1); // last ow_block?
+        CGA64::b(xa::LT, end_label);
 
-        L(tail_label);
-        ldr(reg_ker_prf, ptr(param1, GET_OFF(filt_prf)));
+        CGA64::L_aarch64(tail_label);
+        CGA64::ldr(reg_ker_prf, xa::ptr(abi_param1_aarch64, GET_OFF(filt_prf)));
         if (ur_w_tail != 0) {
             add_imm(reg_inp_prf, reg_inp_prf, inp_shift);
             add_imm(reg_out_prf, reg_out_prf, out_shift);
             compute_loop(ur_w_tail, 0, r_pad);
         }
-        L(end_label);
+        CGA64::L_aarch64(end_label);
     }
     postamble();
 

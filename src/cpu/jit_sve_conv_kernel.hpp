@@ -21,11 +21,10 @@
 #include "memory_tracking.hpp"
 
 #include "cpu_memory.hpp"
-#include "jit_generator_aarch64.hpp"
+#include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
 //#include "jit_uni_eltwise.hpp"
 
-using namespace Xbyak::Xbyak_aarch64;
 
 #define PRFWMAX    32
 #define LDRMAX    256
@@ -37,8 +36,12 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+#define CGA64 CodeGeneratorAArch64
+namespace xa = Xbyak::Xbyak_aarch64;
+
+
 template<typename Vmm>
-struct _jit_sve_conv_fwd_kernel : public jit_generator_aarch64 {
+struct _jit_sve_conv_fwd_kernel : public jit_generator {
 
     _jit_sve_conv_fwd_kernel(jit_conv_conf_t ajcp,
             const primitive_attr_t &attr)
@@ -65,13 +68,13 @@ struct _jit_sve_conv_fwd_kernel : public jit_generator_aarch64 {
     void (*jit_ker_)(jit_conv_call_s *);
 
 private:
-    using reg64_t = const Xbyak::Xbyak_aarch64::XReg;
+    using reg64_t = const xa::XReg;
     enum {
         typesize = sizeof(float),
         ker_reg_base_idx = 28,
     };
 
-    const Xbyak::Xbyak_aarch64::PReg reg_p_all_ones  = p1;
+    const xa::PReg reg_p_all_ones  = p1;
 
     /* ----------------------------------- */
     reg64_t reg_tmp_addr        = x30;
@@ -133,26 +136,26 @@ private:
 
       if( value >= 0){   
         if(value < ADDMAX){
-            add(out, in, value);
+            CGA64::add(out, in, value);
         }else if(value < MOVMAX){
-            mov(reg_tmp, value);
-            add(out, in, reg_tmp);
+            CGA64::mov(reg_tmp, value);
+            CGA64::add(out, in, reg_tmp);
         }else{
-            mov(reg_tmp, value&0xffff);
-            movk(reg_tmp, value>>16, 16);
-            add(out, in, reg_tmp);
+            CGA64::mov(reg_tmp, value&0xffff);
+            CGA64::movk(reg_tmp, value>>16, 16);
+            CGA64::add(out, in, reg_tmp);
         }
       }else{
         int val = -1 * value;
         if(val < ADDMAX){
-            sub(out, in, val);
+            CGA64::sub(out, in, val);
         }else if(val < MOVMAX){
-            mov(reg_tmp, val);
-            sub(out, in, reg_tmp);
+            CGA64::mov(reg_tmp, val);
+            CGA64::sub(out, in, reg_tmp);
         }else{
-            mov(reg_tmp, val&0xffff);
-            movk(reg_tmp, val>>16, 16);
-            sub(out, in, reg_tmp);
+            CGA64::mov(reg_tmp, val&0xffff);
+            CGA64::movk(reg_tmp, val>>16, 16);
+            CGA64::sub(out, in, reg_tmp);
         }
 
       }
@@ -172,14 +175,6 @@ private:
     inline void compute_loop(int ur_w, int pad_l, int pad_r);
 
     void generate();
-/*
-    inline void vadd(Vmm vmm, const Xbyak::Operand& op) {
-        if (jcp.ver == ver_4vnni || jcp.ver == ver_vnni)
-            vpaddd(vmm, vmm, op);
-        else
-            vaddps(vmm, vmm, op);
-    }
-*/
     inline size_t get_output_offset(int oi, int n_oc_block) {
         return (size_t)jcp.typesize_out * ((size_t)n_oc_block * jcp.oh
             * jcp.ow * jcp.od + oi) * jcp.oc_block;
