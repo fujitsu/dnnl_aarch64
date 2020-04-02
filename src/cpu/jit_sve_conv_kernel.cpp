@@ -1311,7 +1311,7 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
             CGA64::ld1rw(zreg_inp_s(jj, nb_oc_block), reg_p_all_ones,
                     xa::ptr(aux_reg_dst, static_cast<int32_t>(aux_output_offset)));
         }else{
-            if( (prev_ofs != -1) && 
+            if( (prev_ofs > -1) && 
                 ((aux_output_offset - prev_ofs)>0) &&
                 ((aux_output_offset - prev_ofs) < LDRWMAX) && 
                 (((aux_output_offset - prev_ofs)& 0x3) ==0)){
@@ -1321,7 +1321,7 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
     
             }else{
                 int ofs;
-                if((prev_ofs != -1) && ((aux_output_offset - prev_ofs)>0)){
+                if((prev_ofs > -1) && ((aux_output_offset - prev_ofs)>0)){
                     ofs = aux_output_offset - prev_ofs;
                     add_imm(reg_prev_bcast_addr, reg_prev_bcast_addr, ofs);
     
@@ -1387,7 +1387,7 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
             int jj_end = get_iw_end(ur_w, ki, r_overflow);
             for (int oc = 0; oc < oc_block; oc++) {
                 if (jcp.kernel_kind == expl_bcast) {
-                    for (int jj = jj_start; jj < jj_end; jj++) {
+                    for (int jj = jj_start; jj < jj_end; jj += 1/*stride_w*/) {
                         int aux_output_offset = output_offset(jj, oc, ki);
                         prev_ofs = bcast_load(jj, nb_ic_block, aux_output_offset, prev_ofs, jj_end);
                     }
@@ -1405,6 +1405,7 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
         }
         add_imm(aux_reg_ker, aux_reg_ker, shift_ker_ptr);
         assert(shift_dst_ptr < 4095);
+        assert(shift_dst_ptr > 0);
         CGA64::sub(aux_reg_dst, aux_reg_dst, shift_dst_ptr);
         //dec(reg_kj);
         CGA64::sub(reg_kj, reg_kj, 1);
@@ -1595,6 +1596,11 @@ status_t jit_sve_conv_bwd_data_kernel_f32::init_conf(
     jcp.dilate_d = (ndims == 5) ? cd.dilates[0] : 0;
     jcp.dilate_h = (ndims == 3) ? 0 : cd.dilates[ndims-4];
     jcp.dilate_w = cd.dilates[ndims-3];
+
+    //TODO
+    if( jcp.stride_h > 1 || jcp.stride_w > 1){
+        return status::unimplemented;
+    }
     if ((jcp.dilate_w != 0 && jcp.stride_w != 1)
             || (jcp.dilate_d != 0 && jcp.stride_d != 1)
             || (jcp.dilate_h != 0 && jcp.stride_h != 1))
@@ -1726,7 +1732,7 @@ status_t jit_sve_conv_bwd_data_kernel_f32::init_conf(
                     jcp.nb_ic_blocking = i;
                     break;
                 }
-        jcp.ur_w = 30 / (jcp.nb_ic_blocking + 1);
+        jcp.ur_w = 31 / (jcp.nb_ic_blocking + 1);
         if (jcp.iw < jcp.ur_w) jcp.ur_w = jcp.iw;
     }
     jcp.ur_w_tail = jcp.iw % jcp.ur_w;
