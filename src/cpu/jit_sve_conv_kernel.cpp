@@ -1380,7 +1380,7 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
 
     CGA64::L_aarch64(kh_label);
     {
-        for (int ki = 0; ki < kw; ki++) {
+        for (int ki = 0; ki < kw; ki++) { // kernel width
             int prev_ofs = -1;
 
             int jj_start = get_iw_start(ki, l_overflow);
