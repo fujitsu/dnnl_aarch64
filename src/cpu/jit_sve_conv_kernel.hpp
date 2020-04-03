@@ -23,7 +23,7 @@
 #include "cpu_memory.hpp"
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
-//#include "jit_uni_eltwise.hpp"
+#include "jit_uni_eltwise.hpp"
 
 
 #define PRFWMAX    32
@@ -47,11 +47,9 @@ struct _jit_sve_conv_fwd_kernel : public jit_generator {
             const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
     {
-#if 0
         if (jcp.with_eltwise)
             eltwise_injector_ = new jit_uni_eltwise_injector_f32<sve>(
                     this, jcp.eltwise);
-#endif
 
         generate();
         jit_ker_ = (void (*)(jit_conv_call_s *))getCode32();
@@ -181,13 +179,7 @@ private:
       }
     }
 
-
-
-#if 0
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
-#else
-    void *eltwise_injector_;
-#endif
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);
@@ -442,14 +434,13 @@ private:
     }
 };
 
-/*
-struct jit_sve_conv_bwd_weights_kernel_f32 : public jit_generator_aarch64 {
+struct jit_sve_conv_bwd_weights_kernel_f32 : public jit_generator {
 
     jit_sve_conv_bwd_weights_kernel_f32(jit_conv_conf_t ajcp)
         : jcp(ajcp)
     {
         generate();
-        jit_ker = (void (*)(jit_conv_call_s *))getCode();
+        jit_ker = (void (*)(jit_conv_call_s *))getCode32();
     }
 
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sve_conv_bwd_weights_kernel_f32)
@@ -465,33 +456,68 @@ struct jit_sve_conv_bwd_weights_kernel_f32 : public jit_generator_aarch64 {
     void (*jit_ker)(jit_conv_call_s *);
 
 private:
-    using reg64_t = const Xbyak::Reg64;
+    using reg64_t = const xa::XReg;
     enum {typesize = sizeof(float)};
     static const int max_ur_w;
     static const int min_oh_reduce;
 
-    reg64_t param = abi_param1;
-    reg64_t reg_input = rax;
-    reg64_t reg_kernel = rdx;
-    reg64_t reg_output = rsi;
-    reg64_t b_ic = abi_not_param1;
-    reg64_t kj = r8;
-    reg64_t reg_kh = r9;
-    reg64_t reg_ur_w_trips = r10;
-    reg64_t reg_oj = r15;
-    reg64_t reg_ih_count = rbx;
-    reg64_t reg_tmp = r14;
-    reg64_t reg_long_offt = r14;
+    reg64_t param          = abi_param1_aarch64;
+    reg64_t reg_input      = x20; //rax;
+    reg64_t reg_kernel     = x17; //rdx;
+    reg64_t reg_output     = x16; //rsi;
+    reg64_t b_ic           = x19; //abi_not_param1;
+    reg64_t kj             = x8; //r8;
+    reg64_t reg_kh         = x9; //r9;
+    reg64_t reg_ur_w_trips = x10; //r10;
+    reg64_t reg_oj         = x15; //r15;
+    reg64_t reg_ih_count   = x18; //rbx;
+    reg64_t reg_tmp        = x14; //r14;
+    reg64_t reg_long_offt  = x14; //r14;
 
-    reg64_t ki = r11;
-    reg64_t reg_kd_count = r12;
-    reg64_t reg_oi = r12;
-    reg64_t reg_d_index = r13;
-    reg64_t reg_input_d = r15;
-    reg64_t reg_output_d = rbx;
-    reg64_t aux_reg_input = r12;
-    reg64_t aux_reg_kernel = r13;
-    reg64_t reg_bias = rbx;
+    reg64_t ki             = x11; //r11;
+    reg64_t reg_kd_count   = x12; //r12;
+    reg64_t reg_oi         = x12; //r12;
+    reg64_t reg_d_index    = x13; //r13;
+    reg64_t reg_input_d    = x15; //r15;
+    reg64_t reg_output_d   = x17; //rbx;
+    reg64_t aux_reg_input  = x12; //r12;
+    reg64_t aux_reg_kernel = x13; //r13;
+    reg64_t reg_bias       = x17; //rbx;
+
+    reg64_t reg_prev_bcast_addr = x27;
+    reg64_t reg_add_tmp       = x28;
+    reg64_t reg_tmp_addr      = x30;
+
+    const xa::PReg reg_p_all_ones  = p1;
+
+    void add_imm(reg64_t out, reg64_t in, int value){
+
+      if( value >= 0){   
+        if(value < ADDMAX){
+            CGA64::add(out, in, value);
+        }else if(value < MOVMAX){
+            CGA64::mov(reg_add_tmp, value);
+            CGA64::add(out, in, reg_add_tmp);
+        }else{
+            CGA64::mov(reg_add_tmp, value&0xffff);
+            CGA64::movk(reg_add_tmp, value>>16, 16);
+            CGA64::add(out, in, reg_add_tmp);
+        }
+      }else{
+        int val = -1 * value;
+        if(val < ADDMAX){
+            CGA64::sub(out, in, val);
+        }else if(val < MOVMAX){
+            CGA64::mov(reg_add_tmp, val);
+            CGA64::sub(out, in, reg_add_tmp);
+        }else{
+            CGA64::mov(reg_add_tmp, val&0xffff);
+            CGA64::movk(reg_add_tmp, val>>16, 16);
+            CGA64::sub(out, in, reg_add_tmp);
+        }
+
+      }
+    }
 
     inline void bias_kernel_2d();
     inline void bias_kernel_3d();
@@ -505,26 +531,11 @@ private:
             int pad_l, int pad_r, int ic_block_step,
             int input_offset, int kernel_offset, int output_offset,
             bool input_wraparound = false);
-    inline void compute_ic_block_step_fma(int ur_w,
-            int pad_l, int pad_r, int ic_block_step,
-            int input_offset, int kernel_offset, int output_offset,
-            bool input_wraparound);
-    inline void compute_ic_block_step_4fma(int ur_w,
-            int pad_l, int pad_r, int ic_block_step,
-            int input_offset, int kernel_offset, int output_offset,
-            bool input_wraparound);
-    inline void compute_ic_block_step_vnni(int ur_w,
-            int pad_l, int pad_r, int ic_block_step,
-            int input_offset, int kernel_offset, int output_offset,
-            bool input_wraparound);
     inline void compute_oh_step_common(int ic_block_step, int max_ur_w);
     inline void compute_oh_step_disp();
     inline void compute_oh_loop_common();
     inline void compute_oh_loop_partial();
     inline void compute_od_loop_partial();
-
-    inline bool compute_full_spat_loop();
-    inline bool flat_4ops_compute();
 
     inline void compute_loop();
 
@@ -533,7 +544,6 @@ private:
     static void balance(const jit_conv_conf_t &j, int &nthr, int &nthr_mb,
             int &nthr_g, int &nthr_oc_b, int &nthr_ic_b);
 };
-*/
 
 }
 }
