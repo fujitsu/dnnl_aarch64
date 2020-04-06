@@ -485,8 +485,10 @@ private:
     reg64_t reg_bias       = x17; //rbx;
 
     reg64_t reg_prev_bcast_addr = x27;
-    reg64_t reg_add_tmp       = x28;
-    reg64_t reg_tmp_addr      = x30;
+    reg64_t reg_add_tmp    = x28;
+    reg64_t reg_tmp_addr   = x30;
+
+    xa::ZRegS zreg_idata   = xa::ZRegS(31);
 
     const xa::PReg reg_p_all_ones  = p1;
 
@@ -509,7 +511,6 @@ private:
     }
 
     void add_imm(reg64_t out, reg64_t in, int value){
-
       if( value >= 0){   
         if(value < ADDMAX){
             CGA64::add(out, in, value);
