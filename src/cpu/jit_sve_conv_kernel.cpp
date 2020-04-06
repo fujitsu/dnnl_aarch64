@@ -1397,7 +1397,7 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
                     if (jj_end - jj_start > 0){
                         wei_load(aux_kernel_offset);
                     }
-                    for (int jj = jj_start; jj < jj_end; jj += stride_w)
+                    for (int jj = jj_start; jj < jj_end; jj += 1/*stride_w*/)
                         CGA64::fmla(zreg_out_s(jj, ii), reg_p_all_ones,
                                     zreg_inp_s(jj, nb_ic_block), zreg_wei_s());
                 }
@@ -1598,9 +1598,9 @@ status_t jit_sve_conv_bwd_data_kernel_f32::init_conf(
     jcp.dilate_w = cd.dilates[ndims-3];
 
     //TODO
-    if( jcp.stride_h > 1 || jcp.stride_w > 1){
-        return status::unimplemented;
-    }
+    //if( jcp.stride_h > 1 || jcp.stride_w > 1){
+    //    return status::unimplemented;
+    //}
     if ((jcp.dilate_w != 0 && jcp.stride_w != 1)
             || (jcp.dilate_d != 0 && jcp.stride_d != 1)
             || (jcp.dilate_h != 0 && jcp.stride_h != 1))
