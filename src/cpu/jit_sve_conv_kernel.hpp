@@ -485,38 +485,77 @@ private:
     reg64_t aux_reg_kernel = x13; //r13;
     reg64_t reg_bias       = x17; //rbx;
 
-    reg64_t reg_prev_bcast_addr = x27;
-    reg64_t reg_add_tmp       = x28;
-    reg64_t reg_tmp_addr      = x30;
+    reg64_t reg_add_tmp    = x26;
+    reg64_t reg_tmp_imm    = x27;
 
-    const xa::PReg reg_p_all_ones  = p1;
+    xa::ZRegS zreg_idata   = xa::ZRegS(31);
+
+    const xa::PReg reg_p_all_ones = p1;
+
+    void mov_imm(reg64_t out, int value){
+        if(value < MOVMAX){
+            CGA64::mov(out, value);
+        }else if(value <= 0xffffffff){
+            CGA64::mov(out, value&0xffff);
+            CGA64::movk(out, value>>16, 16);
+        }else if( value <= 0xffffffffffff ){
+            CGA64::mov(out, value&0xffff);
+            CGA64::movk(out, (value>>16)&0xffff, 16);
+            CGA64::movk(out, value>>32, 32);
+        }else{
+            CGA64::mov(out, value&0xffff);
+            CGA64::movk(out, (value>>16)&0xffff, 16);
+            CGA64::movk(out, (value>>32)&0xffff, 32);
+            CGA64::movk(out, value>>48, 48);
+        }
+    }
 
     void add_imm(reg64_t out, reg64_t in, int value){
-
       if( value >= 0){   
         if(value < ADDMAX){
             CGA64::add(out, in, value);
         }else if(value < MOVMAX){
-            CGA64::mov(reg_add_tmp, value);
-            CGA64::add(out, in, reg_add_tmp);
+            CGA64::mov(reg_tmp_imm, value);
+            CGA64::add(out, in, reg_tmp_imm);
+        }else if(value <= 0xffffffff){
+            CGA64::mov(reg_tmp_imm, value&0xffff);
+            CGA64::movk(reg_tmp_imm, value>>16, 16);
+            CGA64::add(out, in, reg_tmp_imm);
+        }else if( value <= 0xffffffffffff ){
+            CGA64::mov(reg_tmp_imm, value&0xffff);
+            CGA64::movk(reg_tmp_imm, (value>>16)&0xffff, 16);
+            CGA64::movk(reg_tmp_imm, value>>32, 32);
+            CGA64::add(out, in, reg_tmp_imm);
         }else{
-            CGA64::mov(reg_add_tmp, value&0xffff);
-            CGA64::movk(reg_add_tmp, value>>16, 16);
-            CGA64::add(out, in, reg_add_tmp);
+            CGA64::mov(reg_tmp_imm, value&0xffff);
+            CGA64::movk(reg_tmp_imm, (value>>16)&0xffff, 16);
+            CGA64::movk(reg_tmp_imm, (value>>32)&0xffff, 32);
+            CGA64::movk(reg_tmp_imm, value>>48, 48);
+            CGA64::add(out, in, reg_tmp_imm);
         }
       }else{
         int val = -1 * value;
         if(val < ADDMAX){
             CGA64::sub(out, in, val);
         }else if(val < MOVMAX){
-            CGA64::mov(reg_add_tmp, val);
-            CGA64::sub(out, in, reg_add_tmp);
+            CGA64::mov(reg_tmp_imm, val);
+            CGA64::sub(out, in, reg_tmp_imm);
+        }else if( val <= 0xffffffff){
+            CGA64::mov(reg_tmp_imm, val&0xffff);
+            CGA64::movk(reg_tmp_imm, val>>16, 16);
+            CGA64::sub(out, in, reg_tmp_imm);
+        }else if( value <= 0xffffffffffff ){
+            CGA64::mov(reg_tmp_imm, val&0xffff);
+            CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
+            CGA64::movk(reg_tmp_imm, val>>32, 32);
+            CGA64::sub(out, in, reg_tmp_imm);
         }else{
-            CGA64::mov(reg_add_tmp, val&0xffff);
-            CGA64::movk(reg_add_tmp, val>>16, 16);
-            CGA64::sub(out, in, reg_add_tmp);
+            CGA64::mov(reg_tmp_imm, val&0xffff);
+            CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
+            CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
+            CGA64::movk(reg_tmp_imm, val>>48, 48);
+            CGA64::sub(out, in, reg_tmp_imm);
         }
-
       }
     }
 
