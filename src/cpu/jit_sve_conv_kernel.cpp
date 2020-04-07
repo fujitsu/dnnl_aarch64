@@ -2215,14 +2215,14 @@ void jit_sve_conv_bwd_weights_kernel_f32::maybe_zero_kernel()
             == cpu_isa_traits<sve>::vlen);
         for (int ic1 = 0; ic1 < jcp.ic_block; ic1++) {
             CGA64::add(reg_add_tmp, reg_kernel, reg_tmp);
-            add_imm(reg_add_tmp, reg_add_tmp, ic1 * jcp.oc_block);
+            add_imm(reg_add_tmp, reg_add_tmp, ic1 * jcp.oc_block * jcp.typesize_out);
             CGA64::str(xa::ZReg(0), xa::ptr(reg_add_tmp));
                 //vmovups(ptr[reg_kernel + reg_tmp + ic1 * jcp.oc_block
                 //    * jcp.typesize_out], zero);
         }
         add_imm(reg_tmp, reg_tmp, jcp.ic_block * jcp.oc_block * jcp.typesize_out);
-        CGA64::cmp(reg_tmp, jcp.ic_block * jcp.oc_block * jcp.kw * jcp.kh * jcp.kd
-            * jcp.typesize_out);
+        mov_imm(reg_add_tmp, jcp.ic_block * jcp.oc_block * jcp.kw * jcp.kh * jcp.kd * jcp.typesize_out);
+        CGA64::cmp(reg_tmp, reg_add_tmp);
         CGA64::b(xa::NE, zeroing_loop);
     }
 
