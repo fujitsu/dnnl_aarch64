@@ -298,7 +298,7 @@ private:
     using reg64_t = const xa::XReg;
     enum {
         typesize = sizeof(float),
-        ker_reg_base_idx = 28,
+        ker_reg_base_idx = 26,
     };
 
     reg64_t param             = abi_param1_aarch64;
@@ -406,6 +406,7 @@ private:
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);
+    inline void compute_loop_fma(int ur_w, int l_overflow, int r_overflow);
     inline void compute_loop_fma_core(int ur_w, int l_overflow, int r_overflow);
     inline void compute_loop(int ur_w, int l_overflow, int r_overflow);
     void generate();

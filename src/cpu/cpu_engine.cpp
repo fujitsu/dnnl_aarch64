@@ -159,6 +159,8 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_sve_convolution_fwd_t<f32>),
     INSTANCE(jit_sve_convolution_bwd_data_t<f32>),
 //    INSTANCE(jit_sve_convolution_bwd_weights_t<f32>),
+    INSTANCE(jit_avx512_common_convolution_bwd_data_t<f32>),
+    INSTANCE(jit_avx512_common_convolution_bwd_weights_t<f32>),
 #endif //#ifndef __ARM_ARCH
     INSTANCE(gemm_convolution_fwd_t),
     INSTANCE(gemm_convolution_bwd_data_t),

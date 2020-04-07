@@ -61,8 +61,8 @@ if(DNNL_AARCH64_NATIVE_JIT_REORDER)
         # ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_uni_eltwise.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_avx512_common_1x1_convolution.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_avx512_common_1x1_conv_kernel.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_avx512_common_convolution.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_avx512_common_conv_kernel.cpp
+        #${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_avx512_common_convolution.cpp
+        #${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_avx512_common_conv_kernel.cpp
         )
 else()
     file(GLOB_RECURSE EXCLUDE_SOURCES

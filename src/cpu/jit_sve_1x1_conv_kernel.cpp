@@ -152,7 +152,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         if (jcp.with_bias
             && one_of(jcp.prop_kind, forward_training, forward_inference)) {
 
-            tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
+            CGA64::tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
             CGA64::b(xa::EQ, init_zero);
 
             // TODO: We need impl offset calc part in the following loop
@@ -499,7 +499,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                         && i_reduce == jcp.reduce_loop_unroll - reduce_step) {
                     xa::LabelAArch64 load_all;
                     xa::LabelAArch64 load_finish;
-                    tst(reg_reduce_pos_flag, FLAG_SP_LAST);
+                    CGA64::tst(reg_reduce_pos_flag, FLAG_SP_LAST);
                     CGA64::b(xa::EQ, load_all);
 
                     const int n_loads = jcp.is % jcp.fma_step;
