@@ -1438,24 +1438,30 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma(
         }
 
         add_imm(aux_reg_ker, aux_reg_ker, typesize * stride_h * kw * oc_block * ic_block);
-        CGA64::sub(aux_reg_dst, aux_reg_dst, typesize * (jcp.dilate_h + 1) * ow * oc_block);
+        //CGA64::sub(aux_reg_dst, aux_reg_dst, typesize * (jcp.dilate_h + 1) * ow * oc_block);
+        add_imm(aux_reg_dst, aux_reg_dst, -1.0 * typesize * (jcp.dilate_h + 1) * ow * oc_block);
         add_imm(aux_reg_ker_prf, aux_reg_ker_prf, 
                     typesize * stride_h * kw * oc_block * ic_block);
-        CGA64::sub(aux_reg_dst_prf, aux_reg_dst_prf, 
-                    typesize * (jcp.dilate_h + 1) * ow * oc_block);
-
+        //CGA64::sub(aux_reg_dst_prf, aux_reg_dst_prf, 
+        //            typesize * (jcp.dilate_h + 1) * ow * oc_block);
+        add_imm(aux_reg_dst_prf, aux_reg_dst_prf, 
+                    -1.0 * typesize * (jcp.dilate_h + 1) * ow * oc_block);
         //dec(reg_kj);
         CGA64::sub(reg_kj, reg_kj, 1);
         CGA64::cmp(reg_kj, 0);
         CGA64::b(xa::GT, kh_label); //jg(kh_label, T_NEAR);
     }
     if (jcp.ndims == 5) {
-        CGA64::sub(aux_reg_dst_d, aux_reg_dst_d,
-                typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block);
+        //CGA64::sub(aux_reg_dst_d, aux_reg_dst_d,
+        //        typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block);
+        add_imm(aux_reg_dst_d, aux_reg_dst_d,
+                -1.0 * typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block);
         add_imm(aux_reg_ker_d, aux_reg_ker_d, typesize * jcp.stride_d * jcp.kw * jcp.kh
                 * oc_block * ic_block);
-        CGA64::sub(aux_reg_dst_d_prf, aux_reg_dst_d_prf,
-                typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block);
+        //CGA64::sub(aux_reg_dst_d_prf, aux_reg_dst_d_prf,
+        //        typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block);
+        add_imm(aux_reg_dst_d_prf, aux_reg_dst_d_prf,
+                -1.0 * typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block);
         add_imm(aux_reg_ker_d_prf, aux_reg_ker_d_prf, 
                 typesize * jcp.stride_d * jcp.kw * jcp.kh * oc_block * ic_block);
 
@@ -1852,10 +1858,6 @@ status_t jit_sve_conv_bwd_data_kernel_f32::init_conf(
     jcp.dilate_h = (ndims == 3) ? 0 : cd.dilates[ndims-4];
     jcp.dilate_w = cd.dilates[ndims-3];
 
-    //TODO
-    //if( jcp.stride_h > 1 || jcp.stride_w > 1){
-    //    return status::unimplemented;
-    //}
     if ((jcp.dilate_w != 0 && jcp.stride_w != 1)
             || (jcp.dilate_d != 0 && jcp.stride_d != 1)
             || (jcp.dilate_h != 0 && jcp.stride_h != 1))
