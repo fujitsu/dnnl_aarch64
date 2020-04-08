@@ -492,7 +492,7 @@ private:
 
     const xa::PReg reg_p_all_ones = p1;
 
-    void mov_imm(reg64_t out, int value){
+    void mov_imm(reg64_t out, long long int value){
         if(value < MOVMAX){
             CGA64::mov(out, value);
         }else if(value <= 0xffffffff){
@@ -510,7 +510,7 @@ private:
         }
     }
 
-    void add_imm(reg64_t out, reg64_t in, int value){
+    void add_imm(reg64_t out, reg64_t in, long long int value){
       if( value >= 0){   
         if(value < ADDMAX){
             CGA64::add(out, in, value);
@@ -534,7 +534,7 @@ private:
             CGA64::add(out, in, reg_tmp_imm);
         }
       }else{
-        int val = -1 * value;
+        long long int val = -1 * value;
         if(val < ADDMAX){
             CGA64::sub(out, in, val);
         }else if(val < MOVMAX){
