@@ -457,30 +457,30 @@ private:
     static const int min_oh_reduce;
 
     reg64_t param          = abi_param1_aarch64;
-    reg64_t reg_input      = x16; //x20; //rax;
-    reg64_t reg_kernel     = x17; //x17; //rdx;
-    reg64_t reg_output     = x18; //x16; //rsi;
-    reg64_t b_ic           = x19; //x19; //abi_not_param1;
-    reg64_t kj             = x20; //x8; //r8;
-    reg64_t reg_kh         = x21; //x9; //r9;
-    reg64_t reg_ur_w_trips = x22; //x10; //r10;
-    reg64_t reg_oj         = x23; //x15; //r15;
-    reg64_t reg_ih_count   = x24; //x18; //rbx;
-    reg64_t reg_tmp        = x25; //x14; //r14;
-    reg64_t reg_long_offt  = x25; //x14; //r14;
+    reg64_t reg_input      = x20; //rax;
+    reg64_t reg_kernel     = x17; //rdx;
+    reg64_t reg_output     = x16; //rsi;
+    reg64_t b_ic           = x19; //abi_not_param1;
+    reg64_t kj             = x8; //r8;
+    reg64_t reg_kh         = x9; //r9;
+    reg64_t reg_ur_w_trips = x10; //r10;
+    reg64_t reg_oj         = x15; //r15;
+    reg64_t reg_ih_count   = x18; //rbx;
+    reg64_t reg_tmp        = x14; //r14;
+    reg64_t reg_long_offt  = x14; //r14;
 
-    reg64_t ki             = x26; //x11; //r11;
-    reg64_t reg_kd_count   = x27; //x12; //r12;
-    reg64_t reg_oi         = x27; //x12; //r12;
-    reg64_t reg_d_index    = x28; //x13; //r13;
-    reg64_t reg_input_d    = x23; //x15; //r15;
-    reg64_t reg_output_d   = x17; //x17; //rbx;
-    reg64_t aux_reg_input  = x27; //x12; //r12;
-    reg64_t aux_reg_kernel = x28; //x13; //r13;
-    reg64_t reg_bias       = x17; //x17; //rbx;
+    reg64_t ki             = x11; //r11;
+    reg64_t reg_kd_count   = x12; //r12;
+    reg64_t reg_oi         = x12; //r12;
+    reg64_t reg_d_index    = x13; //r13;
+    reg64_t reg_input_d    = x15; //r15;
+    reg64_t reg_output_d   = x17; //rbx;
+    reg64_t aux_reg_input  = x12; //r12;
+    reg64_t aux_reg_kernel = x13; //r13;
+    reg64_t reg_bias       = x17; //rbx;
 
-    reg64_t reg_add_tmp    = x29; //x26;
-    reg64_t reg_tmp_imm    = x30; //x27;
+    reg64_t reg_add_tmp    = x26;
+    reg64_t reg_tmp_imm    = x27;
 
     xa::ZRegS zreg_idata   = xa::ZRegS(31);
 
