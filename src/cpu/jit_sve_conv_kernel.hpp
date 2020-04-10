@@ -506,7 +506,6 @@ private:
     }
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
-
       if( value >= 0){   
         if(value < ADDMAX){
             CGA64::add(out, in, value);

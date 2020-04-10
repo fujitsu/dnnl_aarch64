@@ -2120,12 +2120,14 @@ void jit_sve_conv_bwd_weights_kernel_f32::compute_ic_block_step(
     for (int i_ur = 0; i_ur < ur_w; i_ur++) {
         if (i_ur == 0) {
             add_imm(reg_add_tmp, reg_output, typesize * (i_ur + 0) * oc_block + output_offset);
+            assert(kw * ic_block_step + (i_ur + 0) % 4 < 31);
             CGA64::ldr(xa::ZReg(kw * ic_block_step + (i_ur + 0) % 4), xa::ptr(reg_add_tmp));
                 //vmovups(Zmm(kw * ic_block_step + (i_ur + 0) % 4),
                 //    EVEX_compress_addr(reg_output, typesize * (i_ur + 0)
                 //    * oc_block + output_offset));
             if (ur_w > 1) {
                 add_imm(reg_add_tmp, reg_output, typesize * (i_ur + 1) * oc_block + output_offset);
+                assert(kw * ic_block_step + (i_ur + 1) % 4 < 31);
                 CGA64::ldr(xa::ZReg(kw * ic_block_step + (i_ur + 1) % 4), xa::ptr(reg_add_tmp));
                     //vmovups(Zmm(kw * ic_block_step + (i_ur + 1) % 4),
                     //EVEX_compress_addr(reg_output, typesize * (i_ur + 1) * oc_block
@@ -2133,6 +2135,7 @@ void jit_sve_conv_bwd_weights_kernel_f32::compute_ic_block_step(
             }
             if (ur_w > 2) {
                 add_imm(reg_add_tmp, reg_output, typesize * (i_ur + 2) * oc_block + output_offset);
+                assert(kw * ic_block_step + (i_ur + 2) % 4 < 31);
                 CGA64::ldr(xa::ZReg(kw * ic_block_step + (i_ur + 2) % 4), xa::ptr(reg_add_tmp));
                     //vmovups(Zmm(kw * ic_block_step + (i_ur + 2) % 4),
                     //EVEX_compress_addr(reg_output, typesize * (i_ur + 2) * oc_block
@@ -2140,6 +2143,7 @@ void jit_sve_conv_bwd_weights_kernel_f32::compute_ic_block_step(
             }
             if (ur_w > 3) {
                 add_imm(reg_add_tmp, reg_output, typesize * (i_ur + 3) * oc_block + output_offset);
+                assert(kw * ic_block_step + (i_ur + 3) % 4 < 31);
                 CGA64::ldr(xa::ZReg(kw * ic_block_step + (i_ur + 3) % 4), xa::ptr(reg_add_tmp));
                     //vmovups(Zmm(kw * ic_block_step + (i_ur + 3) % 4),
                     //EVEX_compress_addr(reg_output, typesize * (i_ur + 3) * oc_block
@@ -2147,6 +2151,7 @@ void jit_sve_conv_bwd_weights_kernel_f32::compute_ic_block_step(
             }
         } else if (i_ur + 3 < ur_w) {
             add_imm(reg_add_tmp, reg_output, typesize * (i_ur + 3) * oc_block + output_offset);
+            assert(kw * ic_block_step + (i_ur + 3) % 4 < 31);
             CGA64::ldr(xa::ZReg(kw * ic_block_step + (i_ur + 3) % 4), xa::ptr(reg_add_tmp));
                 // vmovups(Zmm(kw * ic_block_step + (i_ur + 3) % 4),
                 //     EVEX_compress_addr(reg_output, typesize * (i_ur + 3) * oc_block
@@ -2778,7 +2783,7 @@ void jit_sve_conv_bwd_weights_kernel_f32::compute_oh_loop_partial() {
         CGA64::ldr(reg_tmp, xa::ptr(param, GET_OFF(flags)));
         CGA64::tst(reg_tmp, reg_tmp);
         CGA64::b(xa::NE, skip_zero_bias);
-        CGA64::fmov(xa::ZRegS(1), float(0.0));
+        CGA64::eor(xa::ZRegS(1), reg_p_all_ones.b, xa::ZRegS(1));
         CGA64::str(xa::ZReg(1), xa::ptr(reg_bias)); //vmovups(ptr[reg_bias], Zmm(1));
         CGA64::L_aarch64(skip_zero_bias);
     }
@@ -2794,6 +2799,7 @@ void jit_sve_conv_bwd_weights_kernel_f32::compute_oh_loop_partial() {
     CGA64::b(xa::LE, loop_end_label); // no iterations along kh
     CGA64::ldr(reg_tmp_imm, xa::ptr(param, GET_OFF(os_index_end)));
     CGA64::cmp(reg_oj, reg_tmp_imm); //cmp(reg_oj, ptr[param + GET_OFF(os_index_end)]);
+    
     CGA64::b(xa::GE, loop_end_label); // no iterations along height dimension
 
     CGA64::L_aarch64(loop_begin_label);
@@ -2819,6 +2825,7 @@ void jit_sve_conv_bwd_weights_kernel_f32::compute_oh_loop_partial() {
         const int inp_ker_overlap = nstl::min(jcp.kh, jcp.ih);
         mov_imm(reg_tmp_imm, inp_ker_overlap);
         CGA64::cmp(reg_kh, reg_tmp_imm);
+        
         CGA64::b(xa::LE, common_block_label);
 
         /* Correct any excess shifts to kernel and input */
@@ -2871,9 +2878,11 @@ void jit_sve_conv_bwd_weights_kernel_f32::compute_oh_loop_partial() {
     /* Execute common block and loop */
     CGA64::L_aarch64(common_block_label);
     add_imm(reg_output, reg_output, output_shift);
+    
     add_imm(reg_oj, reg_oj, 1);
     CGA64::ldr(reg_tmp_imm, xa::ptr(param, GET_OFF(os_index_end)));
     CGA64::cmp(reg_oj, reg_tmp_imm); //cmp(reg_oj, ptr[param + GET_OFF(os_index_end)]);
+    
     CGA64::b(xa::LT, loop_begin_label);
 
     CGA64::L_aarch64(loop_end_label);
