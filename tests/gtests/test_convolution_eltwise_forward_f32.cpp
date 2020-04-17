@@ -85,7 +85,7 @@ TEST_P(convolution_test, TestConvolutionEltwise)
     );
 
     INST_TEST_CASE(SimpleSmall_Blocked16,
-        //PARAMS(nChw16c, Goihw16g, x, nChw16c, 1, 48, 48, 20, 20, 48, 20, 20, 3, 3, 1, 1, 1, 1),
+        PARAMS(nChw16c, Goihw16g, x, nChw16c, 1, 48, 48, 20, 20, 48, 20, 20, 3, 3, 1, 1, 1, 1),
         PARAMS(nChw16c, OIhw16i16o, x, nChw16c, 1, 1, 48, 20, 20, 48, 20, 20, 1, 1, 0, 0, 1, 1),
         PARAMS(nChw16c, OIhw16i16o, x, nChw16c, 1, 1, 48, 20, 20, 48, 20, 20, 3, 3, 0, 0, 1, 1),
         PARAMS(nChw16c, OIhw16i16o, x, nChw16c, 2, 1, 32, 32, 32, 32, 32, 32, 3, 3, 0, 0, 1, 1)
