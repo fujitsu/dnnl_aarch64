@@ -114,8 +114,7 @@ inline void jit_conv_3d_ker_pipeline_ow_thr(jit_conv_ker_t ker,
         ker(&p);
 }
 
-#if 0
-void jit_conv_2d_ker_bwd_w_pipeline(jit_conv_ker_t ker, jit_conv_call_s &p,
+void jit_sve_conv_2d_ker_bwd_w_pipeline(jit_conv_ker_t ker, jit_conv_call_s &p,
         const void *src, const void *dst, const void *filt, const void *bias,
         int channel, int os_index_begin, int os_index_end,
         int kh_padding /* kh_work_size */, size_t kh_offset) {
@@ -135,7 +134,7 @@ void jit_conv_2d_ker_bwd_w_pipeline(jit_conv_ker_t ker, jit_conv_call_s &p,
         ker(&p);
 }
 
-void jit_conv_3d_ker_bwd_w_pipeline(jit_conv_ker_t ker, jit_conv_call_s &p,
+void jit_sve_conv_3d_ker_bwd_w_pipeline(jit_conv_ker_t ker, jit_conv_call_s &p,
         const void *src, const void *dst, const void *filt, const void *bias,
         int channel, int os_index_begin, int os_index_end,
         int kd_padding /* kd_work_size */, size_t kd_offset) {
@@ -154,8 +153,6 @@ void jit_conv_3d_ker_bwd_w_pipeline(jit_conv_ker_t ker, jit_conv_call_s &p,
     if (p.src)
         ker(&p);
 }
-#endif // #if 0
-
 #define wht_blk_off(d, g, ...) \
         (pd()->with_groups() \
          ? (d).blk_off((g), __VA_ARGS__) \
@@ -532,7 +529,6 @@ template struct jit_sve_convolution_fwd_t<data_type::f32>;
 template struct jit_sve_convolution_fwd_t<data_type::s16,
         data_type::s16, data_type::s32>;
 
-#if 0
 template <data_type_t diff_dst_type, data_type_t wei_type,
           data_type_t diff_src_type>
 void jit_sve_convolution_bwd_data_t<diff_dst_type, wei_type,
@@ -1389,7 +1385,7 @@ void jit_sve_convolution_bwd_weights_t<src_type, diff_dst_type,
             auto src = src_h + src_d.blk_off(0, _ic);
             auto diff_dst = diff_dst_h + diff_dst_d.blk_off(0, _oc);
 
-            jit_conv_2d_ker_bwd_w_pipeline(kernel_->jit_ker, p, src, diff_dst,
+            jit_sve_conv_2d_ker_bwd_w_pipeline(kernel_->jit_ker, p, src, diff_dst,
                     diff_wei + wht_blk_off(diff_weights_d, g, oc_b, ic_b),
                     diff_bia + _oc * jcp.oc_block, (img == img_first),
                     oh_s, oh_e, kh_padding, kh_padding_offset);
@@ -1403,7 +1399,7 @@ void jit_sve_convolution_bwd_weights_t<src_type, diff_dst_type,
         // on the last iteration of loop above. Only valid pointers make sense
         // here as call parameters to avoid execution of prefetch instructions
         // with nullptr, other parameters are not used in real jit call here
-        jit_conv_2d_ker_bwd_w_pipeline(kernel_->jit_ker, p,
+        jit_sve_conv_2d_ker_bwd_w_pipeline(kernel_->jit_ker, p,
                 ti->src + src_d.blk_off(img + 1, _ic),
                 ti->diff_dst + diff_dst_d.blk_off(img + 1, _oc),
                 diff_wei + wht_blk_off(diff_weights_d, ti->g_start,
@@ -1466,7 +1462,7 @@ void jit_sve_convolution_bwd_weights_t<src_type, diff_dst_type,
             auto dst = &ti->diff_dst[diff_dst_d.blk_off(img, _oc)
                     + od_s * output_step];
 
-            jit_conv_3d_ker_bwd_w_pipeline(kernel_->jit_ker, p, src, dst,
+            jit_sve_conv_3d_ker_bwd_w_pipeline(kernel_->jit_ker, p, src, dst,
                     diff_wei + wht_blk_off(diff_weights_d, g, oc_b, ic_b),
                     diff_bia + _oc * 16, (img == img_first), od_s, od_e,
                     jcp.kd - kd_front_pad - kd_back_pad, kd_pad_off);
@@ -1482,7 +1478,7 @@ void jit_sve_convolution_bwd_weights_t<src_type, diff_dst_type,
         // on the last iteration of loop above. Only valid pointers make sense
         // here as call parameters to avoid execution of prefetch instructions
         // with nullptr, other parameters are not used in real jit call here
-        jit_conv_3d_ker_bwd_w_pipeline(kernel_->jit_ker, p,
+        jit_sve_conv_3d_ker_bwd_w_pipeline(kernel_->jit_ker, p,
                 &ti->src[src_d.blk_off(img + 1, _ic)],
                 &ti->diff_dst[diff_dst_d.blk_off(img + 1, _oc)],
                 diff_wei + wht_blk_off(diff_weights_d, ti->g_start,
@@ -1785,7 +1781,6 @@ void jit_sve_convolution_bwd_weights_t<src_type, diff_dst_type,
 template struct jit_sve_convolution_bwd_weights_t<data_type::f32>;
 template struct jit_sve_convolution_bwd_weights_t<data_type::s16,
     data_type::s16, data_type::s32>;
-#endif // #if 0
 
 }
 }
