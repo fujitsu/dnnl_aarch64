@@ -1005,6 +1005,10 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                                       9,9,10,10,11,11,12,12,13,13,14,14,15,15 };
             for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
                 dw(_idx[i]);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+	    binCommit();
+#endif
         }
 
         ker_ = (decltype(ker_))this->getCode();
@@ -1177,6 +1181,9 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
         postamble();
 
         eltwise_injector_->prepare_table();
+#ifdef XBYAK_TRANSLATE_AARCH64
+        binCommit();
+#endif
 
         if (is_bf16_) {
             align(64);
@@ -1185,6 +1192,10 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
                                       9,9,10,10,11,11,12,12,13,13,14,14,15,15 };
             for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
                 dw(_idx[i]);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+	    binCommit();
+#endif
         }
 
         ker_ = (decltype(ker_))this->getCode();
