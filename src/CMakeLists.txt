@@ -155,18 +155,18 @@ if(XBYAK_TRANSLATE_AARCH64)
     if(XBYAK_XED_LIB_ARCH_IS_AARCH64)
         find_library(XED
             NAMES "xed"
-            PATHS ../third_party/xbyak/translator/third_party/build_xed_aarch64/kits/xed/lib /usr/local/lib /usr/lib /usr/local/lib64 /usr/lib64 /usr/lib/aarch64-linux-gnu
+            PATHS ../third_party/build_xed_aarch64/kits/xed/lib /usr/local/lib /usr/lib /usr/local/lib64 /usr/lib64 /usr/lib/aarch64-linux-gnu
             ENV LD_LIBRARY_PATH)
         include_directories(
-            ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/third_party/build_xed_aarch64/kits/xed/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_aarch64/kits/xed/include
             )
     else()
         find_library(XED
             NAMES "xed"
-            PATHS ../third_party/xbyak/translator/third_party/build_xed_x86_64/kits/xed/lib /usr/local/lib /usr/lib /usr/local/lib64 /usr/lib64 /usr/lib/x86_64-linux-gnu
+            PATHS ../third_party/build_xed_x86_64/kits/xed/lib /usr/local/lib /usr/lib /usr/local/lib64 /usr/lib64 /usr/lib/x86_64-linux-gnu
             ENV LD_LIBRARY_PATH)
         include_directories(
-            ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/third_party/build_xed_x86_64/kits/xed/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_x86_64/kits/xed/include
             )
     endif()
 
@@ -226,14 +226,14 @@ if(WIN32)
                 "${CMAKE_CURRENT_BINARY_DIR}/${BUILD_TYPE}")
 
             append_to_windows_path_list(CTESTCONFIG_PATH
-                "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/third_party/build_xed_x86_64/kits/xed/bin")
+                "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_x86_64/kits/xed/bin")
         endforeach()
     else()
         append_to_windows_path_list(CTESTCONFIG_PATH
             "${CMAKE_CURRENT_BINARY_DIR}")
 
         append_to_windows_path_list(CTESTCONFIG_PATH
-            "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/third_party/build_xed_x86_64/kits/xed/bin")
+            "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_x86_64/kits/xed/bin")
     endif()
     set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}" PARENT_SCOPE)
 endif()
