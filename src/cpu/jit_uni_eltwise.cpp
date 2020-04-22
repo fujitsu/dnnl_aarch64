@@ -284,6 +284,7 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
             h->uni_vcmpgeps(vmm_aux0, vmm_aux0, threshold);
             h->uni_vtestps(vmm_aux0, vmm_aux0);
         }
+	h->nop();
         h->jz(end_tanh_label, Xbyak::CodeGenerator::T_NEAR);
     };
 
@@ -330,14 +331,23 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     // We need to save kmask, vmm_aux0, vmm_aux1, vmm_aux2 and vmm_src as exp
     // uses them.
     // vmm_src is not more read afterwards, so we do not have to save it
+#ifdef XBYAK_TRANSLATE_AARCH64
+    auto stack_size = 4 * vlen + 8;
+#else
     auto stack_size = 4 * vlen + (isa == avx512_common) * 4;
+#endif
     h->sub(h->rsp, stack_size);
     h->uni_vmovups(h->ptr[h->rsp + 0 * vlen], vmm_aux0);
     h->uni_vmovups(h->ptr[h->rsp + 1 * vlen], vmm_aux1);
     h->uni_vmovups(h->ptr[h->rsp + 2 * vlen], vmm_aux2);
     h->uni_vmovups(h->ptr[h->rsp + 3 * vlen], vmm_src);
+#ifdef XBYAK_TRANSLATE_AARCH64
+    h->Xbyak_aarch64::CodeGeneratorAArch64::add(Xbyak_aarch64::XReg(28), Xbyak_aarch64::XReg(28), 4 * vlen);
+    h->Xbyak_aarch64::CodeGeneratorAArch64::str(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(Xbyak_aarch64::XReg(28)));
+#else
     if (isa == avx512_common)
         h->kmovw(h->ptr[h->rsp + 4 * vlen], k_mask);
+#endif
 
     exp_compute_vector(vmm_aux3);
 
@@ -345,8 +355,13 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     h->uni_vmovups(vmm_aux1, h->ptr[h->rsp + 1 * vlen]);
     h->uni_vmovups(vmm_aux2, h->ptr[h->rsp + 2 * vlen]);
     h->uni_vmovups(vmm_src, h->ptr[h->rsp + 3 * vlen]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+    h->Xbyak_aarch64::CodeGeneratorAArch64::add(Xbyak_aarch64::XReg(28), Xbyak_aarch64::XReg(28), 4 * vlen);
+    h->Xbyak_aarch64::CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(Xbyak_aarch64::XReg(28)));
+#else
     if (isa == avx512_common)
         h->kmovw(k_mask, h->ptr[h->rsp + 4 * vlen]);
+#endif
     h->add(h->rsp, stack_size);
 
     // 1 + exp(2x)
@@ -982,6 +997,7 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         for (int id = 0; id < 2; id++) {
             L(loop_label[id]);
             cmp(reg_work_amount, uf[id] * loop_dec[id] - 1);
+	    nop();
             jle(loop_label[id + 1], T_NEAR);
 
             compute_step(loop_vectorize[id], uf[id], shift[id]);
@@ -1123,6 +1139,7 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
         Label vectorized_loop_start, vectorized_loop_end;
 
         cmp(reg_work_amount, simd_w);
+	nop();
         jl(reminder_loop_start, T_NEAR);
 
         L(vectorized_loop_start);
@@ -1151,6 +1168,7 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
 
         sub(reg_work_amount, simd_w);
         cmp(reg_work_amount, simd_w);
+	nop();
         jge(vectorized_loop_start, T_NEAR);
 
         L(vectorized_loop_end);
@@ -1158,6 +1176,7 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
         L(reminder_loop_start);
 
         cmp(reg_work_amount, 0);
+	nop();
         jle(reminder_loop_end, T_NEAR);
         if (is_bf16_) {
             vmovups(ymm_src | k_tail_mask, ptr[reg_from]);
