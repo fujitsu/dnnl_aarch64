@@ -284,7 +284,6 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
             h->uni_vcmpgeps(vmm_aux0, vmm_aux0, threshold);
             h->uni_vtestps(vmm_aux0, vmm_aux0);
         }
-	h->nop();
         h->jz(end_tanh_label, Xbyak::CodeGenerator::T_NEAR);
     };
 
@@ -483,7 +482,7 @@ void jit_uni_eltwise_injector_f32<isa>::soft_relu_compute_vector(
 
     // tmp = floorf(fx)
     h->uni_vroundps(vmm_aux0, vmm_src, _op_floor);
-
+    
     // keep fx for further computations
     h->uni_vmovups(vmm_src, vmm_aux0); //vmm_src = fx
     // calculation fx * ln2
@@ -997,7 +996,6 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         for (int id = 0; id < 2; id++) {
             L(loop_label[id]);
             cmp(reg_work_amount, uf[id] * loop_dec[id] - 1);
-	    nop();
             jle(loop_label[id + 1], T_NEAR);
 
             compute_step(loop_vectorize[id], uf[id], shift[id]);
@@ -1139,7 +1137,6 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
         Label vectorized_loop_start, vectorized_loop_end;
 
         cmp(reg_work_amount, simd_w);
-	nop();
         jl(reminder_loop_start, T_NEAR);
 
         L(vectorized_loop_start);
@@ -1168,7 +1165,6 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
 
         sub(reg_work_amount, simd_w);
         cmp(reg_work_amount, simd_w);
-	nop();
         jge(vectorized_loop_start, T_NEAR);
 
         L(vectorized_loop_end);
@@ -1176,7 +1172,6 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
         L(reminder_loop_start);
 
         cmp(reg_work_amount, 0);
-	nop();
         jle(reminder_loop_end, T_NEAR);
         if (is_bf16_) {
             vmovups(ymm_src | k_tail_mask, ptr[reg_from]);
