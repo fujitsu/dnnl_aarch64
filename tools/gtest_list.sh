@@ -20,5 +20,5 @@ for i in ${list_bin} ; do
     echo ${i} 
     ./${i} --gtest_list_tests | grep -v "GetParam" | tee hoge
     echo "#/bin/bash" > ${i}.sh
-    cat hoge | sed -e "s/^/\${GTEST_PREFIX\} .\/${i} --gtest_filter=\"/" | sed -e "s/$/\*\"/" | tee -a ${i}.sh
+    cat hoge | sed -e "s/^/.\/${i} --gtest_filter=\"/" | sed -e "s/$/\*\"/" | tee -a ${i}.sh
 done
