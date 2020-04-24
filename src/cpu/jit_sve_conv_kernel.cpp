@@ -2057,7 +2057,7 @@ void jit_sve_conv_bwd_data_kernel_f32::init_scratchpad(
 
 // Initialize static data members
 const int jit_sve_conv_bwd_weights_kernel_f32::max_ur_w = 28;
-const int jit_sve_conv_bwd_weights_kernel_f32::min_oh_reduce = 99999;
+const int jit_sve_conv_bwd_weights_kernel_f32::min_oh_reduce = 9;
 
 void jit_sve_conv_bwd_weights_kernel_f32::od_step_comeback_pointers()
 {

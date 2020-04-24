@@ -82,39 +82,42 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     const xa::PReg reg_p_all_ones  = p1;
 
     /* Flag */
-    reg64_t reg_reduce_pos_flag     = x8; 
-    reg64_t aux1_reg_bcast_data     = x9; 
+    reg64_t reg_reduce_pos_flag     = x1; //x8; 
+    reg64_t aux1_reg_bcast_data     = x2; //x9; 
 
-    reg64_t aux_reg_output_data     = x10;
-    reg64_t reduce_loop_iter        = x11;
-    reg64_t bcast_loop_iter         = x12;
+    reg64_t aux_reg_output_data     = x3; //x10;
+    reg64_t reduce_loop_iter        = x4; //x11;
+    reg64_t bcast_loop_iter         = x5; //x12;
 
-    reg64_t reg_relu_ns             = x13; // For forward
-    reg64_t reg_output_stride       = x13; // For backward
+    reg64_t reg_relu_ns             = x6; //x13; // For forward
+    reg64_t reg_output_stride       = x6; //x13; // For backward
 
-    reg64_t aux_reg_bcast_data      = x14;
-    reg64_t aux_reg_load_data       = x15;
+    reg64_t aux_reg_bcast_data      = x7; //x14;
+    reg64_t aux_reg_load_data       = x8; //x15;
 
     /* Pointer */
-    reg64_t reg_bcast_data          = x16; // Weight
-    reg64_t reg_load_data           = x17; // Input
-    reg64_t reg_output_data         = x18; // Output
-    reg64_t reg_bias_data           = x19; // bias
+    reg64_t reg_bcast_data          = x9; //x16; // Weight
+    reg64_t reg_load_data           = x10;//x17; // Input
+    reg64_t reg_output_data         = x11;//x18; // Output
+    reg64_t reg_bias_data           = x12;//x19; // bias
 
-    reg64_t reg_load_data_tmp       = x20; // Weight
-    reg64_t reg_prev_bcast_addr     = x21; // Input
-    reg64_t reg_bias_data_tmp       = x22; // Bias
-    reg64_t reg_tmp                 = x23; // tmp for add_imm
-    reg64_t reg_tmp_ofs             = x23; // tmp_ofs (for load, bcast, output, bias_ofs, generate())
-    reg64_t reg_tmp_out_ofs         = x24; // tmp reg to calc bwd wei offset in out_load
-    reg64_t reg_prev_out_addr       = x25; // this reg keeps addr accessed by previous ldr or str inst
+    reg64_t reg_load_data_tmp       = x13;//x20; // Weight
+    reg64_t reg_prev_bcast_addr     = x14;//x21; // Input
+    reg64_t reg_bias_data_tmp       = x15;//x22; // Bias
+    reg64_t reg_tmp                 = x16;//x23; // tmp for add_imm
+    reg64_t reg_tmp_ofs             = x16;//x23; // tmp_ofs (for load, bcast, output, bias_ofs, generate())
+    reg64_t reg_tmp_out_ofs         = x17;//x24; // tmp reg to calc bwd wei offset in out_load
+    reg64_t reg_prev_out_addr       = x18;//x25; // this reg keeps addr accessed by previous ldr or str inst
 
     /* Workload */
-    reg64_t reg_load_loop_work      = x27;
-    reg64_t reg_reduce_loop_work    = x29;
-    reg64_t reg_bcast_loop_work     = x30;
+    reg64_t reg_load_loop_work      = x19;//x27;
+    reg64_t reg_reduce_loop_work    = x20;//x29;
+    reg64_t reg_bcast_loop_work     = x21;//x30;
 
     reg64_t imm_addr64              = aux_reg_load_data;
+
+    int reg_base_idx                = 22;
+    int num_reg4bcast               = 31 - reg_base_idx;
 
     void add_imm(reg64_t out, reg64_t in, int value){
       if( value >= 0){   

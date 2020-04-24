@@ -458,14 +458,14 @@ private:
 
     reg64_t param          = abi_param1_aarch64;
     reg64_t reg_input      = x20; //rax;
-    reg64_t reg_kernel     = x17; //rdx;
+    reg64_t reg_kernel     = x18; //rdx;
     reg64_t reg_output     = x16; //rsi;
     reg64_t b_ic           = x19; //abi_not_param1;
     reg64_t kj             = x8; //r8;
     reg64_t reg_kh         = x9; //r9;
     reg64_t reg_ur_w_trips = x10; //r10;
     reg64_t reg_oj         = x15; //r15;
-    reg64_t reg_ih_count   = x18; //rbx;
+    reg64_t reg_ih_count   = x17; //rbx;
     reg64_t reg_tmp        = x14; //r14;
     reg64_t reg_long_offt  = x14; //r14;
 
