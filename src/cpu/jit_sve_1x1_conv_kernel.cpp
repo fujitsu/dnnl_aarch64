@@ -264,8 +264,8 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             add_imm(reg_prev_out_addr, aux_reg_output_data, ofs);
           }
           if(i_load) CGA64::madd(r, r, reg_output_stride, reg_prev_out_addr); 
-          else        r = reg_prev_out_addr;
-          CGA64::ldr(vreg_sum(), xa::ptr(reg_prev_out_addr));
+          else       r = reg_prev_out_addr;
+          CGA64::ldr(vreg_sum(), xa::ptr(r));
   
           prev_ofs = ofs_tmp;
         }
