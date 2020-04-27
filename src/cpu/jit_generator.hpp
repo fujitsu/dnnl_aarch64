@@ -105,10 +105,14 @@ static inline int float2int(float x) {
 
 #ifdef XBYAK_TRANSLATE_AARCH64
 // Callee-saved registers
+/* Intel64 GCC passes (arg0 - arg5) by registers.
+   AArch64 passes (arg0 - arg7) by registers.
+   In preamble(), x0->rdi, x1->rsi, x2->rdx, x3->rcx, x4->r8, x5->r9,
+   x6->save to stack, x7->save to stack. */
 constexpr xa::Operand::Code abi_save_gpr_regs_aarch64[] = { xa::Operand::X19,
     xa::Operand::X20, xa::Operand::X21, xa::Operand::X22, xa::Operand::X23,
     xa::Operand::X24, xa::Operand::X25, xa::Operand::X26, xa::Operand::X27,
-    xa::Operand::X28 };
+    xa::Operand::X28, xa::Operand::X6,  xa::Operand::X7};
 
 // See "Procedure Call Standsard for the ARM 64-bit Architecture (AArch64)"
 static const xa::XReg abi_param1_aarch64(xa::Operand::X0),
@@ -201,7 +205,7 @@ private:
             / sizeof(abi_save_gpr_regs_aarch64[0]);
 
     const size_t size_of_abi_save_regs_aarch64
-            = num_abi_save_gpr_regs_aarch64 * x0.getBit() / 8
+            = (num_abi_save_gpr_regs_aarch64 + 2) * x0.getBit() / 8
             + vreg_to_preserve * vreg_len_preserve;
 
     const size_t preserved_stack_size
@@ -286,6 +290,7 @@ public:
 	CodeGeneratorAArch64::mov(x1, x3);
 	CodeGeneratorAArch64::mov(x8, x4);
 	CodeGeneratorAArch64::mov(x9, x5);
+	/* args of x6 and x7 are saved to stack. */
 
 	CodeGeneratorAArch64::mov(x4, CodeGeneratorAArch64::sp);
 #else //#ifdef XBYAK_TRANSLATE_AARCH64
@@ -988,7 +993,7 @@ public:
 public:
     jit_generator(
         void *code_ptr = nullptr,
-        size_t code_size = 256 * 1024
+        size_t code_size = 1024 * 1024 * 512
         ) : Xbyak::CodeGenerator(code_size, code_ptr)
     {
     }
