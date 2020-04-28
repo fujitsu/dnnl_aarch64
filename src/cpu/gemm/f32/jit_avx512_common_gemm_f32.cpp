@@ -1499,11 +1499,16 @@ struct xbyak_gemm : public jit_generator {
 
             mov(BO1, rcx);
             mov(rcx, M);
+            assert(0 < unroll_m && unroll_m < (uint32_t(1)<<12));
             sub(rcx, unroll_m - 16);
             mov(CO1, 16);
             cmp(rcx, 16);
 
             cmovg(rcx, CO1);
+            mov(rax, 1);
+            sal(rax, cl);
+            sub(rax, 1);
+            // mov(rcx, 0xffff); /* NO need, because mov(rcx, B01) is executed. */
 	    
             if (unroll_m == 16) {
 	      kIdx = 1;
@@ -1536,7 +1541,7 @@ struct xbyak_gemm : public jit_generator {
 
             cmovg(rcx, CO1);
             mov(rax, 1);
-            sal(rax, cl); // cl <= 16
+            sal(rax, cl);
             sub(rax, 1);
             mov(rcx, 0xffff);
 
@@ -1838,7 +1843,7 @@ struct xbyak_gemm : public jit_generator {
 #ifdef XBYAK_TRANSLATE_AARCH64
 	    Xbyak_aarch64::PReg k4_aarch64{k4.getIdx()};
 	    for (int i = 0; i < 7; i++) {
-	      CodeGeneratorAArch64::ptrue(k4_aarch64.d, static_cast<Xbyak_aarch64::Pattern>(i)); // i means VLi
+	      CodeGeneratorAArch64::ptrue(k4_aarch64.d, static_cast<Xbyak_aarch64::Pattern>(i+1)); // (i+1) means VLi
 	      CodeGeneratorAArch64::not_(k4_aarch64.b, P_ALL_ONE/Xbyak_aarch64::T_z, k4_aarch64.b);
 	      vpaddq(ZSTRIDE | k4, ZSTRIDE, zmm2);
 	    }
