@@ -153,17 +153,17 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
 #endif // __ARM_ARCH
 
 #if 0
-inline unsigned int get_cache_size(int level, bool per_core = true) {
+  inline unsigned int get_A64FX_cache_size(int level, bool per_core = true, int nthreads = 1) {
     unsigned int l = level - 1;
     // Currently, if XByak is not able to fetch the cache topology
-    // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
+    // we default to 64KiB of L1 per core, 8MiB of L2 per 1CMG.
     if (cpu.getDataCacheLevels() == 0) {
-        const int L1_cache_per_core = 64000;
-        const int L2_cache_per_core = 8000000;
-        int num_cores = per_core ? 1 : mkldnn_get_max_threads();
+        const int L1_cache_per_core = 65536;
+        const int L2_cache_per_CMG = 8388608;
+        int num_cores = per_core ? 1 : nthreads;
         switch (l) {
-        case (0): return L1_cache_per_core;
-        case (1): return L2_cache_per_core / num_cores;
+        case (0): return L1_cache_per_core * num_cores;
+        case (1): return L2_cache_per_CMG * utils::div_up(num_cores, 12);
         default: return 0;
         }
     }
@@ -176,7 +176,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true) {
 #endif
 
 } // namespace
-#endif //#if 1
+#endif
 
 
 class jit_generator_aarch64 : public Xbyak::Xbyak_aarch64::CodeGeneratorAArch64

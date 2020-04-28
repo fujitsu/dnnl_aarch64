@@ -561,7 +561,12 @@ void jit_uni_pool_kernel<isa>::maybe_zero_diff_src() {
     if (jpp.ndims == 5) {
         mov(zero_size, ptr[reg_param + GET_OFF(oh)]);
         mov(tmp_gpr, jpp.ih * jpp.iw * jpp.c_block * jpp.dt_size);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+	CodeGeneratorAArch64::mul(Xbyak_aarch64::XReg(zero_size.getIdx()), Xbyak_aarch64::XReg(zero_size.getIdx()), Xbyak_aarch64::XReg(tmp_gpr.getIdx()));
+#else
         imul(zero_size, tmp_gpr);
+#endif
     }
 
     auto vzero = vmm_tmp;
@@ -652,8 +657,16 @@ void jit_uni_pool_kernel<isa>::generate() {
         if (isa == avx) {
             mov(reg_shuf_mask, 0x0c080400);
         } else if (isa >= avx512_common) {
+#ifdef XBYAK_TRANSLATE_AARCH64
+	  CodeGeneratorAArch64::mov(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), uint64_t(0x000000000000ffff));
+	  CodeGeneratorAArch64::sub(Xbyak_aarch64::XReg(rsp.getIdx()), Xbyak_aarch64::XReg(rsp.getIdx()), 8);
+	  CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), Xbyak_aarch64::ptr(Xbyak_aarch64::XReg(rsp.getIdx())));
+	  CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_index_mask.getIdx()), Xbyak_aarch64::ptr(Xbyak_aarch64::XReg(rsp.getIdx())));
+	  CodeGeneratorAArch64::add(Xbyak_aarch64::XReg(rsp.getIdx()), Xbyak_aarch64::XReg(rsp.getIdx()), 8);
+#else
             mov(tmp_gpr.cvt32(), 0x000f);
             kmovw(k_index_mask, tmp_gpr.cvt32());
+#endif
         }
     }
 
@@ -773,6 +786,10 @@ void jit_uni_pool_kernel<isa>::generate() {
                                   9,9,10,10,11,11,12,12,13,13,14,14,15,15 };
         for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
             dw(_idx[i]);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+	binCommit();
+#endif
     }
 }
 

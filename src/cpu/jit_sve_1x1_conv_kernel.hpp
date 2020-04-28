@@ -26,11 +26,11 @@
 
 using namespace mkldnn::impl::types;
 
-#define PRFWMAX   32
-#define LDRMAX   256
-#define LDRWMAX  253
-#define ADDMAX  4096
-#define MOVMAX 65536
+#define PRFWMAX   31
+#define LDRMAX   255
+#define LDRWMAX  252
+#define ADDMAX  4095
+#define MOVMAX 65535
 
 namespace mkldnn {
 namespace impl {
@@ -81,78 +81,54 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     using reg64_t = const xa::XReg;
     const xa::PReg reg_p_all_ones  = p1;
 
-    /* Flag */
-    reg64_t reg_reduce_pos_flag     = x8; 
-    reg64_t aux1_reg_bcast_data     = x9; 
-
-    reg64_t aux_reg_output_data     = x10;
-    reg64_t reduce_loop_iter        = x11;
-    reg64_t bcast_loop_iter         = x12;
-
-    reg64_t reg_relu_ns             = x13; // For forward
-    reg64_t reg_output_stride       = x13; // For backward
-
-    reg64_t aux_reg_bcast_data      = x14;
-    reg64_t aux_reg_load_data       = x15;
+    /* Flags and loop variables */
+    reg64_t reg_reduce_pos_flag     = x1; 
+    reg64_t reduce_loop_iter        = x2; 
+    reg64_t bcast_loop_iter         = x3; 
+    reg64_t reg_relu_ns             = x4;  // For forward
+    reg64_t reg_output_stride       = x4;  // For backward
 
     /* Pointer */
-    reg64_t reg_bcast_data          = x16; // Weight
-    reg64_t reg_load_data           = x17; // Input
-    reg64_t reg_output_data         = x18; // Output
-    reg64_t reg_bias_data           = x19; // bias
-
-    reg64_t reg_load_data_tmp       = x20; // Weight
-    reg64_t reg_prev_bcast_addr     = x21; // Input
-    reg64_t reg_bias_data_tmp       = x22; // Bias
-    reg64_t reg_tmp                 = x23; // tmp for add_imm
-    reg64_t reg_tmp_ofs             = x23; // tmp_ofs (for load, bcast, output, bias_ofs, generate())
-    reg64_t reg_tmp_out_ofs         = x24; // tmp reg to calc bwd wei offset in out_load
-    reg64_t reg_prev_out_addr       = x25; // this reg keeps addr accessed by previous ldr or str inst
+    reg64_t reg_bcast_data          = x5;  // Weight
+    reg64_t reg_load_data           = x6;  // Input
+    reg64_t reg_output_data         = x7;  // Output
+    reg64_t reg_bias_data           = x8;  // bias
+    reg64_t aux1_reg_bcast_data     = x9; 
+    reg64_t aux_reg_output_data     = x10; 
+    reg64_t aux_reg_bcast_data      = x11; 
+    reg64_t aux_reg_load_data       = x12; 
+    reg64_t reg_prev_bcast_addr     = x13; // Input: The reg keeps addr accessed by previous ldr inst
+    reg64_t reg_prev_out_addr       = x14; // Output: The reg keeps addr accessed by previous ldr or str inst
 
     /* Workload */
-    reg64_t reg_load_loop_work      = x27;
-    reg64_t reg_reduce_loop_work    = x29;
-    reg64_t reg_bcast_loop_work     = x30;
+    reg64_t reg_load_loop_work      = x15;
+    reg64_t reg_reduce_loop_work    = x16;
+    reg64_t reg_bcast_loop_work     = x17;
 
-    reg64_t imm_addr64              = aux_reg_load_data;
+    /* Temporay registers */
+    reg64_t reg_tmp_imm             = x18; // tmp for add_imm
+    reg64_t reg_tmp_ofs             = x19; // tmp reg to calc bwd wei offset in out_load
 
-    void add_imm(reg64_t out, reg64_t in, int value){
-      if( value >= 0){   
-        if(value < ADDMAX){
-            CGA64::add(out, in, value);
-        }else if(value < MOVMAX){
-            CGA64::mov(reg_tmp, value);
-            CGA64::add(out, in, reg_tmp);
+    int reg_base_idx                = 20;
+    int num_reg4bcast               = 31 - reg_base_idx;
+
+    void add_imm(reg64_t out, reg64_t in, long long int value){
+        int val = (value >= 0) ? value : -1 * value;
+        if( val <= ADDMAX ){
+            if( value >= 0 )  CGA64::add(out, in, val);
+            else              CGA64::sub(out, in, val);
         }else{
-            CGA64::mov(reg_tmp, value&0xffff);
-            CGA64::movk(reg_tmp, value>>16, 16);
-            CGA64::add(out, in, reg_tmp);
-        }
-      }else{
-        int val = -1 * value;
-        if(val < ADDMAX){
-            CGA64::sub(out, in, val);
-        }else if(val < MOVMAX){
-            CGA64::mov(reg_tmp, val);
-            CGA64::sub(out, in, reg_tmp);
-        }else{
-            CGA64::mov(reg_tmp, val&0xffff);
-            CGA64::movk(reg_tmp, val>>16, 16);
-            CGA64::sub(out, in, reg_tmp);
-        }
+            CGA64::mov(reg_tmp_imm, val&0xffff);
+            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
+            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
+            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
 
-      }
+            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
+            else              CGA64::sub(out, in, reg_tmp_imm);
+        }
     }
 
-
-#if 1
     jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
-#else
-    void *eltwise_injector_;
-#endif
-
-    int bcast_loop_work_offt = 0;
-    int stack_space_needed = 16;
 
     void bcast_loop(int load_loop_blk);
     void reduce_loop(int load_loop_blk, int ur, int substep, bool wraparound);

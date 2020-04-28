@@ -53,7 +53,7 @@ using namespace Xbyak;
 namespace {
 
 constexpr auto small_spatial = 14;
-unsigned int L1_cache_size = get_cache_size(1, true);
+unsigned int L1_cache_size = get_A64FX_cache_size(1, true, 1);
 
 
 inline void pick_loop_order(jit_conv_conf_t &jcp) {
@@ -962,7 +962,7 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
         if (!is_ow_threading_applicable())
             return res_ow_block;
 
-        int L2_part = (get_cache_size(2) * 7 / 8) / typesize;
+        int L2_part = (get_A64FX_cache_size(2, false, nthreads) * 7 / 8) / typesize;
         if (jcp.ver == ver_4fma)
             L2_part /= 2;
         int size_src_chunk = jcp.ic_block * ur_w * jcp.kh;
@@ -982,7 +982,7 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
         for (int nb_ow = start_nb_ow; nb_ow <= max_nb_ow; nb_ow++) {
             int ow_block
                 = nstl::min(rnd_up(div_up(jcp.ow, nb_ow), ur_w), jcp.ow);
-            float eff_threshold = (jcp.ver == ver_4fma) ? 0.8f : 0.9f;
+            float eff_threshold = (jcp.ver == ver_4fma) ? 0.8f : 0.9f; //0.9f
             if (ow_block < nb_oc_blocking * jcp.oc_block && eff > eff_threshold)
                 break;
             if (div_up(jcp.ow, ow_block) != nb_ow)
@@ -1061,7 +1061,7 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
             }
         }
 
-#ifndef __ARM_ARCH        
+#ifndef __ARM_ARCH
         if (jcp.kw > 3
                 || (jcp.stride_w == 1 && jcp.stride_h == 1
                            && embd_bcast_condition)
@@ -1131,9 +1131,10 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
     jcp.ow_block = get_ow_block(jcp.nb_oc_blocking, jcp.ur_w, thr_eff);
     jcp.nb_ow = div_up(jcp.ow, jcp.ow_block);
 
-    const int L2_size = get_cache_size(2, true) / sizeof(float);
+    const int L2_size = get_A64FX_cache_size(2, false, nthreads) / sizeof(float);
     // Source and output data needs to fit in L2,
     // leaving some space for weights and prefetching.
+    // 0.6f
     int h_L2 = int(((0.6f * L2_size) / jcp.simd_w
                            - nstl::min(0, jcp.kh - jcp.stride_h) * jcp.iw)
             / (jcp.stride_h * jcp.iw + jcp.ow));
@@ -2057,7 +2058,7 @@ void jit_sve_conv_bwd_data_kernel_f32::init_scratchpad(
 
 // Initialize static data members
 const int jit_sve_conv_bwd_weights_kernel_f32::max_ur_w = 28;
-const int jit_sve_conv_bwd_weights_kernel_f32::min_oh_reduce = 99999;
+const int jit_sve_conv_bwd_weights_kernel_f32::min_oh_reduce = 9;
 
 void jit_sve_conv_bwd_weights_kernel_f32::od_step_comeback_pointers()
 {
