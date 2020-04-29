@@ -584,6 +584,10 @@ struct jit_avx512_core_bf16_reorder_s16c_to_S16c2s_t : public jit_generator {
         L(dst_prm_table);
         for (size_t i = 0; i < 32; ++i)
             dw(dst_prm_array[i]);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+        binCommit();
+#endif
     }
 
     void (*jit_ker)(bf16_cvt_utils::jit_call_t *);

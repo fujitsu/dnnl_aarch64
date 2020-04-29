@@ -287,6 +287,9 @@ struct jit_bnorm_t: public jit_generator {
         align(32);
         L(l_relu_mask_avx2); /* [0x80 0x40 0x20 0x10 0x08 0x04 0x02 0x01] */
         for (int i = 0; i < 8; ++i) dd(1<<i);
+#ifdef XBYAK_TRANSLATE_AARCH64
+        binCommit();
+#endif
         L(l_mask_after);
     }
 

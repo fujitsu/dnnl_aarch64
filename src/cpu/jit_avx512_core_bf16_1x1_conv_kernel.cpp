@@ -554,6 +554,10 @@ void jit_avx512_core_bf16_1x1_conv_kernel::generate()
         L(dst_prm_table);
         for (int i = 0; i < 32; ++i)
             dw(dst_prm_array[i]);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+	binCommit();
+#endif
     }
 }
 

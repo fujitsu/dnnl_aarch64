@@ -791,6 +791,9 @@ void jit_uni_eltwise_injector_f32<isa>::prepare_table(bool gen_table) {
         case eltwise_square: break;
         default: assert(!"unsupported eltwise algorithm");
     }
+#ifdef XBYAK_TRANSLATE_AARCH64
+	h->binCommit();
+#endif
     }
 }
 
@@ -1195,9 +1198,6 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
         postamble();
 
         eltwise_injector_->prepare_table();
-#ifdef XBYAK_TRANSLATE_AARCH64
-        binCommit();
-#endif
 
         if (is_bf16_) {
             align(64);

@@ -395,6 +395,10 @@ T jit_avx512_core_gemv_s8u8s32_kern::generate(int use_vnni) {
         L_aligned(one_label);
         for (i = 0; i < size_vec_reg_/8; i++)
             dq(0x0001000100010001);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+        binCommit();
+#endif
     }
 
     return (T) getCode();
