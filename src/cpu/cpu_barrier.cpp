@@ -101,8 +101,14 @@ struct jit_t: public jit_generator {
     void (*barrier)(ctx_t *ctx, size_t nthr);
 
     jit_t() {
-        generate(*this, abi_param1, abi_param2);
-        ret();
+#ifdef XBYAK_TRANSLATE_AARCH64
+      preamble();
+      generate(*this, abi_param1, abi_param2);
+      postamble();
+#else
+      generate(*this, abi_param1, abi_param2);
+      ret();
+#endif
         barrier = reinterpret_cast<decltype(barrier)>(const_cast<uint8_t*>(
                     this->getCode()));
     }
