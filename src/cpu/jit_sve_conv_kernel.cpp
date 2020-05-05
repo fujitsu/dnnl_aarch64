@@ -202,7 +202,6 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
                 bias_load(bias_offset);
                 CGA64::fadd(zreg_out_s(j,k), zreg_out_s(j,k), zreg_tmp_s());
             }
-            //mic_prefetcht1(EVEX_compress_addr(reg_bias, bias_offset + 64));
         }
     }
 
