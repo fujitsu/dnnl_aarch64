@@ -264,104 +264,58 @@ private:
         ker_reg_base_idx = 26,
     };
 
-    reg64_t param             = abi_param1_aarch64;
-    reg64_t reg_dst           = x8;
-    reg64_t reg_ker           = x9;
-    reg64_t reg_src           = x10;
+    reg64_t param               = abi_param1_aarch64;
+    reg64_t reg_dst             = x1;  //x8;
+    reg64_t reg_ker             = x2;  //x9;
+    reg64_t reg_src             = x3;  //x10;
 
-    reg64_t reg_dst_prf       = x11;
-    reg64_t reg_ker_prf       = x12;
-    reg64_t reg_src_prf       = x13;
+    reg64_t reg_dst_prf         = x4;  //x11;
+    reg64_t reg_ker_prf         = x5;  //x12;
+    reg64_t reg_src_prf         = x6;  //x13;
 
-    reg64_t aux_reg_dst       = x14;
-    reg64_t aux_reg_ker       = x15;
+    reg64_t aux_reg_dst         = x7;  //x14;
+    reg64_t aux_reg_ker         = x8;  //x15;
 
-    reg64_t aux_reg_dst_prf   = x16; //rsi;
-    reg64_t aux_reg_ker_prf   = x17; //rdx;
+    reg64_t aux_reg_dst_prf     = x9;  //x16; //rsi;
+    reg64_t aux_reg_ker_prf     = x10; //x17; //rdx;
 
-    reg64_t aux_reg_dst_d_prf = x13;
-    reg64_t aux_reg_dst_d     = x18; //rbx;
-    reg64_t aux_reg_ker_d_prf = x19; //abi_not_param1;
-    reg64_t aux_reg_ker_d     = x9;
-    reg64_t reg_ki            = x10;
+    reg64_t aux_reg_dst_d_prf   = x6;  //x13;
+    reg64_t aux_reg_dst_d       = x11; //x18; //rbx;
+    reg64_t aux_reg_ker_d_prf   = x12; //x19; //abi_not_param1;
+    reg64_t aux_reg_ker_d       = x2;  //x9;
+    reg64_t reg_ki              = x3;  //x10;
 
-    reg64_t reg_kj            = x20; //rax;
-    reg64_t reg_oi            = x18; //rbx;
-    reg64_t reg_kh            = x19; //abi_not_param1;
+    reg64_t reg_kj              = x13; //x20; //rax;
+    reg64_t reg_oi              = x11; //x18; //rbx;
+    reg64_t reg_kh              = x12; //x19; //abi_not_param1;
 
-    reg64_t reg_channel       = x16; //rsi;
+    reg64_t reg_channel         = x9;  //x16; //rsi;
 
-    reg64_t reg_tmp           = x21; //rbp;
-    reg64_t reg_long_offt     = x14;
+    reg64_t reg_tmp             = x14; //x21; //rbp;
+    reg64_t reg_long_offt       = x7;  //x14;
 
-    reg64_t reg_prev_bcast_addr = x27;
-    reg64_t reg_tmp_imm       = x28;
-    reg64_t reg_tmp_addr      = x30;
+    reg64_t reg_prev_bcast_addr = x15; //x27;
+    reg64_t reg_tmp_imm         = x16; //x28;
+    reg64_t reg_tmp_addr        = x18; //x30;
 
     const xa::PReg reg_p_all_ones  = p1;
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
+        int val = (value >= 0) ? value : -1 * value;
+        if( val <= ADDMAX ){
+            if( value >= 0 )  CGA64::add(out, in, val);
+            else              CGA64::sub(out, in, val);
+        }else{
+            CGA64::mov(reg_tmp_imm, val&0xffff);
+            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
+            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
+            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
 
-      if( value >= 0){   
-        if(value < ADDMAX){
-            CGA64::add(out, in, value);
-        }else{
-          if(value < MOVMAX){
-              CGA64::mov(reg_tmp_imm, value);
-          }else if(value <= 0xffffffff){
-              CGA64::mov(reg_tmp_imm, value&0xffff);
-              CGA64::movk(reg_tmp_imm, value>>16, 16);
-          }else if( value <= 0xffffffffffff ){
-              CGA64::mov(reg_tmp_imm, value&0xffff);
-              CGA64::movk(reg_tmp_imm, (value>>16)&0xffff, 16);
-              CGA64::movk(reg_tmp_imm, value>>32, 32);
-          }else{
-              CGA64::mov(reg_tmp_imm, value&0xffff);
-              CGA64::movk(reg_tmp_imm, (value>>16)&0xffff, 16);
-              CGA64::movk(reg_tmp_imm, (value>>32)&0xffff, 32);
-              CGA64::movk(reg_tmp_imm, value>>48, 48);
-          }
-          CGA64::add(out, in, reg_tmp_imm);
+            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
+            else              CGA64::sub(out, in, reg_tmp_imm);
         }
-      }else{
-        long long int val = -1 * value;
-        if(val < ADDMAX){
-            CGA64::sub(out, in, val);
-        }else{
-          if(val < MOVMAX){
-              CGA64::mov(reg_tmp_imm, val);
-          }else if( val <= 0xffffffff){
-              CGA64::mov(reg_tmp_imm, val&0xffff);
-              CGA64::movk(reg_tmp_imm, val>>16, 16);
-          }else if( value <= 0xffffffffffff ){
-              CGA64::mov(reg_tmp_imm, val&0xffff);
-              CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
-              CGA64::movk(reg_tmp_imm, val>>32, 32);
-          }else{
-              CGA64::mov(reg_tmp_imm, val&0xffff);
-              CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
-              CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
-              CGA64::movk(reg_tmp_imm, val>>48, 48);
-          }
-          CGA64::sub(out, in, reg_tmp_imm);
-        }
-      }
     }
-/*
-    inline void vpXdpwssd(Xbyak::Zmm zmm1, Xbyak::Zmm zmm2, reg64_t reg,
-        int offset) {
-        if (jcp.ver == ver_4vnni)
-            vp4dpwssd(zmm1, zmm2, EVEX_compress_addr(reg, offset, false));
-        else
-            vpdpwssd(zmm1, zmm2, EVEX_compress_addr(reg, offset, true));
-    }
-    inline void vadd(Xbyak::Zmm zmm, const Xbyak::Operand& op) {
-        if (jcp.ver == ver_4vnni || jcp.ver == ver_vnni)
-            vpaddd(zmm, zmm, op);
-        else
-            vaddps(zmm, zmm, op);
-    }
-*/
+
     xa::ZReg reg_wei = xa::ZReg(31);
 
     inline void prepare_output(int ur_w);
