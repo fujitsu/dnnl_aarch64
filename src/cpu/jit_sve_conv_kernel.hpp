@@ -26,11 +26,11 @@
 #include "jit_uni_eltwise.hpp"
 
 
-#define PRFWMAX    32
-#define LDRMAX    256
+#define PRFWMAX    31
+#define LDRMAX    255
 #define LDRWMAX   253
-#define ADDMAX   4096
-#define MOVMAX  65536
+#define ADDMAX   4095
+#define MOVMAX  65535
 
 namespace mkldnn {
 namespace impl {
@@ -74,106 +74,72 @@ private:
 
     const xa::PReg reg_p_all_ones  = p1;
 
-    /* ----------------------------------- */
-    reg64_t reg_tmp_addr        = x30;
-    reg64_t reg_prev_bcast_addr = x29;
-    reg64_t reg_tmp_imm         = x28; //rbp;
-    /* ----------------------------------- */
-
     reg64_t param               = abi_param1_aarch64;
-    reg64_t reg_inp             = x8; //r8;
-    reg64_t reg_ker             = x9; //r9;
-    reg64_t reg_out             = x10; //r10;
+    reg64_t reg_inp             = x1;  //r8;
+    reg64_t reg_ker             = x2;  //r9;
+    reg64_t reg_out             = x3;  //r10;
 
-    reg64_t reg_inp_prf         = x11; //r11;
-    reg64_t reg_ker_prf         = x12; //r12;
-    reg64_t reg_out_prf         = x13; //r13;
-    reg64_t reg_owb             = x12; //r12;
+    reg64_t reg_inp_prf         = x4;  //r11;
+    reg64_t reg_ker_prf         = x5;  //r12;
+    reg64_t reg_owb             = x5;  //r12;
+    reg64_t reg_out_prf         = x6;  //r13;
 
-    reg64_t aux_reg_inp         = x14; //r14;
-    reg64_t aux_reg_ker         = x15; //r15;
+    reg64_t aux_reg_inp         = x7;  //r14;
+    reg64_t aux_reg_ker         = x8;  //r15;
 
-    reg64_t aux_reg_inp_prf     = x16; //rsi;
-    reg64_t aux_reg_ker_prf     = x17; //rdx;
+    reg64_t aux_reg_inp_prf     = x9;  //rsi;
+    reg64_t aux_reg_ker_prf     = x10; //rdx;
 
-    reg64_t reg_channel         = x16; //rsi;
-    reg64_t reg_bias            = x17; //rdx;
+    reg64_t reg_channel         = x9;  //rsi;
+    reg64_t reg_bias            = x10; //rdx;
 
-    reg64_t aux_reg_ker_d       = x9; //r9;
-    reg64_t aux_reg_inp_d       = x18; //rbx;
-    reg64_t aux_reg_inp_d_prf   = x13; //r13;
-    reg64_t aux_reg_ker_d_prf   = x24; //abi_not_param1_aarch64;
-    reg64_t reg_ki              = x10; //r10;
+    reg64_t aux_reg_ker_d       = x2;  //r9;
+    reg64_t aux_reg_inp_d       = x11; //rbx;
+    reg64_t aux_reg_inp_d_prf   = x6;  //r13;
+    reg64_t aux_reg_ker_d_prf   = x12; //abi_not_param1_aarch64;
+    reg64_t reg_ki              = x3;  //r10;
 
-    reg64_t reg_kj              = x19; //rax;
-    reg64_t reg_relu_ns         = x19; //rax;
-    reg64_t reg_oi              = x20; //rbx;
-    reg64_t reg_kh              = x24; //abi_not_param1_aarch64;
+    reg64_t reg_kj              = x13; //rax;
+    reg64_t reg_relu_ns         = x13; //rax;
+    reg64_t reg_oi              = x11; //rbx;
+    reg64_t reg_kh              = x12; //abi_not_param1_aarch64;
 
-    reg64_t reg_ic_loop         = x22; //rdx;
-    reg64_t reg_inp_loop        = x23; //rsi;
+    reg64_t reg_ic_loop         = x10; //rdx;
+    reg64_t reg_inp_loop        = x9;  //rsi;
 
-    reg64_t reg_init_flag       = x13; //r13;
+    reg64_t reg_init_flag       = x6;  //r13;
     reg64_t reg_bias_ptr        = param;
 
-    reg64_t aux_reg_ic          = x12; //r12;
-    reg64_t reg_binp            = x19; //rax;
-    reg64_t reg_bout            = x11; //r11;
-    reg64_t aux1_reg_inp        = x20; //rbx;
-    reg64_t aux_reg_out         = x24; //abi_not_param1_aarch64;
+    reg64_t aux_reg_ic          = x5;  //r12;
+    reg64_t reg_binp            = x13; //rax;
+    reg64_t reg_bout            = x4;  //r11;
+    reg64_t aux1_reg_inp        = x11; //rbx;
+    reg64_t aux_reg_out         = x12; //abi_not_param1_aarch64;
 
-    reg64_t reg_long_offt       = x11; //r11;
-    reg64_t reg_out_long_offt   = x14; //r14;
+    reg64_t reg_long_offt       = x4;  //r11;
+    reg64_t reg_out_long_offt   = x7;  //r14;
 
+    reg64_t imm_addr64          = x8; //r15;
 
- 
-    reg64_t imm_addr64 = x15; //r15;
+    /* Temporary registers for ARM insts */
+    reg64_t reg_tmp_addr        = x14;
+    reg64_t reg_prev_bcast_addr = x15;
+    reg64_t reg_tmp_imm         = x16; 
+
     void add_imm(reg64_t out, reg64_t in, long long int value){
+        int val = (value >= 0) ? value : -1 * value;
+        if( val <= ADDMAX ){
+            if( value >= 0 )  CGA64::add(out, in, val);
+            else              CGA64::sub(out, in, val);
+        }else{
+            CGA64::mov(reg_tmp_imm, val&0xffff);
+            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
+            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
+            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
 
-      if( value >= 0){   
-        if(value < ADDMAX){
-            CGA64::add(out, in, value);
-        }else{
-          if(value < MOVMAX){
-              CGA64::mov(reg_tmp_imm, value);
-          }else if(value <= 0xffffffff){
-              CGA64::mov(reg_tmp_imm, value&0xffff);
-              CGA64::movk(reg_tmp_imm, value>>16, 16);
-          }else if( value <= 0xffffffffffff ){
-              CGA64::mov(reg_tmp_imm, value&0xffff);
-              CGA64::movk(reg_tmp_imm, (value>>16)&0xffff, 16);
-              CGA64::movk(reg_tmp_imm, value>>32, 32);
-          }else{
-              CGA64::mov(reg_tmp_imm, value&0xffff);
-              CGA64::movk(reg_tmp_imm, (value>>16)&0xffff, 16);
-              CGA64::movk(reg_tmp_imm, (value>>32)&0xffff, 32);
-              CGA64::movk(reg_tmp_imm, value>>48, 48);
-          }
-          CGA64::add(out, in, reg_tmp_imm);
+            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
+            else              CGA64::sub(out, in, reg_tmp_imm);
         }
-      }else{
-        long long int val = -1 * value;
-        if(val < ADDMAX){
-            CGA64::sub(out, in, val);
-        }else{
-          if(val < MOVMAX){
-              CGA64::mov(reg_tmp_imm, val);
-          }else if( val <= 0xffffffff){
-              CGA64::mov(reg_tmp_imm, val&0xffff);
-              CGA64::movk(reg_tmp_imm, val>>16, 16);
-          }else if( value <= 0xffffffffffff ){
-              CGA64::mov(reg_tmp_imm, val&0xffff);
-              CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
-              CGA64::movk(reg_tmp_imm, val>>32, 32);
-          }else{
-              CGA64::mov(reg_tmp_imm, val&0xffff);
-              CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
-              CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
-              CGA64::movk(reg_tmp_imm, val>>48, 48);
-          }
-          CGA64::sub(out, in, reg_tmp_imm);
-        }
-      }
     }
 
     jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;

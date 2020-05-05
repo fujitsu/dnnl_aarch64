@@ -335,8 +335,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         CGA64::L_aarch64(store_noadd);
         if (jcp.with_eltwise) {
-            //assert(!jcp.with_eltwise);
-#if 1
             xa::LabelAArch64 store_noeltwise;
             CGA64::cmp(reg_reduce_pos_flag, FLAG_REDUCE_LAST);
             CGA64::b(xa::NE, store_noeltwise);
@@ -344,7 +342,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             eltwise_injector_->compute_vector_range(0, ur * load_loop_blk);
 
             CGA64::L_aarch64(store_noeltwise);
-#endif 
         }
 
         auto store_output = [=](bool output_is_aligned) {
@@ -409,17 +406,9 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     }
                 }
             }
-            //int num_bcast_loop = ( ur < num_reg4bcast ) ? ur : num_reg4bcast;
-            //for (int i_ur = 0; i_ur < num_bcast_loop; ++i_ur) { // HW
-            //    prev_bcast_ofs = bcast_load_wreg(i_reduce, i_ur, prev_bcast_ofs);
-            //}
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
-                //if( i_ur < num_reg4bcast){
-                //  CGA64::mov(vreg_bcast_s(), xa::WReg( reg_base_idx + i_ur));
-                //}else{
-                  prev_bcast_ofs = bcast_load(i_reduce, i_ur, prev_bcast_ofs);
-                //}
+                prev_bcast_ofs = bcast_load(i_reduce, i_ur, prev_bcast_ofs);
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
                     CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
                                 vreg_load_s(i_load, 0), vreg_bcast_s());
