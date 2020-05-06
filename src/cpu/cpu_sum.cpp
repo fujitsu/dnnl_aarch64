@@ -32,8 +32,10 @@ using spd_create_f = mkldnn::impl::engine_t::sum_primitive_desc_create_f;
 namespace {
 #define INSTANCE(...) __VA_ARGS__::pd_t::create
 static const spd_create_f cpu_sum_impl_list[] = {
+#ifdef __ARM_ARCH
     INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::bf16>),
     INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::f32>),
+#endif //#ifdef __ARM_ARCH
     INSTANCE(simple_sum_t<data_type::bf16, data_type::bf16>),
     INSTANCE(simple_sum_t<data_type::bf16, data_type::f32>),
     INSTANCE(simple_sum_t<data_type::f32, data_type::f32>),

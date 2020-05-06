@@ -345,7 +345,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         }
 
         auto store_output = [=](bool output_is_aligned) {
-        
             int prev_ofs = -1;
             for (int i_ur = 0; i_ur < ur; ++i_ur)
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load){
@@ -722,15 +721,9 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 
     jcp.load_grp_count = 1;
 
-#if 0
-    const int L1_capacity = get_cache_size(1, true) / sizeof(float);
-    const int L2_size     = get_cache_size(2, true) / sizeof(float);
-    const int L2_capacity = (L2_size * 3) / 4;
-#else
-    const int L1_capacity = 64000 / sizeof(float);
-    const int L2_size     = 8000000 / sizeof(float);
+    const int L1_capacity = get_A64FX_cache_size(1, true, nthreads) / sizeof(float);
+    const int L2_size     = get_A64FX_cache_size(2, false, nthreads) / sizeof(float);
     const int L2_capacity = (L2_size*3) / 4;
-#endif
 
     if (one_of(jcp.prop_kind, forward_training, forward_inference,
                 backward_data)) {
@@ -752,14 +745,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 
             jcp.bcast_dim = jcp.os;
         }
-        jcp.reduce_loop_unroll = jcp.reduce_block;
-        jcp.reduce_loop_bcast_step
-                = jcp.reduce_loop_unroll * jcp.bcast_dim * jcp.typesize_in;
-
-        jcp.reduce_loop_load_step
-                = jcp.reduce_loop_unroll * jcp.load_block * jcp.typesize_in;
-        jcp.load_loop_load_step
-                = jcp.reduce_dim * jcp.load_block * jcp.typesize_in;
 
         // adjusting registry blocking
         int max_regs, min_regs, size_treshold, ur_step;
@@ -826,9 +811,15 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
             }
         }
 
+	/* used reduce_loop() */
         jcp.reduce_loop_unroll = jcp.reduce_block;
+
         jcp.reduce_loop_bcast_step
                 = jcp.reduce_loop_unroll * jcp.bcast_dim * jcp.typesize_in;
+        jcp.reduce_loop_load_step
+                = jcp.reduce_loop_unroll * jcp.load_block * jcp.typesize_in;
+        jcp.load_loop_load_step
+                = jcp.reduce_dim * jcp.load_block * jcp.typesize_in;
 
         jcp.bcast_block = jcp.ur;
 
@@ -839,14 +830,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 
         jcp.load_loop_iter_step = jcp.load_block;
 
-        if (jcp.prop_kind == backward_data)
-            jcp.loop_order = loop_lbr;
-        else
-            jcp.loop_order = reduce_src ? loop_blr : loop_lbr;
-
-        int nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
         int nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
-        int nb_load = div_up(jcp.load_dim, jcp.load_block);
 
         if (jcp.ver == ver_sve && jcp.expl_bcast) {
             if (jcp.load_dim <= BIG_LOAD_DIM && spatial > SMALL_SPATIAL
@@ -855,13 +839,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
             else if (spatial > SMALL_SPATIAL)
                 reduce_blocking = nstl::min(jcp.reduce_dim, 512);
             else
-                reduce_blocking = nstl::min(jcp.reduce_dim, 256);
-
-            if ((jcp.mb > 28 && spatial >= 28)
-                    || (jcp.mb > 112 && spatial >= 17))
-                jcp.use_vmovntps = true;
-            else
-                jcp.use_vmovntps = false;
+	        reduce_blocking = nstl::min(jcp.reduce_dim, 256);
         } else {
 
             reduce_blocking = nb_reduce;
@@ -876,10 +854,10 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 
         // Check input data cache aliasing.
         // For other ISA constants may be updated.
-        // 64 * 1024 is chosen due to 1MB L2 16-way cache.
+        // 256B line size * 2048 sets is chosen due to 8MB L2 16-way cache.
         // 7 is empirical value. It is about half of 16.
         // So we leave about half of the set for other data - weights, dst
-        int way_size = (64 * 1024) / jcp.typesize_in;
+        int way_size = (256 * 2048) / jcp.typesize_in;
         int max_hits = 7;
         if (jcp.bcast_dim * reduce_blocking > way_size * max_hits) {
             int nrb = reduce_blocking / simd_w;
@@ -897,17 +875,44 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
             }
         }
 
+        if (jcp.prop_kind == backward_data) {
+	  jcp.loop_order = loop_lbr;
+	}
+        else {
+	  jcp.loop_order = reduce_src ? loop_blr : loop_lbr;
+	}
+
         if (reduce_blocking < jcp.reduce_dim) {
-            jcp.use_vmovntps = false;
             if (jcp.prop_kind == backward_data)
                 jcp.loop_order = reduce_src ? loop_lbr : loop_rlb;
             else
                 jcp.loop_order = reduce_src ? loop_rbl : loop_rlb;
         }
+
+        if (jcp.ver == ver_sve && jcp.expl_bcast) {
+            if ((jcp.mb > 28 && spatial >= 28)
+                    || (jcp.mb > 112 && spatial >= 17))
+	      {
+                jcp.use_vmovntps = true;
+	      }
+            else
+	      {
+                jcp.use_vmovntps = false;
+	      }
+	}
+
+        if (reduce_blocking < jcp.reduce_dim) {
+            jcp.use_vmovntps = false;
+	}
+
+
         load_blocking = jcp.load_dim;
 
         int load_size = jcp.load_dim * jcp.reduce_dim;
         int bcast_size = jcp.mb * jcp.ngroups * jcp.bcast_dim * jcp.reduce_dim;
+
+        int nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
+        int nb_load = div_up(jcp.load_dim, jcp.load_block);
 
         if (jcp.ver == ver_sve && nthreads <= 28 && jcp.mb < nthreads
                 && nb_load * nb_bcast > nthreads) {
@@ -961,7 +966,9 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 && jcp.load_dim > 512 && jcp.load_dim / jcp.reduce_dim >= 4) {
             jcp.load_grp_count = nstl::max(jcp.load_grp_count, 2);
             load_blocking = jcp.load_block;
-        }
+        } else if (load_size < 256 && jcp.load_dim < 128){
+	  load_blocking = simd_w;
+	}
 
         bcast_blocking = div_up(jcp.mb * jcp.ngroups * nb_bcast,
                                  div_up(nthreads, jcp.load_grp_count))

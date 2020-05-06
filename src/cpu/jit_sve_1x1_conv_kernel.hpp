@@ -90,9 +90,9 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
 
     /* Pointer */
     reg64_t reg_bcast_data          = x5;  // Weight
-    reg64_t reg_load_data           = x6; // Input
-    reg64_t reg_output_data         = x7; // Output
-    reg64_t reg_bias_data           = x8; // bias
+    reg64_t reg_load_data           = x6;  // Input
+    reg64_t reg_output_data         = x7;  // Output
+    reg64_t reg_bias_data           = x8;  // bias
     reg64_t aux1_reg_bcast_data     = x9; 
     reg64_t aux_reg_output_data     = x10; 
     reg64_t aux_reg_bcast_data      = x11; 

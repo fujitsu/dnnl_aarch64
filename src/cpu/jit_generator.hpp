@@ -176,6 +176,29 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
     } else
         return 0;
 }
+#ifdef XBYAK_TRANSLATE_AARCH64
+  inline unsigned int get_A64FX_cache_size(int level, bool per_core = true, int nthreads = 1) {
+    unsigned int l = level - 1;
+    // Currently, if XByak is not able to fetch the cache topology
+    // we default to 64KiB of L1 per core, 8MiB of L2 per 1CMG.
+    if (cpu.getDataCacheLevels() == 0) {
+        const int L1_cache_per_core = 65536;
+        const int L2_cache_per_CMG = 8388608;
+        int num_cores = per_core ? 1 : nthreads;
+        switch (l) {
+        case (0): return L1_cache_per_core * num_cores;
+        case (1): return L2_cache_per_CMG * utils::div_up(num_cores, 12);
+        default: return 0;
+        }
+    }
+    if (l < cpu.getDataCacheLevels()) {
+        return cpu.getDataCacheSize(l)
+                / (per_core ? cpu.getCoresSharingDataCache(l) : 1);
+    } else
+        return 0;
+}
+#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+
 
 }
 
