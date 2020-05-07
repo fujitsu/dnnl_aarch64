@@ -261,8 +261,8 @@ public:
       /*
 	 |                        |
 	 |------------------------|
-	 | Translater use         |
-	 |------------------------| <- X_TRANSLATER_STACK reg. value at end of preamble().
+	 | Translator use         |
+	 |------------------------| <- X_TRANSLATOR_STACK reg. value at end of preamble().
 	 |                        |
 	 |------------------------|
 	 | User app. use          |
@@ -304,8 +304,8 @@ public:
 	CodeGeneratorAArch64::mov(x9, x5); /* 6-th arg. */
 	/* Note:If # of args is more than 6, 7-th, 8-th, ..., args are passed by stack. */
 
-	CodeGeneratorAArch64::sub(X_TRANSLATER_STACK, CodeGeneratorAArch64::sp, xt_stack_offset);
 	CodeGeneratorAArch64::mov(x4, CodeGeneratorAArch64::sp); /* Intel64's stack register is 4-th register. */
+	CodeGeneratorAArch64::sub_imm(X_TRANSLATOR_STACK, x4, xt_stack_offset, X_TMP_0, X_TMP_1);
 #else //#ifdef XBYAK_TRANSLATE_AARCH64
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len); // subtract by imm
