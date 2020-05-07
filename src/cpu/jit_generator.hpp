@@ -260,10 +260,13 @@ public:
 #ifdef XBYAK_TRANSLATE_AARCH64
       /*
 	 |                        |
-	 | User app. use          |
-	 |------------------------| <- X_TRANSLATER_STACK reg. value  at end of preamble().
+	 |------------------------|
 	 | Translater use         |
-	 |------------------------| <- SP and X_TRANSLATER_STACK registers' value at end of preamble().
+	 |------------------------| <- X_TRANSLATER_STACK reg. value at end of preamble().
+	 |                        |
+	 |------------------------|
+	 | User app. use          |
+	 |------------------------| <- SP reg. value at end of preamble().
 	 | Callee saved registers |
          -------------------------- <- Stack pointer (SP) register's value at beginning of preamble().
        */
@@ -293,16 +296,16 @@ public:
 	CodeGeneratorAArch64::not_(P_MSB_256.b, P_ALL_ONE/xa::T_z, P_MSB_256.b);
 
 	/* arg values are passed different registers between x86_64 and aarch64. */
-	CodeGeneratorAArch64::mov(x7, x0);
-	CodeGeneratorAArch64::mov(x6, x1);
+	CodeGeneratorAArch64::mov(x7, x0); /* First arg. */
+	CodeGeneratorAArch64::mov(x6, x1); /* Sedond arg. */
 	CodeGeneratorAArch64::mov(x2, x2);
 	CodeGeneratorAArch64::mov(x1, x3);
 	CodeGeneratorAArch64::mov(x8, x4);
-	CodeGeneratorAArch64::mov(x9, x5);
-	/* args of x6 and x7 are saved to stack. */
+	CodeGeneratorAArch64::mov(x9, x5); /* 6-th arg. */
+	/* Note:If # of args is more than 6, 7-th, 8-th, ..., args are passed by stack. */
 
-	CodeGeneratorAArch64::mov(X_TRANSLATER_STACK, CodeGeneratorAArch64::sp);
-	CodeGeneratorAArch64::sub_imm(xa::XReg(xt_sp_reg_idx), X_TRANSLATER_STACK, NUM_BYTES_TRANSLATER_STACK_SIZE, X_TMP_0, X_TMP_1);
+	CodeGeneratorAArch64::sub(X_TRANSLATER_STACK, CodeGeneratorAArch64::sp, xt_stack_offset);
+	CodeGeneratorAArch64::mov(x4, CodeGeneratorAArch64::sp); /* Intel64's stack register is 4-th register. */
 #else //#ifdef XBYAK_TRANSLATE_AARCH64
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len); // subtract by imm
