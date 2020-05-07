@@ -258,6 +258,15 @@ public:
 
     void preamble() {
 #ifdef XBYAK_TRANSLATE_AARCH64
+      /*
+	 |                        |
+	 | User app. use          |
+	 |------------------------| <- X_TRANSLATER_STACK reg. value  at end of preamble().
+	 | Translater use         |
+	 |------------------------| <- SP and X_TRANSLATER_STACK registers' value at end of preamble().
+	 | Callee saved registers |
+         -------------------------- <- Stack pointer (SP) register's value at beginning of preamble().
+       */
         assert(!(num_abi_save_gpr_regs_aarch64 % 2));
 
         stp(x29, x30,
@@ -292,7 +301,8 @@ public:
 	CodeGeneratorAArch64::mov(x9, x5);
 	/* args of x6 and x7 are saved to stack. */
 
-	CodeGeneratorAArch64::mov(x4, CodeGeneratorAArch64::sp);
+	CodeGeneratorAArch64::mov(X_TRANSLATER_STACK, CodeGeneratorAArch64::sp);
+	CodeGeneratorAArch64::sub_imm(xa::XReg(xt_sp_reg_idx), X_TRANSLATER_STACK, NUM_BYTES_TRANSLATER_STACK_SIZE, X_TMP_0, X_TMP_1);
 #else //#ifdef XBYAK_TRANSLATE_AARCH64
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len); // subtract by imm

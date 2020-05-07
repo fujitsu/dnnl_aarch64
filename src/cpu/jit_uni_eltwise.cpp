@@ -340,13 +340,14 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     h->uni_vmovups(h->ptr[h->rsp + 1 * vlen], vmm_aux1);
     h->uni_vmovups(h->ptr[h->rsp + 2 * vlen], vmm_aux2);
     h->uni_vmovups(h->ptr[h->rsp + 3 * vlen], vmm_src);
+    if (isa == avx512_common) {
 #ifdef XBYAK_TRANSLATE_AARCH64
-    h->Xbyak_aarch64::CodeGeneratorAArch64::add(Xbyak_aarch64::XReg(28), Xbyak_aarch64::XReg(28), 4 * vlen);
-    h->Xbyak_aarch64::CodeGeneratorAArch64::str(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(Xbyak_aarch64::XReg(28)));
+        h->Xbyak_aarch64::CodeGeneratorAArch64::add(h->X_TMP_ADDR, Xbyak_aarch64::XReg(h->xt_sp_reg_idx), 4 * vlen);
+        h->Xbyak_aarch64::CodeGeneratorAArch64::str(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(h->X_TMP_ADDR));
 #else
-    if (isa == avx512_common)
         h->kmovw(h->ptr[h->rsp + 4 * vlen], k_mask);
 #endif
+    }
 
     exp_compute_vector(vmm_aux3);
 
@@ -354,13 +355,14 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     h->uni_vmovups(vmm_aux1, h->ptr[h->rsp + 1 * vlen]);
     h->uni_vmovups(vmm_aux2, h->ptr[h->rsp + 2 * vlen]);
     h->uni_vmovups(vmm_src, h->ptr[h->rsp + 3 * vlen]);
+    if (isa == avx512_common) {
 #ifdef XBYAK_TRANSLATE_AARCH64
-    h->Xbyak_aarch64::CodeGeneratorAArch64::add(Xbyak_aarch64::XReg(28), Xbyak_aarch64::XReg(28), 4 * vlen);
-    h->Xbyak_aarch64::CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(Xbyak_aarch64::XReg(28)));
+        h->Xbyak_aarch64::CodeGeneratorAArch64::add(h->X_TMP_ADDR, Xbyak_aarch64::XReg(h->xt_sp_reg_idx), 4 * vlen);
+        h->Xbyak_aarch64::CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(h->X_TMP_ADDR));
 #else
-    if (isa == avx512_common)
         h->kmovw(k_mask, h->ptr[h->rsp + 4 * vlen]);
 #endif
+    }
     h->add(h->rsp, stack_size);
 
     // 1 + exp(2x)
