@@ -1,5 +1,5 @@
 #/bin/bash
-file_tp_list="../../../tools/regression.list.txt"
+file_tp_list="${1:-../../../tools/regression.list.txt}"
 dir_work=work_regression
 
 get_date_str() {
@@ -66,8 +66,10 @@ while [ ${count} -le ${num_tp} ] ; do
     # Output progress
     echo "[${count}/${num_tp}] ${file_one_tp_log}"
 
+    # Execute one test pattern
     ${tp_cmd} ${tp_opt} > ${dir_work}/${file_one_tp_log}
 
+    # Summarize result
     test_result=`tail -n 1 ${dir_work}/${file_one_tp_log}`
     echo "${test_result} ${file_one_tp_log}" >> ${file_summary}
     
