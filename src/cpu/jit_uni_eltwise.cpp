@@ -330,11 +330,7 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     // We need to save kmask, vmm_aux0, vmm_aux1, vmm_aux2 and vmm_src as exp
     // uses them.
     // vmm_src is not more read afterwards, so we do not have to save it
-#ifdef XBYAK_TRANSLATE_AARCH64
-    auto stack_size = 4 * vlen + 8;
-#else
     auto stack_size = 4 * vlen + (isa == avx512_common) * 4;
-#endif
     h->sub(h->rsp, stack_size);
     h->uni_vmovups(h->ptr[h->rsp + 0 * vlen], vmm_aux0);
     h->uni_vmovups(h->ptr[h->rsp + 1 * vlen], vmm_aux1);
@@ -342,8 +338,8 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     h->uni_vmovups(h->ptr[h->rsp + 3 * vlen], vmm_src);
     if (isa == avx512_common) {
 #ifdef XBYAK_TRANSLATE_AARCH64
-        h->Xbyak_aarch64::CodeGeneratorAArch64::add(h->X_TMP_ADDR, Xbyak_aarch64::XReg(h->xt_sp_reg_idx), 4 * vlen);
-        h->Xbyak_aarch64::CodeGeneratorAArch64::str(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(h->X_TMP_ADDR));
+        h->Xbyak_aarch64::CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
+        h->Xbyak_aarch64::CodeGeneratorAArch64::str(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
 #else
         h->kmovw(h->ptr[h->rsp + 4 * vlen], k_mask);
 #endif
@@ -357,8 +353,8 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     h->uni_vmovups(vmm_src, h->ptr[h->rsp + 3 * vlen]);
     if (isa == avx512_common) {
 #ifdef XBYAK_TRANSLATE_AARCH64
-        h->Xbyak_aarch64::CodeGeneratorAArch64::add(h->X_TMP_ADDR, Xbyak_aarch64::XReg(h->xt_sp_reg_idx), 4 * vlen);
-        h->Xbyak_aarch64::CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(h->X_TMP_ADDR));
+        h->Xbyak_aarch64::CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
+        h->Xbyak_aarch64::CodeGeneratorAArch64::add(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
 #else
         h->kmovw(k_mask, h->ptr[h->rsp + 4 * vlen]);
 #endif

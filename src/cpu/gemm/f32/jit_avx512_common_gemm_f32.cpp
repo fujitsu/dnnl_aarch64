@@ -209,7 +209,6 @@ struct xbyak_gemm : public jit_generator {
             } else {
                 for (int i = 0; i < 4; i++) {
 #ifdef XBYAK_TRANSLATE_AARCH64
-		    Xbyak_aarch64::XReg sp_intel64(xt_sp_reg_idx);
 		    CodeGeneratorAArch64::mov(k4_aarch64.b, k1_aarch64.b);
 #else
                     kmovw(k4, k1);
@@ -218,13 +217,13 @@ struct xbyak_gemm : public jit_generator {
                             ptr[BO1 + ZSTRIDE + (i - OFFSET) * SIZE]);
                     lea(BO2, ptr[BO1 + LDA * 8]);
 #ifdef XBYAK_TRANSLATE_AARCH64
-		    CodeGeneratorAArch64::sub(sp_intel64, sp_intel64, 8);
-		    CodeGeneratorAArch64::str(k1_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
+		    CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+		    CodeGeneratorAArch64::str(k1_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
 		    CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
-		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::add(sp_intel64, sp_intel64, 8);
+		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
 #else
                     kshiftrw(k4, k1, 8);
 #endif
@@ -243,13 +242,13 @@ struct xbyak_gemm : public jit_generator {
                                 ptr[BO2 + ZSTRIDE + (i - OFFSET) * SIZE]);
                         lea(BO2, ptr[BO2 + LDA * 8]);
 #ifdef XBYAK_TRANSLATE_AARCH64
-		    CodeGeneratorAArch64::sub(sp_intel64, sp_intel64, 8);
-		    CodeGeneratorAArch64::str(k2_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
+		    CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+		    CodeGeneratorAArch64::str(k2_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
 		    CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
-		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::add(sp_intel64, sp_intel64, 8);
+		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
 #else
                         kshiftrw(k4, k2, 8);
 #endif
@@ -269,13 +268,13 @@ struct xbyak_gemm : public jit_generator {
                                 ptr[BO2 + ZSTRIDE + (i - OFFSET) * SIZE]);
                         lea(BO2, ptr[BO2 + LDA * 8]);
 #ifdef XBYAK_TRANSLATE_AARCH64
-		    CodeGeneratorAArch64::sub(sp_intel64, sp_intel64, 8);
-		    CodeGeneratorAArch64::str(k3_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
+		    CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+		    CodeGeneratorAArch64::str(k3_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
 		    CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
-		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::add(sp_intel64, sp_intel64, 8);
+		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
 #else
                         kshiftrw(k4, k3, 8);
 #endif
@@ -333,13 +332,13 @@ struct xbyak_gemm : public jit_generator {
                 lea(BO2, ptr[BO1 + LDA * 8]);
 
 #ifdef XBYAK_TRANSLATE_AARCH64
-		    CodeGeneratorAArch64::sub(sp_intel64, sp_intel64, 8);
-		    CodeGeneratorAArch64::str(k1_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
+		    CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+		    CodeGeneratorAArch64::str(k1_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
 		    CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
-		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::add(sp_intel64, sp_intel64, 8);
+		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
 #else
                 kshiftrw(k4, k1, 8);
 #endif
@@ -357,13 +356,13 @@ struct xbyak_gemm : public jit_generator {
                             ptr[BO2 + ZSTRIDE + (0 - OFFSET) * SIZE]);
                     lea(BO2, ptr[BO2 + LDA * 8]);
 #ifdef XBYAK_TRANSLATE_AARCH64
-		    CodeGeneratorAArch64::sub(sp_intel64, sp_intel64, 8);
-		    CodeGeneratorAArch64::str(k2_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
+		    CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+		    CodeGeneratorAArch64::str(k2_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
 		    CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
-		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::add(sp_intel64, sp_intel64, 8);
+		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
 #else
                     kshiftrw(k4, k2, 8);
 #endif
@@ -383,13 +382,13 @@ struct xbyak_gemm : public jit_generator {
                             ptr[BO2 + ZSTRIDE + (0 - OFFSET) * SIZE]);
                     lea(BO2, ptr[BO2 + LDA * 8]);
 #ifdef XBYAK_TRANSLATE_AARCH64
-		    CodeGeneratorAArch64::sub(sp_intel64, sp_intel64, 8);
-		    CodeGeneratorAArch64::str(k3_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
+		    CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+		    CodeGeneratorAArch64::str(k3_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
 		    CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
-		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(sp_intel64));
-		    CodeGeneratorAArch64::add(sp_intel64, sp_intel64, 8);
+		    CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+		    CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
 #else
                     kshiftrw(k4, k3, 8);
 #endif
