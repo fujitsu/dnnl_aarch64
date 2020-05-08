@@ -163,7 +163,12 @@ inline unsigned int get_A64FX_cache_size(int level, bool per_core = true, int nt
         int num_cores = per_core ? 1 : nthreads;
         switch (l) {
         case (0): return L1_cache_per_core * num_cores;
-        case (1): return L2_cache_per_CMG * utils::div_up(num_cores, 12);
+        case (1):
+	  if (per_core) {
+	    return (L2_cache_per_CMG * utils::div_up(num_cores, 12)) / nthreads;
+	  } else {
+	    return L2_cache_per_CMG * utils::div_up(num_cores, 12);
+	  }
         default: return 0;
         }
     }
