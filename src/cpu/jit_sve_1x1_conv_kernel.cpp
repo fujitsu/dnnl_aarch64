@@ -464,6 +464,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     CGA64::subs(reduce_loop_iter, reduce_loop_iter, jcp.reduce_loop_unroll);
     CGA64::b(xa::LE, reduce_loop_tail);
 
+    align(32);
     /* Input channel loop */
     CGA64::L_aarch64(reduce_loop); {
         fma_block(false);
