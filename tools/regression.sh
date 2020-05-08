@@ -55,8 +55,8 @@ output_misc_info > ${file_summary}
 
 
 file_log="regression_${date_str}.log"
-#num_tp=`wc -l ${file_tp_list} | cut -f 1 -d " "`
-num_tp=10
+num_tp=`wc -l ${file_tp_list} | cut -f 1 -d " "`
+#num_tp=10
 
 count=1
 while [ ${count} -le ${num_tp} ] ; do 
