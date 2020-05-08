@@ -124,6 +124,7 @@ static const Xbyak::Xbyak_aarch64::XReg abi_param1_aarch64(Xbyak::Xbyak_aarch64:
         abi_param8_aarch64(Xbyak::Xbyak_aarch64::Operand::X7),
         abi_not_param1_aarch64(Xbyak::Xbyak_aarch64::Operand::X15); // Fujitsu uses X15 on A64FX as
                                              // abi_not_param1 on x64.
+
 #endif //#ifndef CPU_JIT_AVX2_GENERATOR_HPP
 
 #else // __ARM_ARCH
@@ -152,8 +153,7 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
 #endif // #ifdef _WIN32
 #endif // __ARM_ARCH
 
-#if 0
-  inline unsigned int get_A64FX_cache_size(int level, bool per_core = true, int nthreads = 1) {
+inline unsigned int get_A64FX_cache_size(int level, bool per_core = true, int nthreads = 1) {
     unsigned int l = level - 1;
     // Currently, if XByak is not able to fetch the cache topology
     // we default to 64KiB of L1 per core, 8MiB of L2 per 1CMG.
@@ -173,11 +173,9 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
     } else
         return 0;
 }
-#endif
 
 } // namespace
 #endif
-
 
 class jit_generator_aarch64 : public Xbyak::Xbyak_aarch64::CodeGeneratorAArch64
 {
@@ -209,7 +207,8 @@ private:
     const size_t size_of_abi_save_regs = num_abi_save_gpr_regs * x0.getBit() / 8
             + vreg_to_preserve * vreg_len_preserve;
 
-	const size_t preserved_stack_size = xreg_len * (2 + num_abi_save_gpr_regs) + vreg_len_preserve * vreg_to_preserve;
+    const size_t preserved_stack_size = xreg_len * (2 + num_abi_save_gpr_regs) + vreg_len_preserve * vreg_to_preserve;
+
 #else
     const size_t size_of_abi_save_regs
             = num_abi_save_gpr_regs * rax.getBit() / 8
@@ -244,7 +243,7 @@ public:
 
     void preamble() {
       stp(x29, x30, pre_ptr(sp, -(static_cast<int64_t>(preserved_stack_size))));
-	  add(x29, sp, xreg_len * 2);
+      add(x29, sp, xreg_len * 2);
         if (vreg_to_preserve) {
             st4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve*4));
             st4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
@@ -252,7 +251,7 @@ public:
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
             stp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i]),
                     Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x29, xreg_len*2));
-	}
+    }
     }
 #else
     Xbyak::Reg64 param1 = abi_param1;
@@ -330,7 +329,7 @@ public:
 
         if (vreg_to_preserve) {
             ld4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve*4));
-	          ld4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
+              ld4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
         }
 
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
@@ -440,16 +439,19 @@ public:
 
     // Disallow char-based labels completely
     void L(const char *label) = delete;
-    void L(Xbyak::Xbyak_aarch64::LabelAArch64 &label) { Xbyak::Xbyak_aarch64::CodeGeneratorAArch64::L_aarch64(label); }
+    void L(Xbyak::Xbyak_aarch64::LabelAArch64 &label) {
+        Xbyak::Xbyak_aarch64::CodeGeneratorAArch64::L_aarch64(label);
+    }
 
-    void L_aligned(Xbyak::Xbyak_aarch64::LabelAArch64&label, int alignment = 16) {
+    void L_aligned(
+            Xbyak::Xbyak_aarch64::LabelAArch64 &label, int alignment = 16) {
         align(alignment);
         L(label);
     }
 
 #ifdef XBYAK_TRANSLATE_AARCH64
     // WREG, XREG, VREG, ZREG
-#if 0  
+#if 0
   void uni_vpxor(const Xbyak::VRreg &x1, const Xbyak::Xbyak_aarch64::VReg &x2, const Xbyak::VRreg &op) {
     assert(x1.getIdx() == x2.getIdx());
     xor(x2, x2, op);
@@ -851,38 +853,38 @@ public:
         assert(NULL);
     }
 
-	void uni_ld(const Xbyak::Xbyak_aarch64::ZRegS &z1s, const Xbyak::Xbyak_aarch64::AdrScImm &addr) {
-		assert(NULL);
-	}
+    void uni_ld(const Xbyak::Xbyak_aarch64::ZRegS &z1s, const Xbyak::Xbyak_aarch64::AdrScImm &addr) {
+        assert(NULL);
+    }
 
 
-	void uni_ld(const Xbyak::Xbyak_aarch64::VReg4S &v1s4, const Xbyak::Xbyak_aarch64::AdrScImm &addr) {
-		assert(NULL);
-	}
+    void uni_ld(const Xbyak::Xbyak_aarch64::VReg4S &v1s4, const Xbyak::Xbyak_aarch64::AdrScImm &addr) {
+        assert(NULL);
+    }
 
-	void uni_st(const Xbyak::Xbyak_aarch64::ZRegS &z1s, const Xbyak::Xbyak_aarch64::AdrScImm &addr) {
-		assert(NULL);
-	}
+    void uni_st(const Xbyak::Xbyak_aarch64::ZRegS &z1s, const Xbyak::Xbyak_aarch64::AdrScImm &addr) {
+        assert(NULL);
+    }
 
-	void uni_st(const Xbyak::Xbyak_aarch64::VReg4S &v1s4, const Xbyak::Xbyak_aarch64::AdrScImm &addr) {
-		assert(NULL);
-	}
+    void uni_st(const Xbyak::Xbyak_aarch64::VReg4S &v1s4, const Xbyak::Xbyak_aarch64::AdrScImm &addr) {
+        assert(NULL);
+    }
 
-	void uni_vcvts2f(const Xbyak::Xbyak_aarch64::ZRegS &z1s, const Xbyak::Xbyak_aarch64::ZRegS &z2s,
+    void uni_vcvts2f(const Xbyak::Xbyak_aarch64::ZRegS &z1s, const Xbyak::Xbyak_aarch64::ZRegS &z2s,
             const Xbyak::Xbyak_aarch64::_PReg &p1) {
-		assert(NULL);
-	}
+        assert(NULL);
+    }
 
-	void uni_vcvts2f(const Xbyak::Xbyak_aarch64::VReg4S &v1, const Xbyak::Xbyak_aarch64::VReg4S &v2,
+    void uni_vcvts2f(const Xbyak::Xbyak_aarch64::VReg4S &v1, const Xbyak::Xbyak_aarch64::VReg4S &v2,
             const Xbyak::Xbyak_aarch64::_PReg &p1) {
-		assert(NULL);
-	}
+        assert(NULL);
+    }
 
-	void uni_vcvtf2s(
+    void uni_vcvtf2s(
             const Xbyak::Xbyak_aarch64::ZRegS &z1s, const Xbyak::Xbyak_aarch64::ZRegS &z2s, const Xbyak::Xbyak_aarch64::_PReg &p1) {
-	}
+    }
 
-	void uni_vcvtf2s(const Xbyak::Xbyak_aarch64::VReg4S &v1, const Xbyak::Xbyak_aarch64::VReg4S &v2,
+    void uni_vcvtf2s(const Xbyak::Xbyak_aarch64::VReg4S &v1, const Xbyak::Xbyak_aarch64::VReg4S &v2,
             const Xbyak::Xbyak_aarch64::PReg &p1) {}
 
 

@@ -82,21 +82,21 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     const xa::PReg reg_p_all_ones  = p1;
 
     /* Flags and loop variables */
-    reg64_t reg_reduce_pos_flag     = x1; 
-    reg64_t reduce_loop_iter        = x2; 
-    reg64_t bcast_loop_iter         = x3; 
+    reg64_t reg_reduce_pos_flag     = x1;
+    reg64_t reduce_loop_iter        = x2;
+    reg64_t bcast_loop_iter         = x3;
     reg64_t reg_relu_ns             = x4;  // For forward
     reg64_t reg_output_stride       = x4;  // For backward
 
     /* Pointer */
-    reg64_t reg_bcast_data          = x5;  // Weight
-    reg64_t reg_load_data           = x6;  // Input
+    reg64_t reg_bcast_data          = x5;  // Input
+    reg64_t reg_load_data           = x6;  // Weight
     reg64_t reg_output_data         = x7;  // Output
     reg64_t reg_bias_data           = x8;  // bias
-    reg64_t aux1_reg_bcast_data     = x9; 
-    reg64_t aux_reg_output_data     = x10; 
-    reg64_t aux_reg_bcast_data      = x11; 
-    reg64_t aux_reg_load_data       = x12; 
+    reg64_t aux1_reg_bcast_data     = x9;
+    reg64_t aux_reg_output_data     = x10;
+    reg64_t aux_reg_bcast_data      = x11;
+    reg64_t aux_reg_load_data       = x12;
     reg64_t reg_prev_bcast_addr     = x13; // Input: The reg keeps addr accessed by previous ldr inst
     reg64_t reg_prev_out_addr       = x14; // Output: The reg keeps addr accessed by previous ldr or str inst
 
