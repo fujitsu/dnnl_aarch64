@@ -497,12 +497,13 @@ void jit_sve_1x1_conv_kernel::generate() {
         switch (jcp.prop_kind) {
           case forward_training:
           case forward_inference:
-
+              /* Calculate the address of the bias for the next bcast_loop */
               add_imm(reg_bias_data, reg_bias_data, load_loop_blk * jcp.load_block * jcp.typesize_out);
 
               add_imm(reg_output_data, reg_output_data, load_loop_blk * jcp.bcast_dim * jcp.load_block *jcp.typesize_out);
               break;
           case backward_data:
+              /* Calculate the address of the weight for the next bcast_loop */
               add_imm(reg_output_data, reg_output_data,
                         load_loop_blk * jcp.bcast_dim * jcp.load_block * jcp.typesize_out);
               break;
@@ -517,7 +518,7 @@ void jit_sve_1x1_conv_kernel::generate() {
         CGA64::sub(reg_load_loop_work, reg_load_loop_work, load_loop_blk * jcp.load_loop_iter_step);
     };
 
-    const int simd_w = 16; // The lenght of vector instructions (512-bit)
+    const int simd_w = 16; // The length of a vector instructions (512-bit)
 
     xa::LabelAArch64 load_loop_blk[7];
 
@@ -608,10 +609,10 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     /* Batchsize */
     jcp.mb = src_d.dims()[0];
 
-    /* Channel */
+    /* Channels */
     jcp.oc_without_padding = dst_d.dims()[1] / jcp.ngroups;
-    jcp.oc = dst_d.dims()[1] / jcp.ngroups; // output channel size
-    jcp.ic = src_d.dims()[1] / jcp.ngroups; // input channel size
+    jcp.oc = dst_d.dims()[1] / jcp.ngroups; // Output channel size
+    jcp.ic = src_d.dims()[1] / jcp.ngroups; // Input channel size
 
     bool ok_to_pad_channels = true
         && jcp.ngroups == 1
@@ -639,13 +640,14 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.stride_h = (ndims == 3) ? 1 : cd.strides[0];
     jcp.stride_w = cd.strides[ndims - 3];
 
-    jcp.src_fmt = src_d.format(); // maybe, nChw16c
+    jcp.src_fmt = src_d.format(); // nChw16c
     /* Bias check */
     jcp.with_bias = pick_by_prop_kind(jcp.prop_kind, cd.bias_desc.format,
             memory_format::undef, cd.diff_bias_desc.format)
         != memory_format::undef;
 
 
+    /* Spatials */
     jcp.os = jcp.oh * jcp.ow;
     jcp.is = jcp.ih * jcp.iw;
     jcp.tr_is = rnd_up(jcp.is, 4);
@@ -718,7 +720,10 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     const int SMALL_SPATIAL = 10;
     const int BIG_SPATIAL = 65;
     const int BIG_REDUCE_DIM = 1024;
-    const int BIG_LOAD_DIM = 256;
+    const int BIG_LOAD_DIM = (jcp.reduce_dim >= 512)
+                           ? 256
+                           : 512;
+    // const int BIG_LOAD_DIM = 256;
 
     int load_blocking{ 0 };
     int load_blocking_max{ 0 };
@@ -939,16 +944,16 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 //                nthreads, jcp.load_grp_count, 2 * jcp.load_grp_count, false);
         }
 
-        if (jcp.ver == ver_sve && jcp.expl_bcast && jcp.bcast_dim <= 64
+        if (jcp.ver == ver_sve && jcp.expl_bcast && jcp.bcast_dim <= 64 // hw 8
                 && load_size >= L2_size) {
             jcp.load_grp_count = nstl::max(jcp.load_grp_count, 4);
         } else if (jcp.bcast_dim <= 49 && jcp.mb <= nthreads
                 && jcp.load_dim > 512 && jcp.load_dim / jcp.reduce_dim >= 4) {
             jcp.load_grp_count = nstl::max(jcp.load_grp_count, 2);
             load_blocking = jcp.load_block;
-        } else if (load_size < 256 && jcp.load_dim < 128){
-            load_blocking = simd_w;
-       }
+        } else if (load_size < 256 && jcp.load_dim < 128) {
+            load_blocking = simd_w; // @todo
+        }
 
         bcast_blocking = div_up(jcp.mb * jcp.ngroups * nb_bcast,
                                  div_up(nthreads, jcp.load_grp_count))
@@ -959,7 +964,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         int space_for_bcast = (L2_capacity  /* kernel_size - */
                                - 2 * jcp.load_block * reduce_blocking
                                - jcp.ur * reduce_blocking
-                               - 3 * 1024);
+                               - 3 * 1024); // @todo for 48threads
+
         if (jcp.reduce_dim * jcp.bcast_dim > L2_capacity)
             space_for_bcast /= 2;
 
