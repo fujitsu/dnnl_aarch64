@@ -795,7 +795,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         jcp.expl_bcast = true;
 
         if (jcp.load_dim > 128 && jcp.load_dim < BIG_LOAD_DIM
-                && spatial > SMALL_SPATIAL && spatial < BIG_SPATIAL) {
+	    && spatial > SMALL_SPATIAL && spatial < BIG_SPATIAL
+	    && jcp.reduce_dim < 256) {
             max_regs = 6;
             min_regs = 5;
         }
