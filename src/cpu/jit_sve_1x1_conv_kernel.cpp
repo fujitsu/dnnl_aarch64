@@ -101,8 +101,12 @@ void jit_sve_1x1_conv_kernel::bcast_loop(int load_loop_blk)
 void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
          int ur, int substep, bool wraparound)
 {
-    auto vreg_bcast_s = [=]() {
-        return xa::ZRegS(30);
+    auto vreg_bcast_s = [=](bool next_iter) {
+        if (next_iter) {
+          return xa::ZRegS(30);
+        } else {
+          return xa::ZRegS(29);
+        }
     };
 
     auto vreg_sum = [=]() {
@@ -170,7 +174,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         CGA64::L_aarch64(init_done);
     };
 
-    auto bcast_load = [=] (int i_reduce, int i_ur, int prev_ofs){
+    auto bcast_load = [=] (int i_reduce, int i_ur, int prev_ofs, bool next_iter){
         int ofs;
 
         if (one_of(jcp.prop_kind, forward_training, forward_inference,
@@ -188,15 +192,19 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
           ofs = i_reduce * jcp.ic_block + i_ur;
       }
 
+      if (next_iter) {
+          ofs += jcp.reduce_loop_unroll;
+      }
+
       ofs = jcp.typesize_in * ofs;
       int tmp_ofs = ofs;
       if( ((ofs&0x3) == 0) && (ofs <= LDRWMAX) && (ofs >= 0)){
-        CGA64::ld1rw(vreg_bcast_s(), reg_p_all_ones,
+        CGA64::ld1rw(vreg_bcast_s(next_iter), reg_p_all_ones,
                       xa::ptr(aux_reg_bcast_data, static_cast<int32_t>(ofs)));
       }else{
         if((prev_ofs != -1) && ((ofs - prev_ofs)>0)
             &&((ofs - prev_ofs) <= LDRWMAX) && (((ofs-prev_ofs)&0x3) == 0)){
-          CGA64::ld1rw(vreg_bcast_s(), reg_p_all_ones,
+          CGA64::ld1rw(vreg_bcast_s(next_iter), reg_p_all_ones,
                         xa::ptr(reg_prev_bcast_addr, static_cast<int32_t>((ofs-prev_ofs))));
         }else{
           if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
@@ -207,7 +215,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
           }
           prev_ofs = tmp_ofs;
 
-          CGA64::ld1rw(vreg_bcast_s(), reg_p_all_ones, xa::ptr(reg_prev_bcast_addr));
+          CGA64::ld1rw(vreg_bcast_s(next_iter), reg_p_all_ones, xa::ptr(reg_prev_bcast_addr));
         }
       }
       return prev_ofs;
@@ -269,6 +277,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
           CGA64::ldr(vreg_sum(), xa::ptr(r));
 
           prev_ofs = ofs_tmp;
+
         }
       }
       return prev_ofs;
@@ -317,8 +326,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     };
 
     auto store = [=]() {
-
-
         xa::LabelAArch64 store_noadd;
         if (!jcp.with_sum) {
             CGA64::tst(reg_reduce_pos_flag, FLAG_REDUCE_FIRST);
@@ -416,11 +423,28 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 //if( i_ur < num_reg4bcast){
                 //  CGA64::mov(vreg_bcast_s(), xa::WReg( reg_base_idx + i_ur));
                 //}else{
-                  prev_bcast_ofs = bcast_load(i_reduce, i_ur, prev_bcast_ofs);
+                if (ur == 1) {
+                    prev_bcast_ofs
+                            = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
+                } else if (i_ur % 2 == 0) {
+                    /* load input x2 */
+                    prev_bcast_ofs
+                            = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
+                  if (i_ur + 1 < ur) {
+                      prev_bcast_ofs
+                              = bcast_load(i_reduce, i_ur, prev_bcast_ofs, true);
+                  }
+                }
                 //}
+                bool next_iter = true;
+                if (i_ur % 2 == 0) {
+                    next_iter = false;
+                }
+
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
                     CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
-                                vreg_load_s(i_load, 0), vreg_bcast_s());
+                                vreg_load_s(i_load, 0), vreg_bcast_s(next_iter));
+
                 }
             }
         }
@@ -720,10 +744,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     const int SMALL_SPATIAL = 10;
     const int BIG_SPATIAL = 65;
     const int BIG_REDUCE_DIM = 1024;
-    const int BIG_LOAD_DIM = (jcp.reduce_dim >= 512)
-                           ? 256
-                           : 512;
-    // const int BIG_LOAD_DIM = 256;
+    const int BIG_LOAD_DIM = (jcp.reduce_dim >= 512) ? 256 : 512;
 
     int load_blocking{ 0 };
     int load_blocking_max{ 0 };
@@ -766,9 +787,9 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 jcp.oh :
                 jcp.ih;
 
-        max_regs = 9;
+        max_regs = 9; // Setting for jcp.ur
         min_regs = 6;
-        size_treshold = 14;
+        size_treshold = 14; // Output H
         ur_step = 1;
         jcp.expl_bcast = true;
 
@@ -787,6 +808,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 break;
             }
         }
+
         if (jcp.ur == 1) {
             jcp.ur = nstl::min(max_regs, jcp.os);
             int os_tail = jcp.os % max_regs;
@@ -826,13 +848,13 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 
         int nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
 
+
         if (jcp.ver == ver_sve && jcp.expl_bcast) {
             if (jcp.load_dim <= BIG_LOAD_DIM && spatial > SMALL_SPATIAL
-        && spatial < BIG_SPATIAL) {
-          reduce_blocking = nstl::min(jcp.reduce_dim, 96);
-        }
-            else if (spatial > SMALL_SPATIAL)
-          reduce_blocking = nstl::min(jcp.reduce_dim, 512);
+                    && spatial < BIG_SPATIAL) {
+                reduce_blocking = nstl::min(jcp.reduce_dim, 80);
+            } else if (spatial > SMALL_SPATIAL)
+                reduce_blocking = nstl::min(jcp.reduce_dim, 512);
             else
                 reduce_blocking = nstl::min(jcp.reduce_dim, 256);
             if ((jcp.mb > 28 && spatial >= 28)
@@ -860,9 +882,9 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         int way_size = (256 * 2048) / jcp.typesize_in;
         int max_hits = 7;
         if (jcp.bcast_dim * reduce_blocking > way_size * max_hits) {
-            int nrb = reduce_blocking / simd_w;
+            int nrb = reduce_blocking / simd_w;//16ic
             int sp = jcp.bcast_dim;
-            int wl = way_size / simd_w;
+            int wl = way_size / simd_w; //16ic
             for (int start_off = 0; start_off < jcp.ur; start_off++) {
                 for (int off = start_off, hits = 0; off < sp * nrb; off += wl) {
                     if (off % sp >= jcp.ur || ++hits < max_hits)
@@ -946,10 +968,10 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
 
         if (jcp.ver == ver_sve && jcp.expl_bcast && jcp.bcast_dim <= 64 // hw 8
                 && load_size >= L2_size) {
-            jcp.load_grp_count = nstl::max(jcp.load_grp_count, 4);
+          jcp.load_grp_count = nstl::max(jcp.load_grp_count, 4);
         } else if (jcp.bcast_dim <= 49 && jcp.mb <= nthreads
                 && jcp.load_dim > 512 && jcp.load_dim / jcp.reduce_dim >= 4) {
-            jcp.load_grp_count = nstl::max(jcp.load_grp_count, 2);
+          jcp.load_grp_count = nstl::max(jcp.load_grp_count, 2);
             load_blocking = jcp.load_block;
         } else if (load_size < 256 && jcp.load_dim < 128) {
             load_blocking = simd_w; // @todo
@@ -961,9 +983,10 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         bcast_blocking = nstl::min(jcp.bcast_dim, bcast_blocking);
         bcast_blocking = rnd_up(bcast_blocking, jcp.bcast_block);
 
-        int space_for_bcast = (L2_capacity  /* kernel_size - */
+        int space_for_bcast = (L2_capacity
+                               /* kernel_size - */
                                - 2 * jcp.load_block * reduce_blocking
-                               - jcp.ur * reduce_blocking
+                               - jcp.ur * reduce_blocking // ic size
                                - 3 * 1024); // @todo for 48threads
 
         if (jcp.reduce_dim * jcp.bcast_dim > L2_capacity)
