@@ -353,7 +353,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             eltwise_injector_->compute_vector_range(0, ur * load_loop_blk);
 
             CGA64::L_aarch64(store_noeltwise);
-#endif
         }
 
         auto store_output = [=](bool output_is_aligned) {
