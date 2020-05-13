@@ -103,9 +103,9 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 {
     auto vreg_bcast_s = [=](bool next_iter) {
         if (next_iter) {
-          return xa::ZRegS(30);
-        } else {
           return xa::ZRegS(29);
+        } else {
+          return xa::ZRegS(30);
         }
     };
 
@@ -420,32 +420,40 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             //}
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
-                //if( i_ur < num_reg4bcast){
-                //  CGA64::mov(vreg_bcast_s(), xa::WReg( reg_base_idx + i_ur));
-                //}else{
-                if (ur == 1) {
-                    prev_bcast_ofs
-                            = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
-                } else if (i_ur % 2 == 0) {
-                    /* load input x2 */
-                    prev_bcast_ofs
-                            = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
-                  if (i_ur + 1 < ur) {
-                      prev_bcast_ofs
-                              = bcast_load(i_reduce, i_ur, prev_bcast_ofs, true);
-                  }
-                }
-                //}
-                bool next_iter = true;
-                if (i_ur % 2 == 0) {
-                    next_iter = false;
-                }
+	      //if( i_ur < num_reg4bcast){
+	      //  CGA64::mov(vreg_bcast_s(), xa::WReg(reg_base_idx + i_ur));
+	      //}else{
 
-                for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
-                    CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
-                                vreg_load_s(i_load, 0), vreg_bcast_s(next_iter));
+              bool next_iter = false;
+	      if (one_of(jcp.prop_kind, backward_weights)) {
+		prev_bcast_ofs
+		  = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
+	      }
+	      //}
+	      else { // forward, backward_data
+		if (ur == 1) {
+		  prev_bcast_ofs
+		    = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
+		} else if (i_ur % 2 == 0) {
+		  /* load input x2 */
+		  prev_bcast_ofs
+		    = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
+		  if (i_ur + 1 < ur) {
+		    prev_bcast_ofs
+		      = bcast_load(i_reduce, i_ur, prev_bcast_ofs, true);
+		  }
+		}
 
-                }
+		if (i_ur % 2 == 1) {
+		  next_iter = true;
+		}
+	      }
+
+	      for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
+		CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
+			    vreg_load_s(i_load, 0), vreg_bcast_s(next_iter));
+	      }
+
             }
         }
     };
