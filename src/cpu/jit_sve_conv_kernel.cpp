@@ -120,11 +120,11 @@ template<typename Vmm>
 void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
 {
 
-    auto zreg_tmp = [=](){
-        return xa::ZReg(31);
+    auto zreg_tmp = [=](int idx){
+        return xa::ZReg(idx);
     };
-    auto zreg_tmp_s = [=](){
-        return xa::ZRegS(31);
+    auto zreg_tmp_s = [=](int idx){
+        return xa::ZRegS(idx);
     };
 
     auto zreg_out = [=](int i_ur, int i_oc){
@@ -150,27 +150,16 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         CGA64::b(xa::EQ, no_update_label);
     }
 
-    auto out_load = [=] (int aux_output_offset){
-        int ofs = aux_output_offset;
-
-        if( ((ofs>>6) < LDRMAX) && 
-                ((ofs>>6) >= (-1.0* LDRMAX)) &&
-                ((ofs&0x3f) == 0)){
-
-            ofs = ofs >>6;
-            CGA64::ldr(zreg_tmp(), xa::ptr(reg_out, static_cast<int32_t>(ofs)));
-        }else{
-            add_imm(reg_tmp_addr, reg_out, ofs);
-            CGA64::ldr(zreg_tmp(), xa::ptr(reg_tmp_addr));
-        }
-    };
+    int reg_ofs = jcp.ur_w * jcp.nb_oc_blocking;
+    int num_regs = 32 - reg_ofs;
 
     for (int k = 0; k < jcp.nb_oc_blocking; k++)
         for (int j = 0; j < ur_w; j++) {
             size_t aux_output_offset = get_output_offset(j, k);
+            int idx = reg_ofs + ((j + k * ur_w)%num_regs);
             add_imm(reg_out_long_offt, reg_out, aux_output_offset);
-            CGA64::ldr(zreg_tmp(), xa::ptr(reg_out_long_offt));
-            CGA64::fadd(zreg_out_s(j, k), zreg_out_s(j, k), zreg_tmp_s());
+            CGA64::ldr(zreg_tmp(idx), xa::ptr(reg_out_long_offt));
+            CGA64::fadd(zreg_out_s(j, k), zreg_out_s(j, k), zreg_tmp_s(idx));
         }
 
     if (!jcp.with_sum) {
@@ -180,17 +169,17 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         CGA64::b(xa::NE, eltwise_label);
     }
 
-    auto bias_load = [=] (int bias_offset){
+    auto bias_load = [=] (int bias_offset, int idx){
         int ofs = bias_offset;
         
         if( ((ofs>>6) < LDRMAX) && 
                 ((ofs>>6) >= (-1.0* LDRMAX)) &&
                 ((ofs&0x3f) == 0)){
             ofs = ofs >>6;
-            CGA64::ldr(zreg_tmp(), xa::ptr(reg_bias, static_cast<int32_t>(ofs)));
+            CGA64::ldr(zreg_tmp(idx), xa::ptr(reg_bias, static_cast<int32_t>(ofs)));
         }else{
             add_imm(reg_tmp_addr, reg_bias, ofs); 
-            CGA64::ldr(zreg_tmp(), xa::ptr(reg_tmp_addr));
+            CGA64::ldr(zreg_tmp(idx), xa::ptr(reg_tmp_addr));
         }
     };
 
@@ -199,8 +188,9 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         for (int k = 0; k < jcp.nb_oc_blocking; k++) {
             int bias_offset = jcp.typesize_out * k * jcp.oc_block;
             for (int j = 0; j < ur_w; j++) {
-                bias_load(bias_offset);
-                CGA64::fadd(zreg_out_s(j,k), zreg_out_s(j,k), zreg_tmp_s());
+                int idx = reg_ofs + ((j + k * ur_w)%num_regs);
+                bias_load(bias_offset, idx);
+                CGA64::fadd(zreg_out_s(j,k), zreg_out_s(j,k), zreg_tmp_s(idx));
             }
         }
     }
