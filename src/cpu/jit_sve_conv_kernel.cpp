@@ -305,8 +305,6 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
     };
     auto zreg_inp_s = [=](int i_ic, int nb_x_blocking){
         int idx = i_ic + nb_x_blocking * jcp.ur_w;
-        //printf("idx, %d = i_ic, %d, nb_x_blocking, %d, ur_w, %d\n",
-        //        idx, i_ic, nb_x_blocking, jcp.ur_w);   
         assert(idx < 31);
         return xa::ZRegS(idx);
     };
@@ -315,11 +313,13 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
         assert(idx < ker_reg_base_idx);
         return xa::ZRegS(idx);
     };
-    auto zreg_wei = [=](){
-        return xa::ZReg(31);
+    auto zreg_wei = [=](int idx){
+        assert(idx < 32);
+        return xa::ZReg(idx);
     };
-    auto zreg_wei_s = [=](){
-        return xa::ZRegS(31);
+    auto zreg_wei_s = [=](int idx){
+        assert(idx < 32);
+        return xa::ZRegS(idx);
     };
 
     auto bcast_load = [&](int jj, int nb_oc_block, int aux_input_offset, int prev_ofs, int jj_end){
@@ -356,17 +356,18 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
     };
 
-    auto wei_load = [=](int aux_kernel_offset){
+    auto wei_load = [=](int aux_kernel_offset, int reg_idx){
         int ofs = aux_kernel_offset;
 
         if( ((ofs>>6) < LDRMAX) && 
                 ((ofs>>6) >= (-1.0* LDRMAX)) &&
                 ((ofs&0x3f) == 0)){
             ofs = ofs >>6;
-            CGA64::ldr(zreg_wei(), xa::ptr(aux_reg_ker, static_cast<int32_t>(ofs)));
+            CGA64::ldr(zreg_wei(reg_idx),
+                         xa::ptr(aux_reg_ker, static_cast<int32_t>(ofs)));
         }else{
             add_imm(reg_tmp_addr, aux_reg_ker, ofs);
-            CGA64::ldr(zreg_wei(), xa::ptr(reg_tmp_addr));
+            CGA64::ldr(zreg_wei(reg_idx), xa::ptr(reg_tmp_addr));
         }
 
     };
@@ -378,6 +379,9 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
 
             int jj_start = get_ow_start(ki, pad_l);
             int jj_end = get_ow_end(ur_w, ki, pad_r);
+
+            int wei_reg_ofs = nb_oc_block * jcp.ur_w + jj_end;
+            int num_regs4wei = 32 - wei_reg_ofs;
             for (int ic = 0; ic < ic_block; ic++) {
                 if (jcp.kernel_kind == expl_bcast) {
                     for (int jj = jj_start; jj < jj_end; jj++) {
@@ -385,21 +389,36 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
                         prev_ofs = bcast_load(jj, nb_oc_block, aux_input_offset, prev_ofs, jj_end);
                     }
                 }
+                int wei_count = 0;
                 for (int ii = 0; ii < nb_oc_block; ii++) {
+                    int reg_idx = wei_reg_ofs + ii;
+                    if(reg_idx >= 32) break;
                     int aux_kernel_offset = jcp.typesize_in
                         * (ii * jcp.nb_ic * jcp.kh * jcp.kw * jcp.kd * ic_block
                         * oc_block + ki * ic_block * oc_block + ic * oc_block);
 
+                    wei_count ++;
                     if (jj_end - jj_start > 0){
-                        wei_load(aux_kernel_offset);
+                        wei_load(aux_kernel_offset, wei_reg_ofs +(ii%num_regs4wei));
                     }
+                }
+
+                for (int ii = 0; ii < nb_oc_block; ii++) {
+                    int aux_kernel_offset = jcp.typesize_in
+                        * ((ii+wei_count) * jcp.nb_ic * jcp.kh * jcp.kw * jcp.kd * ic_block
+                        * oc_block + ki * ic_block * oc_block + ic * oc_block);
 
                     for (int jj = jj_start; jj < jj_end; jj++)
                         if (jcp.kernel_kind == expl_bcast)
                             CGA64::fmla(zreg_out_s(jj, ii), reg_p_all_ones,
-                                        zreg_inp_s(jj, nb_oc_block), zreg_wei_s());
+                                        zreg_inp_s(jj, nb_oc_block), 
+                                        zreg_wei_s(wei_reg_ofs +(ii%num_regs4wei)));
                         else 
                             assert(NULL);
+
+                    if ((jj_end - jj_start > 0) && ((wei_count + ii) < nb_oc_block)){
+                        wei_load(aux_kernel_offset, wei_reg_ofs +((ii+wei_count)%num_regs4wei));
+                    }
                 }
             }
         }
@@ -1629,7 +1648,6 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
             int jj_start = get_iw_start(ki, l_overflow);
             int jj_end = get_iw_end(ur_w, ki, r_overflow);
             for (int oc = 0; oc < oc_block; oc++) {
-                //if (jcp.kernel_kind == expl_bcast) {
                 if (stride_w == 1) {
                     for (int jj = jj_start; jj < jj_end; jj += 1) {
                         int aux_output_offset = output_offset(jj, oc, ki);
@@ -1734,6 +1752,7 @@ void jit_sve_conv_bwd_data_kernel_f32::generate()
 
     preamble();
     CGA64::ptrue( reg_p_all_ones.b );
+    /* Address */
     CGA64::ldr(reg_src, xa::ptr(param, GET_OFF(src)));
     CGA64::ldr(reg_dst, xa::ptr(param, GET_OFF(dst)));
     CGA64::ldr(reg_ker, xa::ptr(param, GET_OFF(filt)));
@@ -1752,7 +1771,7 @@ void jit_sve_conv_bwd_data_kernel_f32::generate()
     int n_oi = iw / ur_w;
     if (r_overflow1 > 0) n_oi--;
 
-    if (ur_w == iw) {
+    if (ur_w == iw) { // Case: workload can run in a single compute_loop call
         compute_loop(ur_w, l_overflow, r_overflow);
     } else if (n_oi == 0) {
         compute_loop(ur_w, l_overflow, r_overflow1);
@@ -1783,7 +1802,6 @@ void jit_sve_conv_bwd_data_kernel_f32::generate()
                 add_imm(reg_src_prf, reg_src_prf, src_shift);
                 add_imm(reg_dst_prf, reg_dst_prf, dst_shift);
 
-                //inc(reg_oi);
                 add_imm( reg_oi, reg_oi, 1);
                 CGA64::cmp(reg_oi, n_oi);
                 CGA64::b(xa::LT, ow_loop_label);
