@@ -123,7 +123,8 @@ private:
     /* Temporary registers for ARM insts */
     reg64_t reg_tmp_addr        = x14;
     reg64_t reg_prev_bcast_addr = x15;
-    reg64_t reg_tmp_imm         = x16; 
+    reg64_t reg_prev_wei_addr   = x16;
+    reg64_t reg_tmp_imm         = x17; 
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
         int val = (value >= 0) ? value : -1 * value;
