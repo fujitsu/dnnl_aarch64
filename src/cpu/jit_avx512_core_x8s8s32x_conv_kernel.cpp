@@ -853,6 +853,10 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::generate()
                 = { 0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15 };
         for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
             dd(_idx[i]);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+        binCommit();
+#endif
     }
 }
 
