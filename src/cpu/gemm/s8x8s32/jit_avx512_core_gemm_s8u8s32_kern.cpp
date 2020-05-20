@@ -471,9 +471,15 @@ void jit_avx512_core_gemm_s8u8s32_kern::generate() {
 
 jit_avx512_core_gemm_s8u8s32_kern::jit_avx512_core_gemm_s8u8s32_kern(
         bool beta_zero, bool enable_offset_c, bool enable_offset_r) :
+#ifdef XBYAK_TRANSLATE_AARCH64
+    jit_generator(nullptr, 512000), arg_a_(0), arg_b_(0), arg_c_(0),
+    arg_ldc_(0), arg_coffset_c_(0), arg_coffset_r_(0), coffset_cx_(0),
+    coffset_cy_(0), coffset_rx_(0), coffset_ry_(0) {
+#else
     jit_generator(nullptr, 100000), arg_a_(0), arg_b_(0), arg_c_(0),
     arg_ldc_(0), arg_coffset_c_(0), arg_coffset_r_(0), coffset_cx_(0),
     coffset_cy_(0), coffset_rx_(0), coffset_ry_(0) {
+#endif
 
     beta_zero_ = beta_zero;
     enable_offset_c_ = enable_offset_c;

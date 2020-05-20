@@ -659,10 +659,10 @@ void jit_uni_pool_kernel<isa>::generate() {
         } else if (isa >= avx512_common) {
 #ifdef XBYAK_TRANSLATE_AARCH64
 	  CodeGeneratorAArch64::mov(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), uint64_t(0x000000000000ffff));
-	  CodeGeneratorAArch64::sub(Xbyak_aarch64::XReg(rsp.getIdx()), Xbyak_aarch64::XReg(rsp.getIdx()), 8);
-	  CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), Xbyak_aarch64::ptr(Xbyak_aarch64::XReg(rsp.getIdx())));
-	  CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_index_mask.getIdx()), Xbyak_aarch64::ptr(Xbyak_aarch64::XReg(rsp.getIdx())));
-	  CodeGeneratorAArch64::add(Xbyak_aarch64::XReg(rsp.getIdx()), Xbyak_aarch64::XReg(rsp.getIdx()), 8);
+	  CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+	  CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+	  CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_index_mask.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+	  CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
 #else
             mov(tmp_gpr.cvt32(), 0x000f);
             kmovw(k_index_mask, tmp_gpr.cvt32());
