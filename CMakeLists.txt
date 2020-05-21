@@ -106,9 +106,9 @@ enable_testing()
 include_directories(include)
 
 #for CBLAS
-include_directories(AFTER "/opt/FJSVstclanga/v1.0.0/include")
-append(CMAKE_C_FLAGS "-L$ENV{HOME}/opt/lib -lcblas")
-append(CMAKE_CXX_FLAGS "-L$ENV{HOME}/opt/lib -lcblas")
+#include_directories(AFTER "/opt/FJSVstclanga/v1.0.0/include")
+#append(CMAKE_C_FLAGS "-L$ENV{HOME}/opt/lib -lcblas")
+#append(CMAKE_CXX_FLAGS "-L$ENV{HOME}/opt/lib -lcblas")
 
 if(XBYAK_TRANSLATE_AARCH64)
     append(CMAKE_C_FLAGS "-DXBYAK_TRANSLATE_AARCH64")
