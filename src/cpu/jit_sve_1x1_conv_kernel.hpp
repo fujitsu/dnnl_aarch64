@@ -109,11 +109,8 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     reg64_t reg_tmp_imm             = x18; // tmp for add_imm
     reg64_t reg_tmp_ofs             = x19; // tmp reg to calc bwd wei offset in out_load
 
-    int reg_base_idx                = 20;
-    int num_reg4bcast               = 31 - reg_base_idx;
-
     void add_imm(reg64_t out, reg64_t in, long long int value){
-        int val = (value >= 0) ? value : -1 * value;
+        long long int val = (value >= 0) ? value : -1 * value;
         if( val <= ADDMAX ){
             if( value >= 0 )  CGA64::add(out, in, val);
             else              CGA64::sub(out, in, val);

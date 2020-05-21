@@ -127,7 +127,7 @@ private:
     reg64_t reg_tmp_imm         = x17; 
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
-        int val = (value >= 0) ? value : -1 * value;
+        long long int val = (value >= 0) ? value : -1 * value;
         if( val <= ADDMAX ){
             if( value >= 0 )  CGA64::add(out, in, val);
             else              CGA64::sub(out, in, val);
@@ -301,7 +301,7 @@ private:
     const xa::PReg reg_p_all_ones  = p1;
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
-        int val = (value >= 0) ? value : -1 * value;
+        long long int val = (value >= 0) ? value : -1 * value;
         if( val <= ADDMAX ){
             if( value >= 0 )  CGA64::add(out, in, val);
             else              CGA64::sub(out, in, val);
@@ -428,7 +428,7 @@ private:
     }
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
-        int val = (value >= 0) ? value : -1 * value;
+        long long int val = (value >= 0) ? value : -1 * value;
         if( val <= ADDMAX ){
             if( value >= 0 )  CGA64::add(out, in, val);
             else              CGA64::sub(out, in, val);

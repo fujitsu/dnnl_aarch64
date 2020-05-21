@@ -288,11 +288,6 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
         CGA64::mov(aux_reg_ker, aux_reg_ker_d);
     }
 
-    auto zreg_inp = [=](int i_ic, int nb_x_blocking){
-        int idx = i_ic + nb_x_blocking * jcp.ur_w;
-        assert(idx < 31);
-        return xa::ZReg(idx);
-    };
     auto zreg_inp_s = [=](int i_ic, int nb_x_blocking){
         int idx = i_ic + nb_x_blocking * jcp.ur_w;
         assert(idx < 31);
@@ -1034,24 +1029,6 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
 
 
     if (jcp.ver == ver_fma && mayiuse(sve)) {
-        int try_nb_oc_blocking = 2;
-        unsigned int ker_inp_size = typesize * div_up(jcp.iw, jcp.stride_w)
-            * jcp.ic_block * jcp.kh * jcp.kd;
-        unsigned int ker_out_size = typesize * jcp.ow * jcp.oc_block
-            * try_nb_oc_blocking;
-        unsigned int ker_wei_size = typesize * jcp.kh * jcp.kw * jcp.ic_block
-            * jcp.oc_block * try_nb_oc_blocking * jcp.kd;
-        unsigned int ker_total_size = ker_inp_size + ker_out_size
-            + ker_wei_size;
-
-#ifdef __ARM_ARCH
-        bool embd_bcast_condition = false;
-#else
-        bool embd_bcast_condition = true
-            && (jcp.kw == 3 && jcp.ow <= 28 && ker_total_size < L1_cache_size)
-            && !(jcp.kw == 3 && jcp.ow == 13 && jcp.ic >= 192)
-            && !(jcp.kw == 3 && jcp.ow == 28 && jcp.ic >= 512);
-#endif
         if (jcp.mb == 1) {
             unsigned int inp_size = jcp.mb * div_up(jcp.ih, jcp.stride_h)
                     * div_up(jcp.iw, jcp.stride_w) * jcp.ic;
@@ -1091,28 +1068,6 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
             }
         }
 
-#ifndef __ARM_ARCH
-        if (jcp.kw > 3
-                || (jcp.stride_w == 1 && jcp.stride_h == 1
-                           && embd_bcast_condition)
-                || ((jcp.stride_w != 1 || jcp.stride_h != 1)
-                           && ((jcp.mb <= 16 && (jcp.oc <= 192 || jcp.oh <= 10)
-                                      && embd_bcast_condition)))
-                || (jcp.mb == 1
-                           && (jcp.ur_w >= jcp.ow || jcp.is_1stconv
-                                      || (jcp.ow <= 147 && jcp.oc <= 96)))) {
-            jcp.kernel_kind = embd_bcast;
-            jcp.ur_w = nstl::min(jcp.ow, regs);
-            jcp.nb_ic_blocking = jcp.nb_oc_blocking = 1;
-            if (ker_total_size < L1_cache_size && jcp.ow <= 8 && jcp.kh <= 3
-                    && jcp.kw <= 3 && jcp.nb_oc % try_nb_oc_blocking == 0
-                    && IMPLICATION(jcp.is_1stconv, jcp.mb == 1)
-                    && IMPLICATION(jcp.mb == 1, jcp.ur_w < jcp.ow)) {
-                jcp.nb_oc_blocking = try_nb_oc_blocking;
-                jcp.ur_w = nstl::min(jcp.ow, 31 / (jcp.nb_oc_blocking + 1));
-            }
-        } else 
-#endif // ifndef __ARM_ARCH
         {
             jcp.kernel_kind = expl_bcast;
             jcp.nb_ic_blocking = 1;
@@ -1305,12 +1260,6 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma(
     assert(oc_block >= ker_pipeline_depth);
 
     int num_ker_loads = oc_block * kw;
-    int num_inp_prfs = ur_w * nstl::min(kw, stride_w)
-                       + nstl::max(0, kw - stride_w);
-    int num_prfs = num_ker_loads + num_inp_prfs;
-    int num_fmas = num_ker_loads * ur_w / stride_w;
-    int prf_inst_spacing = nstl::max(1, num_fmas / num_prfs);
-    int prf_inst_trigger = (num_fmas % prf_inst_spacing) / 2;
 
 
     auto zreg_ker = [=](int i_ic) {
@@ -1402,7 +1351,6 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma(
     int prev_ofs = 0;
     CGA64::L_aarch64(kh_label); {
         int step = 0;
-        int ker_prfs = 0;
         for (int ki = 0; ki < kw; ki++) {
             for (int oc = 0; oc < oc_block; oc++) {
                 if (step == 0) {
@@ -1420,7 +1368,6 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma(
                     ker_load(ker_load_reg_idx, aux_kernel_offset);
                 }
 
-                bool ker_prf_inserted = false;
                 auto zreg_kernel_s = zreg_ker_s(step % ker_pipeline_depth);
 
                 int jj_start = get_iw_start(ki, l_overflow);
@@ -1442,30 +1389,6 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma(
                             zreg_kernel_s, xa::ZRegS(31));
 
                     
-                    int fma_idx = (step * ur_w + jj) / stride_w;
-                    int prf_slot_idx = fma_idx / prf_inst_spacing;
-                    /*
-                    if (fma_idx % prf_inst_spacing == prf_inst_trigger) {
-                        if (!ker_prf_inserted && ker_prfs < num_ker_loads) {
-                            int ker_prf_offset = typesize
-                                * ker_prfs * jcp.oc_block;
-                            mic_prefetcht1(EVEX_compress_addr(
-                                        aux_reg_ker_prf, ker_prf_offset));
-                            ker_prf_inserted = true;
-                            ker_prfs++;
-                        } else {
-                            int inp_prf_idx = prf_slot_idx - ker_prfs;
-                            if (inp_prf_idx < num_inp_prfs) {
-                                int inp_prf_offset
-                                    = ic_block * typesize
-                                    * ((inp_prf_idx / kw) * kw
-                                            + (inp_prf_idx % kw));
-                                mic_prefetcht0(EVEX_compress_addr(
-                                            aux_reg_dst_prf, inp_prf_offset));
-                            }
-                        }
-                    }
-                    */
                 }
                 step++;
             }
@@ -1995,13 +1918,6 @@ status_t jit_sve_conv_bwd_data_kernel_f32::init_conf(
 
     if (jcp.ver == ver_fma && mayiuse(sve)) {
         int try_nb_ic_blocking = 2;
-        unsigned int ker_inp_size = typesize * jcp.iw * jcp.ic_block
-            * try_nb_ic_blocking * jcp.kh;
-        unsigned int ker_out_size = typesize * jcp.ow * jcp.oc_block;
-        unsigned int ker_wei_size = typesize * jcp.kh * jcp.kw * jcp.ic_block
-            * jcp.oc_block * try_nb_ic_blocking;
-        unsigned int ker_total_size = ker_inp_size + ker_out_size
-            + ker_wei_size;
 
         if (!(jcp.kw == 1 || (jcp.kw == 5 && jcp.iw < 8)
             || (jcp.kw < 5 && ((jcp.iw <= 5 || (jcp.iw > 8 && jcp.iw <= 13)))))
@@ -3220,14 +3136,6 @@ status_t jit_sve_conv_bwd_weights_kernel_f32::init_conf(
             && jcp.ngroups == 1;
         if (!src_ok)
             return status::unimplemented;
-
-        const int tr_ld = rnd_up(div_up(jcp.iw + jcp.l_pad + jcp.r_pad,
-                    jcp.stride_w), 16);
-        const int kh_step = nstl::max((28 - jcp.with_bias) / jcp.kw, 1);
-        const int kh_step_rem = jcp.kh % kh_step;
-        const auto want_4fma_wfmt = with_groups
-            ? pick(ndims - 3, gOiw16o, gOihw16o, gOidhw16o)
-            : pick(ndims - 3, Oiw16o, Oihw16o, Oidhw16o);
 
         {
             jcp.ver = ver_fma;
