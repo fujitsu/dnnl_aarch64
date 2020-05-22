@@ -35,7 +35,6 @@ SET(BLAS_LIBRARIES)
 SET(BLAS_INCLUDE_DIR)
 SET(BLAS_INFO)
 
-SET(WITH_BLAS "" CACHE STRING "Blas type [ssl2/cblas]")
 
 # Old FindBlas
 INCLUDE(CheckCSourceRuns)
@@ -195,6 +194,20 @@ if((NOT BLAS_LIBRARIES)
   "cblas")
   if (BLAS_LIBRARIES)
     set(BLAS_INFO "cblas")
+  endif (BLAS_LIBRARIES)
+endif()
+
+# openblas BLAS library?
+if((NOT BLAS_LIBRARIES)
+    AND ((NOT WITH_BLAS) OR (WITH_BLAS STREQUAL "openblas")))
+  check_blas_libraries(
+  BLAS_LIBRARIES
+  BLAS
+  sgemm
+  ""
+  "openblas")
+  if (BLAS_LIBRARIES)
+    set(BLAS_INFO "openblas")
   endif (BLAS_LIBRARIES)
 endif()
 
