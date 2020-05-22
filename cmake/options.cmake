@@ -71,11 +71,11 @@ set(MKLDNN_THREADING "OMP" CACHE STRING
     set TBBROOT (either environment variable or CMake option) to the library
     location")
 
-set(MKLDNN_USE_MKL "DEF" CACHE STRING
+set(MKLDNN_USE_MKL "NONE" CACHE STRING
     "specifies what Intel MKL library to use.
-    Supports DEF (default), NONE, ML, FULL, FULL:STATIC.
+    Supports DEF, NONE (default), ML, FULL, FULL:STATIC.
 
-    By default (DEF) cmakes tries to find Intel MKL-ML library, then full
+    DEF cmakes tries to find Intel MKL-ML library, then full
     Intel MKL library, or just builds Intel MKL-DNN w/o any binary dependency.
 
     To build Intel MKL-DNN w/o any dependencies on Intel MKL / Intel MKL-ML
@@ -98,6 +98,8 @@ set(MKLDNN_USE_MKL "DEF" CACHE STRING
              set MKL_THREADING_LAYER to `tbb` or `sequential`, to avoid
              conflict between OpenMP and TBB thread pools.")
 
+
+SET(WITH_BLAS "NONE" CACHE STRING "Blas type [NONE/ssl2/cblas/openblas]")
 
 # =============
 # Optimizations
