@@ -2,18 +2,10 @@
 
 ## 概要
 
-- Deep Neural Network Libary for AArch64 (DNNL_aarch64) は、ARM(R)v8-A アーキテクチャの CPU 
-
-向けのオープンソースライブラリです。
-- DNNL_aarch64 は、インテル社の x86-64 CPU 向けに開発された Deep Neural Network Library 
-
-(DNNL) の、v0.21.2 をベースとしています。
-- DNNL_aarch64 は、ARMv8-A アーキテクチャの SVE (Scalable Vector Extension) 命令に最適化さ
-
-れています。
-- DNNL_aarch64 は、X86-64 向け Xbyak をARMv8-Aへ拡張した Xbyak_aarch64と、x86_64 向けに記述
-
-された Xbyak コードから ARMv8-A 命令に置き換えて実行する
+- Deep Neural Network Libary for AArch64 (DNNL_aarch64) は、ARM(R)v8-A アーキテクチャの CPU 向けのオープンソースライブラリです。
+- DNNL_aarch64 は、インテル社の x86-64 CPU 向けに開発された Deep Neural Network Library (DNNL) の、v0.21.2 をベースとしています。
+- DNNL_aarch64 は、ARMv8-A アーキテクチャの SVE (Scalable Vector Extension) 命令に最適化されています。
+- DNNL_aarch64 は、X86-64 向け Xbyak をARMv8-Aへ拡張した Xbyak_aarch64と、x86_64 向けに記述された Xbyak コードから ARMv8-A 命令に置き換えて実行します。
 　Xbayk は、サイボウズ・ラボの光成氏によって開発されたオープンソースソフトウェアです。
 
 
