@@ -58,8 +58,8 @@ if(POLICY CMP0066)
     cmake_policy(SET CMP0066 NEW)
 endif()
 
-set(PROJECT_NAME "Intel(R) MKL-DNN")
-set(PROJECT_FULL_NAME "Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)")
+set(PROJECT_NAME "DNNL for AArch64")
+set(PROJECT_FULL_NAME "Deep Neural Networks Library for AArch64")
 set(PROJECT_VERSION "0.21.2")
 
 set(LIB_NAME mkldnn)
@@ -72,7 +72,7 @@ else()
 endif()
 
 if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-    message("FATAL_ERROR" "Intel(R) MKL-DNN supports 64 bit platforms only")
+    message("FATAL_ERROR" "DNNL for AArch64 supports 64 bit platforms only")
 endif()
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -105,10 +105,6 @@ enable_testing()
 
 include_directories(include)
 
-#for CBLAS
-#include_directories(AFTER "/opt/FJSVstclanga/v1.0.0/include")
-#append(CMAKE_C_FLAGS "-L$ENV{HOME}/opt/lib -lcblas")
-#append(CMAKE_CXX_FLAGS "-L$ENV{HOME}/opt/lib -lcblas")
 
 if(XBYAK_TRANSLATE_AARCH64)
     append(CMAKE_C_FLAGS "-DXBYAK_TRANSLATE_AARCH64")

@@ -98,6 +98,7 @@ set(MKLDNN_USE_MKL "DEF" CACHE STRING
              set MKL_THREADING_LAYER to `tbb` or `sequential`, to avoid
              conflict between OpenMP and TBB thread pools.")
 
+
 # =============
 # Optimizations
 # =============
