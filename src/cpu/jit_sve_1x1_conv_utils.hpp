@@ -33,8 +33,8 @@
   CGA64::ldr(X, xa::ptr(sp)); \
   CGA64::add(sp, sp, 8);
 
-#define ADDMAX 4096
-#define MOVMAX 65536
+#define ADDMAX  4095
+#define MOVMAX 65535
 
 namespace mkldnn {
 namespace impl {
