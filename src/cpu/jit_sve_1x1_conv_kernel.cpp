@@ -334,7 +334,6 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         CGA64::L_aarch64(store_noadd);
         if (jcp.with_eltwise) {
-            assert(NULL); // TODO
             xa::LabelAArch64 store_noeltwise;
             CGA64::tst(reg_reduce_pos_flag, FLAG_REDUCE_LAST);
             CGA64::b(xa::EQ, store_noeltwise);
@@ -661,7 +660,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
     const int eltwise_ind = p.find(primitive_kind::eltwise);
     jcp.with_eltwise = eltwise_ind != -1;
     if (jcp.with_eltwise) {
-      return status::unimplemented; // TODO
       jcp.eltwise = p.entry_[eltwise_ind].eltwise;
       if (dst_d.data_type() == data_type::s32) return status::unimplemented;
     }
