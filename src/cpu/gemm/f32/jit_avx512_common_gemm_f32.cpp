@@ -32,7 +32,11 @@ namespace cpu {
 
 #define CACHE_LINE_SIZE 64
 
+#ifdef XBYAK_TRANSLATE_AARCH64
+#define STACKSIZE get_size_of_abi_save_regs_aarch64()
+#else
 #define STACKSIZE get_size_of_abi_save_regs()
+#endif
 #ifdef _WIN32
 #define STACK_K_CAPACITY 32
 #else
@@ -51,10 +55,17 @@ using namespace gemm_utils;
 struct xbyak_gemm : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_gemm_f32_xbyak_gemm)
 
+#ifdef XBYAK_TRANSLATE_AARCH64
+    xbyak_gemm(char isTransA, char isTransB, float beta, bool hasBias = false,
+            void *code_ptr = nullptr,
+            size_t code_size = 8 * 1024 * Xbyak::DEFAULT_MAX_CODE_SIZE)
+        : jit_generator(code_ptr, code_size)
+#else
     xbyak_gemm(char isTransA, char isTransB, float beta, bool hasBias = false,
             void *code_ptr = nullptr,
             size_t code_size = 80 * Xbyak::DEFAULT_MAX_CODE_SIZE)
         : jit_generator(code_ptr, code_size)
+#endif
     {
         using namespace Xbyak;
 
@@ -84,6 +95,20 @@ struct xbyak_gemm : public jit_generator {
         auto A = ARG_A;
         auto LDA = ARG_LDA;
 #endif
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+    /* AArch64 ABI: x0...x7 are used to pass parameters.
+     But, in xbyak_translator, args on x6 and x7 are passed by stack. */
+    auto ARG_B = ptr[rsp - 16 + stackOffset];
+        auto ARG_LDB = ptr[rsp - 8 + stackOffset];
+        auto ARG_BETA = ptr[rsp + 0 + stackOffset];
+        auto ARG_C = ptr[rsp + 8 + stackOffset];
+        auto ARG_LDC = ptr[rsp + 16 + stackOffset];
+        auto ARG_BIAS = ptr[rsp + 24 + stackOffset];
+        auto ARG_WS = ptr[rsp + 32 + stackOffset];
+#else
+    /* Intel64 GCC ABI: First six parameters are passed by registers.
+     Remaining args are passed by stack. */
         auto ARG_B = ptr[rsp + 8 + stackOffset];
         auto ARG_LDB = ptr[rsp + 16 + stackOffset];
         auto ARG_BETA = ptr[rsp + 24 + stackOffset];
@@ -91,6 +116,7 @@ struct xbyak_gemm : public jit_generator {
         auto ARG_LDC = ptr[rsp + 40 + stackOffset];
         auto ARG_BIAS = ptr[rsp + 48 + stackOffset];
         auto ARG_WS = ptr[rsp + 56 + stackOffset];
+#endif
 
         auto B = r11;
         auto LDB = rbx;
@@ -131,6 +157,15 @@ struct xbyak_gemm : public jit_generator {
             zmm16, zmm17, zmm18, zmm19, zmm20, zmm21, zmm22, zmm23, zmm24,
             zmm25, zmm26, zmm27, zmm28, zmm29, zmm30, zmm31 };
 
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+    Xbyak_aarch64::PReg k1_aarch64(k1.getIdx());
+    Xbyak_aarch64::PReg k2_aarch64(k2.getIdx());
+    Xbyak_aarch64::PReg k3_aarch64(k2.getIdx());
+    Xbyak_aarch64::PReg k4_aarch64(k4.getIdx());
+    Xbyak_aarch64::XReg sp_intel64{xt_sp_reg_idx};
+#endif
+
         // Function for packing if needed
         auto do_pack = [&](int unroll_m) {
             Label pack2, pack3, pack4, pack10;
@@ -139,6 +174,9 @@ struct xbyak_gemm : public jit_generator {
             lea(AO1, ptr[rsp + 128 + OFFSET * SIZE]);
             mov(LL, K);
             sar(LL, 2);
+#ifdef XBYAK_TRANSLATE_AARCH64
+        CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(LL.getIdx()), 0);
+#endif
             jle(pack3, T_NEAR);
             align(16);
 
@@ -170,22 +208,50 @@ struct xbyak_gemm : public jit_generator {
                 }
             } else {
                 for (int i = 0; i < 4; i++) {
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::mov(k4_aarch64.b, k1_aarch64.b);
+#else
                     kmovw(k4, k1);
+#endif
                     vgatherqps(ymm5 | k4,
                             ptr[BO1 + ZSTRIDE + (i - OFFSET) * SIZE]);
                     lea(BO2, ptr[BO1 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+            CodeGeneratorAArch64::str(k1_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
+            CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+#else
                     kshiftrw(k4, k1, 8);
+#endif
                     vgatherqps(ymm6 | k4,
                             ptr[BO2 + ZSTRIDE + (i - OFFSET) * SIZE]);
                     vshuff64x2(zmm0, zmm5, zmm6, 0x44);
 
                     if (unroll_m > 16) {
                         lea(BO2, ptr[BO2 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::mov(k4_aarch64.b, k2_aarch64.b);
+#else
                         kmovw(k4, k2);
+#endif
                         vgatherqps(ymm5 | k4,
                                 ptr[BO2 + ZSTRIDE + (i - OFFSET) * SIZE]);
                         lea(BO2, ptr[BO2 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+            CodeGeneratorAArch64::str(k2_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
+            CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+#else
                         kshiftrw(k4, k2, 8);
+#endif
                         vgatherqps(ymm6 | k4,
                                 ptr[BO2 + ZSTRIDE + (i - OFFSET) * SIZE]);
                         vshuff64x2(zmm1, zmm5, zmm6, 0x44);
@@ -193,11 +259,25 @@ struct xbyak_gemm : public jit_generator {
 
                     if (unroll_m > 32) {
                         lea(BO2, ptr[BO2 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::mov(k4_aarch64.b, k3_aarch64.b);
+#else
                         kmovw(k4, k3);
+#endif
                         vgatherqps(ymm5 | k4,
                                 ptr[BO2 + ZSTRIDE + (i - OFFSET) * SIZE]);
                         lea(BO2, ptr[BO2 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+            CodeGeneratorAArch64::str(k3_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
+            CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+#else
                         kshiftrw(k4, k3, 8);
+#endif
                         vgatherqps(ymm6 | k4,
                                 ptr[BO2 + ZSTRIDE + (i - OFFSET) * SIZE]);
                         lea(BO2, ptr[BO2 + LDA * 8]);
@@ -228,6 +308,9 @@ struct xbyak_gemm : public jit_generator {
             L(pack3);
             mov(LL, K);
             and_(LL, 3);
+#ifdef XBYAK_TRANSLATE_AARCH64
+        CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(LL.getIdx()), 0);
+#endif
             jle(pack10, T_NEAR);
             align(16);
 
@@ -240,20 +323,49 @@ struct xbyak_gemm : public jit_generator {
                     vmovups(zmm2 | k3, ptr[BO1 + (2 * 16 - OFFSET) * SIZE]);
                 add(BO1, LDA);
             } else {
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::mov(k4_aarch64.b, k1_aarch64.b);
+#else
                 kmovw(k4, k1);
+#endif
                 vgatherqps(ymm5 | k4, ptr[BO1 + ZSTRIDE + (0 - OFFSET) * SIZE]);
                 lea(BO2, ptr[BO1 + LDA * 8]);
+
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+            CodeGeneratorAArch64::str(k1_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
+            CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+#else
                 kshiftrw(k4, k1, 8);
+#endif
                 vgatherqps(ymm6 | k4, ptr[BO2 + ZSTRIDE + (0 - OFFSET) * SIZE]);
                 vshuff64x2(zmm0, zmm5, zmm6, 0x44);
 
                 if (unroll_m > 16) {
                     lea(BO2, ptr[BO2 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::mov(k4_aarch64.b, k2_aarch64.b);
+#else
                     kmovw(k4, k2);
+#endif
                     vgatherqps(ymm5 | k4,
                             ptr[BO2 + ZSTRIDE + (0 - OFFSET) * SIZE]);
                     lea(BO2, ptr[BO2 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+            CodeGeneratorAArch64::str(k2_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
+            CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+#else
                     kshiftrw(k4, k2, 8);
+#endif
                     vgatherqps(ymm6 | k4,
                             ptr[BO2 + ZSTRIDE + (0 - OFFSET) * SIZE]);
                     vshuff64x2(zmm1, zmm5, zmm6, 0x44);
@@ -261,11 +373,25 @@ struct xbyak_gemm : public jit_generator {
 
                 if (unroll_m > 32) {
                     lea(BO2, ptr[BO2 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::mov(k4_aarch64.b, k3_aarch64.b);
+#else
                     kmovw(k4, k3);
+#endif
                     vgatherqps(ymm5 | k4,
                             ptr[BO2 + ZSTRIDE + (0 - OFFSET) * SIZE]);
                     lea(BO2, ptr[BO2 + LDA * 8]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+            CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+            CodeGeneratorAArch64::str(k3_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::lsr(X_TMP_0, X_TMP_0, 8);
+            CodeGeneratorAArch64::str(X_TMP_0, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::ldr(k4_aarch64, Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+            CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+#else
                     kshiftrw(k4, k3, 8);
+#endif
                     vgatherqps(ymm6 | k4,
                             ptr[BO2 + ZSTRIDE + (0 - OFFSET) * SIZE]);
                     lea(BO2, ptr[BO2 + LDA * 8]);
@@ -1052,6 +1178,9 @@ struct xbyak_gemm : public jit_generator {
             L(kernel15);
             mov(LL, K);
             and_(LL, 7);
+#ifdef XBYAK_TRANSLATE_AARCH64
+        CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(LL.getIdx()), 0);
+#endif
             jle(kernel18, T_NEAR);
             align(16);
 
@@ -1215,6 +1344,7 @@ struct xbyak_gemm : public jit_generator {
 
             L(kernel18);
             vbroadcastss(VALPHA, ALPHA);
+        CodeGeneratorAArch64::mov(Xbyak_aarch64::XReg(27), Xbyak_aarch64::XReg(27));
 
             if (isBetaN) {
                 vbroadcastss(VBETA, BETA);
@@ -1331,7 +1461,11 @@ struct xbyak_gemm : public jit_generator {
                 sub(BO2, rax);
             } else {
                 mov(rax, LDB);
+#ifdef XBYAK_TRANSLATE_AARCH64
+        CodeGeneratorAArch64::mul(Xbyak_aarch64::XReg(rax.getIdx()), Xbyak_aarch64::XReg(rax.getIdx()), Xbyak_aarch64::XReg(K.getIdx()));
+#else
                 imul(rax, K);
+#endif
                 sub(BO1, rax);
                 add(BO1, unroll_n * SIZE);
             }
@@ -1352,6 +1486,51 @@ struct xbyak_gemm : public jit_generator {
             Label subloop98, subloop98mask;
             Label subloop99;
 
+#ifdef XBYAK_TRANSLATE_AARCH64
+        {
+          unsigned kIdx;
+          Xbyak_aarch64::XReg spTmp{xt_sp_reg_idx};
+          Xbyak_aarch64::ZReg zTmp0{30};
+          Xbyak_aarch64::ZReg zTmp1{31};
+            // Create mask
+          CodeGeneratorAArch64::str(zTmp0, Xbyak_aarch64::ptr(spTmp, -1, Xbyak_aarch64::MUL_VL));
+          CodeGeneratorAArch64::str(zTmp1, Xbyak_aarch64::ptr(spTmp, -2, Xbyak_aarch64::MUL_VL));
+
+            mov(BO1, rcx);
+            mov(rcx, M);
+            assert(0 < unroll_m && unroll_m < (uint32_t(1)<<12));
+            sub(rcx, unroll_m - 16);
+            mov(CO1, 16);
+            cmp(rcx, 16);
+
+            cmovg(rcx, CO1);
+            mov(rax, 1);
+            sal(rax, cl);
+            sub(rax, 1);
+            // mov(rcx, 0xffff); /* NO need, because mov(rcx, B01) is executed. */
+        
+            if (unroll_m == 16) {
+          kIdx = 1;
+            } else if (unroll_m == 32) {
+          CodeGeneratorAArch64::ptrue(k1_aarch64.s, Xbyak_aarch64::VL16);
+          kIdx = 2;
+            } else {
+          CodeGeneratorAArch64::ptrue(k1_aarch64.s, Xbyak_aarch64::VL16);
+          CodeGeneratorAArch64::ptrue(k2_aarch64.s, Xbyak_aarch64::VL16);
+          kIdx = 3;
+            }
+
+        CodeGeneratorAArch64::ptrue(Xbyak_aarch64::PRegB(kIdx), Xbyak_aarch64::ALL);
+        CodeGeneratorAArch64::dup(zTmp0.s, Xbyak_aarch64::WReg(rcx.getIdx()));
+        CodeGeneratorAArch64::index(zTmp1.s, 1, 1);
+        CodeGeneratorAArch64::cmpge(Xbyak_aarch64::PRegS(kIdx), Xbyak_aarch64::PReg(kIdx)/Xbyak_aarch64::T_z, zTmp0.s, zTmp1.s);
+
+        CodeGeneratorAArch64::ldr(zTmp0, Xbyak_aarch64::ptr(spTmp, -1, Xbyak_aarch64::MUL_VL));
+        CodeGeneratorAArch64::ldr(zTmp1, Xbyak_aarch64::ptr(spTmp, -2, Xbyak_aarch64::MUL_VL));
+
+        mov(rcx, 0xffff);
+        }
+#else
             // Create mask
             mov(BO1, rcx);
             mov(rcx, M);
@@ -1375,6 +1554,7 @@ struct xbyak_gemm : public jit_generator {
                 kmovw(k2, ecx);
                 kmovw(k3, eax);
             }
+#endif
             mov(rcx, BO1);
 
             and_(rax, 0xffff);
@@ -1582,7 +1762,12 @@ struct xbyak_gemm : public jit_generator {
                 add(A, unroll_m * SIZE);
             } else {
                 mov(rax, LDA);
+#ifdef XBYAK_TRANSLATE_AARCH64
+        CodeGeneratorAArch64::mov(X_TMP_0, unroll_m);
+        CodeGeneratorAArch64::mul(Xbyak_aarch64::XReg(rax.getIdx()), Xbyak_aarch64::XReg(rax.getIdx()), X_TMP_0);
+#else
                 imul(rax, rax, unroll_m);
+#endif
                 add(A, rax);
             }
 
@@ -1619,7 +1804,12 @@ struct xbyak_gemm : public jit_generator {
 
         // Create buffer and align to 4kB page
         lea(rax, ptr[K * SIZE]);
+#ifdef XBYAK_TRANSLATE_AARCH64
+    CodeGeneratorAArch64::mov(X_TMP_0, 0x30);
+    CodeGeneratorAArch64::mul(Xbyak_aarch64::XReg(rax.getIdx()), Xbyak_aarch64::XReg(rax.getIdx()), X_TMP_0);
+#else
         imul(rax, rax, 0x30);
+#endif
         add(rax, 256);
         sub(rsp, rax);
         and_(rsp, -PAGE_4K);
@@ -1649,6 +1839,14 @@ struct xbyak_gemm : public jit_generator {
         if (isTransA) {
             vpbroadcastq(zmm2, LDA);
             vpxorq(ZSTRIDE, ZSTRIDE, ZSTRIDE);
+#ifdef XBYAK_TRANSLATE_AARCH64
+        Xbyak_aarch64::PReg k4_aarch64(k4.getIdx());
+        for (int i = 0; i < 7; i++) {
+          CodeGeneratorAArch64::ptrue(k4_aarch64.d, static_cast<Xbyak_aarch64::Pattern>(i+1)); // (i+1) means VLi
+          CodeGeneratorAArch64::not_(k4_aarch64.b, P_ALL_ONE/Xbyak_aarch64::T_z, k4_aarch64.b);
+          vpaddq(ZSTRIDE | k4, ZSTRIDE, zmm2);
+        }
+#else
             mov(rax, -2);
             kmovw(k4, eax);
 
@@ -1657,6 +1855,7 @@ struct xbyak_gemm : public jit_generator {
                 kshiftlw(k4, k4, 1);
             }
             vpaddq(ZSTRIDE | k4, ZSTRIDE, zmm2);
+#endif
         }
 
         // Check A alignment and leading dimension; take copy-based path as

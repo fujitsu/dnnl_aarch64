@@ -19,7 +19,11 @@
 
 #include "jit_generator.hpp"
 
-#define F32_COPY_KERNEL_CODE_SIZE          (4096L * 5)
+#ifdef XBYAK_TRANSLATE_AARCH64
+#define F32_COPY_KERNEL_CODE_SIZE          (4096L * 10 * 100)
+#else
+#define F32_COPY_KERNEL_CODE_SIZE          (4096L * 5 * 10)
+#endif
 
 namespace mkldnn {
 namespace impl {

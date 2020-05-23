@@ -19,8 +19,6 @@
 #include "mkldnn_thread.hpp"
 #include "utils.hpp"
 
-//#include "jit_generator_aarch64.hpp"
-
 #include "jit_sve_1x1_convolution.hpp"
 
 namespace mkldnn {

@@ -35,8 +35,6 @@ SET(BLAS_LIBRARIES)
 SET(BLAS_INCLUDE_DIR)
 SET(BLAS_INFO)
 
-SET(WITH_BLAS "" CACHE STRING "Blas type [ssl2/generic]")
-
 # Old FindBlas
 INCLUDE(CheckCSourceRuns)
 INCLUDE(CheckFortranFunctionExists)
@@ -108,12 +106,67 @@ MACRO(Check_Fortran_Libraries LIBRARIES _prefix _name _flags _list)
   endif(NOT _libraries_work)
 endmacro(Check_Fortran_Libraries)
 
+MACRO(Check_Blas_Libraries LIBRARIES _prefix _name _flags _list)
+  # This macro checks for the existence of the combination of fortran libraries
+  # given by _list.  If the combination is found, this macro checks (using the
+  # Check_Fortran_Function_Exists macro) whether can link against that library
+  # combination using the name of a routine given by _name using the linker
+  # flags given by _flags.  If the combination of libraries is found and passes
+  # the link test, LIBRARIES is set to the list of complete library paths that
+  # have been found.  Otherwise, LIBRARIES is set to NOTFOUND.
+  # N.B. _prefix is the prefix applied to the names of all cached variables that
+  # are generated internally and marked advanced by this macro.
+
+  set(__list)
+  foreach(_elem ${_list})
+    if(__list)
+      set(__list "${__list} - ${_elem}")
+    else(__list)
+      set(__list "${_elem}")
+    endif(__list)
+  endforeach(_elem)
+  message(STATUS "Checking for [${__list}]")
+
+  set(_libraries_work TRUE)
+  set(${LIBRARIES})
+  set(_combined_name)
+  foreach(_library ${_list})
+    set(_combined_name ${_combined_name}_${_library})
+    if(_libraries_work)
+      if ( WIN32 )
+        find_library(${_prefix}_${_library}_LIBRARY
+          NAMES ${_library}
+          PATHS ENV LIB
+          PATHS ENV PATH )
+      endif ( WIN32 )
+      if ( APPLE )
+        find_library(${_prefix}_${_library}_LIBRARY
+          NAMES ${_library}
+          PATHS /usr/local/lib /usr/lib /usr/local/lib64 /usr/lib64 /opt/OpenBLAS/lib /usr/lib/aarch64-linux-gnu
+          ENV DYLD_LIBRARY_PATH )
+      else ( APPLE )
+        find_library(${_prefix}_${_library}_LIBRARY
+          NAMES ${_library}
+          PATHS /usr/local/lib /usr/lib /usr/local/lib64 /usr/lib64 /opt/OpenBLAS/lib /usr/lib/aarch64-linux-gnu
+          ENV LD_LIBRARY_PATH )
+      endif( APPLE )
+      mark_as_advanced(${_prefix}_${_library}_LIBRARY)
+      set(${LIBRARIES} ${${LIBRARIES}} ${${_prefix}_${_library}_LIBRARY})
+      set(_libraries_work ${${_prefix}_${_library}_LIBRARY})
+      MESSAGE(STATUS "  Library ${_library}: ${${_prefix}_${_library}_LIBRARY}")
+    endif(_libraries_work)
+  endforeach(_library ${_list})
+  if(NOT _libraries_work)
+    set(${LIBRARIES} NOTFOUND)
+  endif(NOT _libraries_work)
+endmacro(Check_Blas_Libraries)
+
 # BLAS in SSL2 library?
 if((NOT BLAS_LIBRARIES)
     AND ((NOT WITH_BLAS) OR (WITH_BLAS STREQUAL "ssl2")))
   if (CMAKE_CXX_COMPILER MATCHES ".*/FCC$" AND
       CMAKE_C_COMPILER MATCHES ".*/fcc$")
-    check_fortran_libraries(
+    check_blas_libraries(
     BLAS_LIBRARIES
     BLAS
     sgemm
@@ -129,17 +182,31 @@ if((NOT BLAS_LIBRARIES)
   endif (BLAS_LIBRARIES)
 endif()
 
-# Generic BLAS library?
+# cblas BLAS library?
 if((NOT BLAS_LIBRARIES)
-    AND ((NOT WITH_BLAS) OR (WITH_BLAS STREQUAL "generic")))
-  check_fortran_libraries(
+    AND ((NOT WITH_BLAS) OR (WITH_BLAS STREQUAL "cblas")))
+  check_blas_libraries(
   BLAS_LIBRARIES
   BLAS
   sgemm
   ""
-  "blas")
+  "cblas")
   if (BLAS_LIBRARIES)
-    set(BLAS_INFO "generic")
+    set(BLAS_INFO "cblas")
+  endif (BLAS_LIBRARIES)
+endif()
+
+# openblas BLAS library?
+if((NOT BLAS_LIBRARIES)
+    AND ((NOT WITH_BLAS) OR (WITH_BLAS STREQUAL "openblas")))
+  check_blas_libraries(
+  BLAS_LIBRARIES
+  BLAS
+  sgemm
+  ""
+  "openblas")
+  if (BLAS_LIBRARIES)
+    set(BLAS_INFO "openblas")
   endif (BLAS_LIBRARIES)
 endif()
 

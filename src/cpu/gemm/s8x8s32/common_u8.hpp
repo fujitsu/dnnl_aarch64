@@ -19,7 +19,11 @@
 
 #include "jit_generator.hpp"
 
+#ifdef XBYAK_TRANSLATE_AARCH64
+#define U8_COPY_KERNEL_CODE_SIZE          (4096L * 4 * 16)
+#else
 #define U8_COPY_KERNEL_CODE_SIZE          (4096L * 4)
+#endif
 
 #define PADD_BYTESIZE_ONPAGE(x, size) \
     (((x) * (size) + PAGE_4K - 1) / PAGE_4K) * PAGE_4K
