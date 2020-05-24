@@ -46,22 +46,13 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak/translator/third_party/xbyak_aarch64/xbyak_aarch64
                     )
 
-if(XBYAK_TRANSLATE_AARCH64)
-    if(XBYAK_XED_LIB_ARCH_IS_AARCH64)
-        find_library(XED
-            NAMES "xed"
-            HINTS ../../third_party/build_xed_aarch64/kits/xed/lib)
-        include_directories(
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/build_xed_aarch64/kits/xed/include
-            )
-        else()
-        find_library(XED
-            NAMES "xed"
-            HINTS ../../third_party/build_xed_x86_64/kits/xed/lib)
-        include_directories(
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/build_xed_x86_64/kits/xed/include
-            )
-    endif()
+if(DNNL_INDIRECT_JIT_AARCH64)
+    find_library(XED
+        NAMES "xed"
+        HINTS ../../third_party/build_xed_aarch64/kits/xed/lib)
+    include_directories(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/build_xed_aarch64/kits/xed/include
+    )
 
     if(NOT XED)
         message(FATAL_ERROR, "libxed not found!")

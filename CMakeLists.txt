@@ -106,7 +106,7 @@ enable_testing()
 include_directories(include)
 
 
-if(XBYAK_TRANSLATE_AARCH64)
+if(DNNL_INDIRECT_JIT_AARCH64)
     append(CMAKE_C_FLAGS "-DXBYAK_TRANSLATE_AARCH64")
     append(CMAKE_CXX_FLAGS "-DXBYAK_TRANSLATE_AARCH64")
 

@@ -32,19 +32,13 @@ else()
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-    option(XBYAK_TRANSLATE_AARCH64
-        "enables translating JIT code from x86_64 to AArch64 architecture."
+    option(DNNL_INDIRECT_JIT_AARCH64
+        "enables indirect JIT code from x86_64 to AArch64 architecture."
         ON) # disabled by default on AArch64 CPU
-    option(XBYAK_XED_LIB_ARCH_IS_AARCH64
-        "select architecture of libxed"
-        ON)
 else()
-    option(XBYAK_TRANSLATE_AARCH64
-        "enables translating JIT code from x86_64 to AArch64 architecture."
+    option(DNNL_INDIRECT_JIT_AARCH64
+        "enables indirect JIT code from x86_64 to AArch64 architecture."
         OFF) # disabled by default on x86_64 CPU
-    option(XBYAK_XED_LIB_ARCH_IS_AARCH64
-        "select architecture of libxed"
-        OFF)
 endif()
 
-message(STATUS "XBYAK_TRANSLATE_AARCH64=${XBYAK_TRANSLATE_AARCH64}")
+message(STATUS "DNNL_INDIRECT_JIT_AARCH64=${DNNL_INDIRECT_JIT_AARCH64}")

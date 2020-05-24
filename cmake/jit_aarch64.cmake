@@ -32,13 +32,13 @@ else()
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-    option(DNNL_AARCH64_NATIVE_JIT_REORDER
-        "enables native JIT reorder for AArch64."
+    option(DNNL_NATIVE_JIT_AARCH64
+        "enables native JIT for AArch64."
         ON) # disabled by default on AArch64 CPU
 else()
-    option(DNNL_AARCH64_NATIVE_JIT_REORDER
-        "enables native JIT reorder for AArch64."
+    option(DNNL_NATIVE_JIT_AARCH64
+        "enables native JIT for AArch64."
         OFF) # disabled by default on x86_64 CPU
 endif()
 
-message(STATUS "XBYAK_TRANSLATE_AARCH64=${XBYAK_TRANSLATE_AARCH64}")
+message(STATUS "DNNL_NATIVE_JIT_AARCH64=${DNNL_NATIVE_JIT_AARCH64}")
