@@ -25,8 +25,7 @@ DNNL includes the following example and test programs, which are built in
 DNNL_aarch64 also contains the same programs. You can run them on ARMv8-a enviroment.
 You can execute DNNL_aarch64 on systems using Arm(R)v8-A architecure CPUs supporting SVE 
 instructions.
-Even if you can't access such systems, you can try DNNL_aarch64 on QEMU (generic and open 
-source machine emulator and virtualizer).
+
 
 動作確認済み環境
  Fujitsu FX1000/FX700
@@ -47,36 +46,38 @@ exception.
 
 ## Installation
 
-Download DNNL_aarch64 source code or clone the repository.
+1. Download DNNL_aarch64 source code or clone the repository.
 
 ```
 git clone https://github.com/fujitsu/dnnl_aarch64.git
-
 cd dnnl_aarch64/
 git checkout fjdev
 git submodule update --init --recursive
-(or pushd third_party/xbyak; git submodule update -i)
+```
 
-cd third_party/
-mkdir build_xed_aarch64
-cd build_xed_aarch64/
+2. Build xed library
+```
+mkdir third_party/build_xed_aarch64
+pushd third_party/build_xed_aarch64/
 ../xbyak/translator/third_party/xed/mfile.py --shared examples install
 cd kits/
 ln -sf xed-install-base-* xed
-cd ../../../
+popd
+```
 
+3. Build DNNL
+```
 mkdir build_aarch64
 cd build_aarch64/
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DXBYAK_TRANSLATE_AARCH64=ON -DDNNL_AARCH64_NATIVE_JIT_REORDER=ON -DXBYAK_XED_LIB_ARCH_IS_AARCH64=ON
+cmake ..
 make -j40
+```
 
+4. Test DNNL(option)
+```
 cd tests/gtests
 MKLDNN_VERBOSE=1 MKLDNN_JIT_DUMP=1 ./test_reorder
 ```
-
-
-Then, please follow the installation instruction written in [README_intel.md](README_intel.md).
-
 
 ## License
 
