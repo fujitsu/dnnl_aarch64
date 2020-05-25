@@ -211,10 +211,8 @@ class jit_generator : public Xbyak::CodeGenerator
 private:
     const size_t xmm_len = 16;
 #ifdef _WIN32
-    const size_t xmm_to_preserve_start = 6;
     const size_t xmm_to_preserve = 10;
 #else
-    const size_t xmm_to_preserve_start = 0;
     const size_t xmm_to_preserve = 0;
 #endif
 
@@ -222,11 +220,7 @@ private:
     const size_t xreg_len = 8;
 
     const size_t vreg_len_preserve = 8; // Only bottom 8byte must be preserved.
-    const size_t vreg_to_preserve_start = 8;
     const size_t vreg_to_preserve = 8; // VREG8 - VREG15
-
-    const size_t gpr_to_preserve_start = 19;
-    const size_t gpr_to_preserve = 19;
 
     const size_t num_abi_save_gpr_regs_aarch64
             = sizeof(abi_save_gpr_regs_aarch64)
