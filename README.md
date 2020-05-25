@@ -74,6 +74,12 @@ popd
 
 4. Build DNNN_aarch64
 
+```
+mkdir build_aarch64
+cd build_aarch64/
+cmake ..
+make -j40
+```
    - Using BLAS (Optional)
 
      1. Set the path to the BLAS library on your environment into `LD_LIBRARY_PATH`
@@ -83,13 +89,6 @@ popd
      | -------- | --------------------------------------------- |
      | SSL2     | -DWITH_BLAS=ssl2 (only with FUJITSU compiler) |
      | openblas | -DWITH_BLAS=openblas                          |
-
-```
-mkdir build_aarch64
-cd build_aarch64/
-cmake ..
-make -j40
-```
 
 5. Test DNNL_aarch64 (optional)
 
