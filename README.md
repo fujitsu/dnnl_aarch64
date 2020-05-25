@@ -57,7 +57,7 @@ git clone https://github.com/fujitsu/dnnl_aarch64.git
 
 ```
 cd dnnl_aarch64/
-git checkout fjdev
+git checkout -b fjdev origin/fjdev
 git submodule update --init --recursive
 ```
 
