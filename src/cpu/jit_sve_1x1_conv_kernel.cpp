@@ -158,9 +158,36 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         }
     };
 
+    auto prefetch_output = [=](int i_load, int i_ur) {
+      int ofs;
+      int bwd_iload = (i_load != 0) && one_of(jcp.prop_kind, backward_weights);
+      auto r = (bwd_iload) ? reg_tmp_ofs : aux_reg_output_data;
+      if (one_of(jcp.prop_kind, forward_training, forward_inference,
+                 backward_data)){
+        ofs = (i_load * jcp.bcast_dim + i_ur) * jcp.load_block * jcp.typesize_out;
+      }else{
+        ofs = jcp.typesize_out * jcp.load_block * i_ur;
+      }
+
+      if(ofs <= PRFMMAX) {
+        CGA64::prfm(xa::PSTL2KEEP, xa::ptr(r, static_cast<int32_t>(ofs)));
+      }else{
+        add_imm(reg_tmp_ofs, aux_reg_output_data, ofs);
+        CGA64::prfm(xa::PSTL2KEEP, xa::ptr(reg_tmp_ofs));
+      }
+    };
+
     auto init = [=]() {
         xa::LabelAArch64 init_done;
         xa::LabelAArch64 init_zero;
+
+        if (jcp.with_sum) {
+          for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
+            for (int i_ur = 0; i_ur < ur; ++i_ur) {
+                prefetch_output(i_load, i_ur);
+            }
+          }
+        }
 
         /* Read bias */
         if (jcp.with_bias
@@ -379,6 +406,113 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         CGA64::L_aarch64(end_store);
     };
 
+    auto prefetch_callback = [=](int ur, int i_reduce, int i_ur, int i_load,
+                                     bool last_block, bool wraparound, int reduce_step)
+    {
+        bool pf_ker_l1 = true;
+        bool pf_ker_l2 = wraparound;
+        int n_ops = (jcp.reduce_loop_unroll / reduce_step) * ur * load_loop_blk;
+        int i_op = (i_reduce / reduce_step) * ur * load_loop_blk +
+            i_ur * load_loop_blk + i_load;
+
+        int n_pf_ker_l1 = pf_ker_l1 ? jcp.reduce_block : 0;
+        int n_pf_ker_l2 = pf_ker_l2 && wraparound ? jcp.reduce_block : 0;
+        int n_pf_out_l1 = jcp.use_vmovntps ? 0 : ur;
+
+        int pf_inp_ops = n_ops / 2; // # of operations during which to pf input
+        int pf_inp_trigger;
+        if (jcp.prop_kind == backward_weights)
+            pf_inp_trigger = nstl::max(1, pf_inp_ops / jcp.reduce_block);
+        else
+            pf_inp_trigger = nstl::max(1, pf_inp_ops / ur);
+
+        int n_other_pf =
+            load_loop_blk * (n_pf_ker_l1 + n_pf_ker_l2 + n_pf_out_l1);
+        int n_other_pf_ops = n_ops - pf_inp_ops;
+        int other_pf_trigger
+                = n_other_pf ? nstl::max(1, n_other_pf_ops / n_other_pf) : 0;
+
+        if (i_op < pf_inp_ops && i_op % pf_inp_trigger == 0) {
+            // input prefetches have the highest priority b/c the
+            // first iteration of the kernel block touches all the
+            // cache lines
+            int i_pf = i_op / pf_inp_trigger;
+            auto pf_reg = wraparound && last_block
+                                  ? reg_bcast_data
+                                  : (last_block ? aux1_reg_bcast_data
+                                                : aux_reg_bcast_data);
+            int ofs = i_pf;
+            if (jcp.prop_kind == backward_weights) {
+                ofs += wraparound && last_block
+                                    ? 0
+                                    : (last_block ? jcp.is : jcp.reduce_block);
+                ofs *= jcp.bcast_block;
+            } else {
+                ofs += wraparound && last_block
+                                    ? 0
+                                    : (last_block ? jcp.ur : jcp.bcast_dim);
+                ofs *= jcp.reduce_block;
+            }
+
+            ofs *= jcp.typesize_in;
+            if(ofs <= PRFMMAX) {
+              CGA64::prfm(xa::PLDL1KEEP, xa::ptr(pf_reg, static_cast<int32_t>(ofs)));
+            }else{
+              add_imm(reg_tmp_ofs, pf_reg, ofs);
+              CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_tmp_ofs));
+            }
+        } else if (i_op >= pf_inp_ops && n_other_pf) {
+            // remaining prefetches are spread among the rest of the
+            // operations; prefetches for output take priority
+            // TODO: spread L2 prefetches among L1 prefetches
+            i_op -= pf_inp_ops;
+            if (i_op % other_pf_trigger == 0) {
+                int i_pf = i_op / (load_loop_blk * other_pf_trigger);
+                if (i_pf < n_pf_ker_l2) {
+                    int ofs = (i_pf + (i_load + 1) * jcp.reduce_dim)
+                        * jcp.load_block;
+                    if (jcp.prop_kind == backward_data && jcp.ver == ver_4vnni)
+                        ofs = (i_pf + (i_load + 1) * jcp.reduce_block)
+                                * jcp.load_block;
+
+                    ofs *= jcp.typesize_in;
+                    if(ofs <= PRFMMAX) {
+                      CGA64::prfm(xa::PLDL2KEEP, xa::ptr(aux_reg_load_data, static_cast<int32_t>(ofs)));
+                    }else{
+                      add_imm(reg_tmp_ofs, aux_reg_load_data, ofs);
+                      CGA64::prfm(xa::PLDL2KEEP, xa::ptr(reg_tmp_ofs));
+                    }
+                } else if (i_pf < n_pf_ker_l2 + n_pf_ker_l1) {
+                  i_pf -= n_pf_ker_l2;
+                  auto pf_reg = last_block ? reg_load_data
+                    : aux_reg_load_data;
+                  int ofs = (i_pf + i_load * jcp.reduce_dim
+                             + (last_block
+                                ? (wraparound ? jcp.reduce_dim : 0)
+                                : jcp.reduce_block))
+                    * jcp.load_block;
+                    ofs *= jcp.typesize_in;
+                    if(ofs <= PRFMMAX) {
+                      CGA64::prfm(xa::PLDL1KEEP, xa::ptr(pf_reg, static_cast<int32_t>(ofs)));
+                    }else{
+                      add_imm(reg_tmp_ofs, pf_reg, ofs);
+                      CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_tmp_ofs));
+                    }
+                } else if (i_pf < n_pf_ker_l1 + n_pf_ker_l2 + n_pf_out_l1) {
+                    i_pf -= n_pf_ker_l1 + n_pf_ker_l2;
+                    int ofs = i_pf * jcp.load_block * jcp.typesize_out;
+                    if(ofs <= PRFMMAX) {
+                      CGA64::prfm(xa::PSTL1KEEP, xa::ptr(aux_reg_output_data, static_cast<int32_t>(ofs)));
+                    }else{
+                      add_imm(reg_tmp_ofs, aux_reg_output_data, ofs);
+                      CGA64::prfm(xa::PSTL1KEEP, xa::ptr(reg_tmp_ofs));
+                    }
+                }
+            }
+        }
+    };
+
+
     auto fma_block = [=](bool last_block) {
         assert(jcp.reduce_loop_unroll % jcp.fma_step == 0);
 
@@ -431,16 +565,18 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             }
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
-	            for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
-		            CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
-			            vreg_load_s(i_load, 0), vreg_bcast_s(bcast_reg_ofs + (i_ur % num_bcast_regs)));
-	            }
+              for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
+                CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
+                            vreg_load_s(i_load, 0), vreg_bcast_s(bcast_reg_ofs + (i_ur % num_bcast_regs)));
+		prefetch_callback(ur, i_reduce, i_ur, i_load,
+				  last_block, wraparound, reduce_step);
+
+              }
               if((num_bcast_load + i_ur) < ur)
                 prev_bcast_ofs = bcast_load(i_reduce, num_bcast_load+i_ur, prev_bcast_ofs, bcast_reg_ofs + ((i_ur + num_bcast_load) % num_bcast_regs));
             }
         }
     };
-
 
     xa::LabelAArch64 reduce_loop;
     xa::LabelAArch64 reduce_loop_tail;
@@ -783,8 +919,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         jcp.expl_bcast = true;
 
         if (jcp.load_dim > 128 && jcp.load_dim < BIG_LOAD_DIM
-	    && spatial > SMALL_SPATIAL && spatial < BIG_SPATIAL
-	    && jcp.reduce_dim < 256) {
+            && spatial > SMALL_SPATIAL && spatial < BIG_SPATIAL
+            && jcp.reduce_dim < 256) {
             max_regs = 6;
             min_regs = 5;
         }
@@ -847,8 +983,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 reduce_blocking = nstl::min(jcp.reduce_dim, 512);
             else
                 reduce_blocking = nstl::min(jcp.reduce_dim, 256);
-            if ((jcp.mb > 28 && spatial >= 28)
-                    || (jcp.mb > 112 && spatial >= 17))
+            if ((jcp.mb > 28 && spatial >= 14)
+                    || (jcp.mb > 112 && spatial >= 7))
                 jcp.use_vmovntps = true;
             else
                 jcp.use_vmovntps = false;
@@ -887,7 +1023,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
             }
         }
 
-        // @todo L1D$ aliasing for reduce blocking
         if (jcp.prop_kind == backward_data)
            jcp.loop_order = loop_lbr;
         else
@@ -899,7 +1034,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 jcp.loop_order = reduce_src ? loop_lbr : loop_rlb;
             else
                 jcp.loop_order = reduce_src ? loop_rbl : loop_rlb;
-	}
+        }
         load_blocking = jcp.load_dim;
 
         /* Number of weight elements to be loaded for dest */
@@ -977,7 +1112,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                                /* kernel_size - */
                                - 2 * jcp.load_block * reduce_blocking
                                - jcp.ur * reduce_blocking // ic size
-                               - 3 * 1024); // @todo for 48threads
+                               - 3 * 1024);
 
         if (jcp.reduce_dim * jcp.bcast_dim > L2_capacity)
             space_for_bcast /= 2;

@@ -115,8 +115,10 @@ void simple_sum_t<src_data_type, dst_data_type>::execute() const {
 }
 
 template struct simple_sum_t<data_type::f32, data_type::f32>;
+#ifndef __ARM_ARCH
 template struct simple_sum_t<data_type::bf16, data_type::bf16>;
 template struct simple_sum_t<data_type::bf16, data_type::f32>;
+#endif //#ifndef __ARM_ARCH
 
 }
 }
