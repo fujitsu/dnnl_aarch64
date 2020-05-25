@@ -32,7 +32,7 @@ Reference implementations by C++ run other than those above operations and unsup
 
 ### Validated Configurations
 
-| CPU          | Fujitsu FX1000 / 700                  |
+| **CPU**      | Fujitsu FX1000 / 700                  |
 | ------------ | ------------------------------------- |
 | **OS**       | RedHad 8.1 / Centos 8.1               |
 | **Compiler** | Fujitsu compiler / GCC 8.3.1 20190507 |
