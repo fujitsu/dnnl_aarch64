@@ -75,9 +75,9 @@ void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
     code.pause();
     code.cmp(reg_tmp, code.ptr[reg_ctx + BAR_SENSE_OFF]);
     code.je(spin_label);
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     code.CodeGeneratorAArch64::dmb(Xbyak_aarch64::ISH);
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
     code.CodeGenerator::L(barrier_exit_restore_label);
     code.pop(reg_tmp);
 
@@ -92,7 +92,7 @@ struct jit_t: public jit_generator {
     void (*barrier)(ctx_t *ctx, size_t nthr);
 
     jit_t() {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
       preamble();
       generate(*this, abi_param1, abi_param2);
       postamble();

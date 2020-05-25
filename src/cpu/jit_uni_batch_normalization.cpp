@@ -287,7 +287,7 @@ struct jit_bnorm_t: public jit_generator {
         align(32);
         L(l_relu_mask_avx2); /* [0x80 0x40 0x20 0x10 0x08 0x04 0x02 0x01] */
         for (int i = 0; i < 8; ++i) dd(1<<i);
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
         binCommit();
 #endif
         L(l_mask_after);
@@ -453,7 +453,7 @@ struct jit_bnorm_t: public jit_generator {
                 }
                 add(reg_soff, factor * vlen_spat_data_);
                 sub(reg_ctr, factor);
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 		CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
 #endif
                 jnz(label);
@@ -612,7 +612,7 @@ struct jit_bnorm_t: public jit_generator {
                     uni_vmovups(vmmword[reg_rbuf1 + reg_roff], Vmm(0));
                     add(reg_roff, reg_coff_max);
                     sub(reg_ctr, 1);
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
 #endif
                     jnz(mean_reduction_thrs);
@@ -672,7 +672,7 @@ struct jit_bnorm_t: public jit_generator {
                     uni_vaddps(Vmm(1), Vmm(1), vmmword[reg_rbuf1 + reg_roff]);
                     add(reg_roff, reg_coff_max);
                     sub(reg_ctr, 1);
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
 #endif
                     jnz(var_reduction_thrs);
@@ -1023,7 +1023,7 @@ struct jit_bnorm_t: public jit_generator {
                     uni_vaddps(Vmm(1), Vmm(1), vmmword[reg_rbuf2 + reg_roff]);
                     add(reg_roff, reg_coff_max);
                     sub(reg_ctr, 1);
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
 #endif
                     jnz(sh_reduction_thrs);

@@ -854,7 +854,7 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::generate()
         for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
             dd(_idx[i]);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
         binCommit();
 #endif
     }

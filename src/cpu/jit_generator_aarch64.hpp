@@ -67,26 +67,6 @@ namespace cpu {
 #if 1
 namespace {
 
-/* following code is implemented in jit_generator.hpp */
-#if 0
-typedef enum {
-    PAGE_4K = 4096,
-    PAGE_2M = 2097152,
-} cpu_page_size_t;
-
-// TODO: move this somewhere else? Although this is only used by jit kernels
-// (Roma)
-static inline int float2int(float x) {
-    union {
-        float vfloat;
-        int vint;
-    } cvt;
-    cvt.vfloat = x;
-    return cvt.vint;
-}
-#endif
-
-
 // TODO: A GPR class that hides ABI details from the JIT kernels and allows
 // numbering registers from 0 to 14 (x86_64) / 6 (x32) (gpr0, gpr1, ...) and
 // stack register (sr).
@@ -104,7 +84,7 @@ static inline int float2int(float x) {
 //
 // (Roma)
 
-#if XBYAK_TRANSLATE_AARCH64
+#if DNNL_INDIRECT_JIT_AARCH64
 #ifndef CPU_JIT_AVX2_GENERATOR_HPP
 #define CPU_JIT_AVX2_GENERATOR_HPP
 // Callee-saved registers
@@ -194,7 +174,7 @@ private:
     const size_t xmm_to_preserve = 0;
 #endif
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     const size_t xreg_len = 8;
 
     const size_t vreg_len_preserve = 8; // Only bottom 8byte must be preserved.
@@ -208,7 +188,7 @@ private:
     const size_t num_abi_save_gpr_regs
             = sizeof(abi_save_gpr_regs_aarch64) / sizeof(abi_save_gpr_regs_aarch64[0]);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     const size_t size_of_abi_save_regs = num_abi_save_gpr_regs * x0.getBit() / 8
             + vreg_to_preserve * vreg_len_preserve;
 
@@ -232,7 +212,7 @@ public:
         _op_floor = 1u,
     };
 
-#if defined(XBYAK_TRANSLATE_AARCH64)
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     Xbyak::Xbyak_aarch64::XReg param1 = abi_param1_aarch64;
     const int EVEX_max_8b_offt = 0x200;
 //    const Xbyak::Reg64 reg_EVEX_max_8b_offt = x5;
@@ -282,7 +262,7 @@ public:
     }
 #endif
 
-#ifndef XBYAK_TRANSLATE_AARCH64
+#ifndef DNNL_INDIRECT_JIT_AARCH64
     void mic_prefetcht0(Xbyak::Address a) {
         if (mayiuse(avx512_mic))
             prefetcht0(a);
@@ -297,30 +277,9 @@ public:
         if (mayiuse(avx512_mic))
             prefetcht2(a);
     }
-#endif // #ifndef XBYAK_TRANSLATE_AARCH64
+#endif // #ifndef DNNL_INDIRECT_JIT_AARCH64
 
-#ifdef XBYAK_TRANSLATE_AARCH64
-#if 0
-    template<class T> void uni_reg_clear(const T& r) {
-
-#ifdef XBYAK_AARCH64_CHECKER
-    Xbyak::ElementWidth ew = Xbyak::undefElement;
-    setWriteFlag(r, true);
-
-    switch(r.getBit()) {
-    case 8: ew = Xbyak::byteElement; break;
-    case 16: ew = Xbyak::halfElement; break;
-    case 32: ew = Xbyak::singleElement; break;
-    case 64: ew = Xbyak::doubleElement; break;
-    case 128: ew = Xbyak::quadElement; break;
-    default: assert(!"no reach here"); break;
-    }
-
-    setElementWidth(r, ew);
-#endif //#ifdef XBYAK_AARCH64_CHECKER
-    eor(r, r, r);
-  }
-#endif
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 
     void uni_vzeroupper() {
         if (mayiuse(avx) && !mayiuse(avx512_mic) && !mayiuse(sve)){
@@ -365,7 +324,7 @@ public:
     }
 #endif
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     /*
       template <typename T>
       Xbyak::Xbyak_aarch64::Adr EVEX_compress_addr(Xbyak::Xbyak_aarch64::XReg base,
@@ -389,7 +348,7 @@ public:
         return ptr(x0);
     }
 
-#else // #ifdef 1
+#else // #ifdef DNNL_INDIRECT_JIT_AARCH64
     template <typename T>
     Xbyak::Address EVEX_compress_addr(
             Xbyak::Reg64 base, T raw_offt, bool bcast = false) {
@@ -440,7 +399,7 @@ public:
             return EVEX_compress_addr(base, raw_offt, bcast);
         }
     }
-#endif // #ifdef 1
+#endif // #ifdef DNNL_INDIRECT_JIT_AARCH64
 
     // Disallow char-based labels completely
     void L(const char *label) = delete;
@@ -454,35 +413,8 @@ public:
         L(label);
     }
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     // WREG, XREG, VREG, ZREG
-#if 0
-  void uni_vpxor(const Xbyak::VRreg &x1, const Xbyak::Xbyak_aarch64::VReg &x2, const Xbyak::VRreg &op) {
-    assert(x1.getIdx() == x2.getIdx());
-    xor(x2, x2, op);
-  }
-
-  void uni_vpxor(const Xbyak::Xbyak_aarch64::ZReg &x1, const Xbyak::Xbyak_aarch64::ZReg &x2, const Xbyak::Xbyak_aarch64::ZReg &op) {
-    assert(x1.getIdx() == x2.getIdx());
-    xor(x2, x2, op);
-  }
-
-  void uni_vmovss(const Xbyak::Xbyak_aarch64::Adr& addr, const Xbyak::Xbyak_aarch64::QReg& x) {
-    str(x, addr);
-  }
-
-  void uni_vmovss(const Xbyak::Xbyak_aarch64::Adr& addr, const Xbyak::Xbyak_aarch64::ZReg& x) {
-    str(x, addr);
-  }
-
-  void uni_vmovss(const Xbyak::Xbyak_aarch64::Adr& addr, const Xbyak::Xbyak_aarch64::QReg& x) {
-    str(x, addr);
-  }
-
-  void uni_vmovss(const Xbyak::Xbyak_aarch64::ZReg &x, const Xbyak::Xbyak_aarch64::Adr& addr) {
-    ldr(x, addr);
-  }
-#endif // #if 0
     void uni_vpxor(const Xbyak::Xbyak_aarch64::QReg &x1, const Xbyak::Xbyak_aarch64::QReg &x2,
             const Xbyak::Xbyak_aarch64::QReg &op) {
         assert(NULL);
@@ -928,7 +860,7 @@ public:
 //        mov(out, tmp);
         assert(NULL);
             }
-#else // #ifdef 1
+#else // #ifdef DNNL_INDIRECT_JIT_AARCH64
     void uni_vpxor(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
             const Xbyak::Operand &op) {
         assert(x1.getIdx() == x2.getIdx());
@@ -1441,7 +1373,7 @@ public:
         }
         mov(out, tmp);
     }
-#endif // #ifdef 1
+#endif // #ifdef DNNL_INDIRECT_JIT_AARCH64
 
     void dump_code(const Xbyak::XBYAK_CODE_PTR *code) const {
         if (code) {
@@ -1455,7 +1387,7 @@ public:
             FILE *fp = mkldnn_fopen(fname, "w+");
             // Failure to dump code is not fatal
             if (fp) {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
                 size_t unused = fwrite(code, getSize() * 4, 1, fp);
 #else
                 size_t unused = fwrite(code, getSize(), 1, fp);
@@ -1487,7 +1419,7 @@ public:
 public:
     jit_generator_aarch64(void *code_ptr = nullptr, size_t code_size = 256 * 1024)
         : Xbyak::Xbyak_aarch64::CodeGeneratorAArch64(code_size, code_ptr) {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
         assert(!(num_abi_save_gpr_regs % 2));
 #endif
     }

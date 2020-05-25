@@ -67,7 +67,7 @@ namespace cpu {
 // TODO: move this to jit_generator class?
 namespace {
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 namespace xa = Xbyak::Xbyak_aarch64;
 #endif
 
@@ -105,9 +105,7 @@ static inline int float2int(float x) {
 // (Roma)
 
 
-#ifdef XBYAK_TRANSLATE_AARCH64
-#ifndef ABI_GPR_REGS_AARCH64
-#define ABI_GPR_REGS_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 // Callee-saved registers
 /* Intel64 GCC passes (arg0 - arg5) by registers.
    AArch64 passes (arg0 - arg7) by registers.
@@ -129,8 +127,7 @@ static const xa::XReg abi_param1_aarch64(xa::Operand::X0),
         abi_param8_aarch64(xa::Operand::X7),
         abi_not_param1_aarch64(xa::Operand::X15); // Fujitsu uses X15 on A64FX
                                                   // as abi_not_param1 on x64.
-#endif //#ifndef ABI_GPR_REGS_AARCH64
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
 #ifdef XBYAK64
 constexpr Xbyak::Operand::Code abi_save_gpr_regs[] = {
@@ -180,7 +177,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
     } else
         return 0;
 }
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
   inline unsigned int get_A64FX_cache_size(int level, bool per_core = true, int nthreads = 1) {
     unsigned int l = level - 1;
     // Currently, if XByak is not able to fetch the cache topology
@@ -201,7 +198,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
     } else
         return 0;
 }
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
 
 }
@@ -218,7 +215,7 @@ private:
     const size_t xmm_to_preserve = 0;
 #endif
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     const size_t xreg_len = 8;
 
     const size_t vreg_len_preserve = 8; // Only bottom 8byte must be preserved.
@@ -239,7 +236,7 @@ private:
     const size_t preserved_stack_size
             = xreg_len * (2 + num_abi_save_gpr_regs_aarch64)
             + vreg_len_preserve * vreg_to_preserve;
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
     const size_t num_abi_save_gpr_regs
         = sizeof(abi_save_gpr_regs) / sizeof(abi_save_gpr_regs[0]);
 
@@ -259,7 +256,7 @@ public:
         _op_floor = 1u,
     };
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     xa::XReg param1_aarch64 = abi_param1_aarch64;
 
     class XRegValue : public xa::XReg
@@ -275,7 +272,7 @@ public:
     inline size_t get_size_of_abi_save_regs_aarch64() {
         return size_of_abi_save_regs_aarch64;
     }
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
   Xbyak::Reg64 param1 = abi_param1;
     const int EVEX_max_8b_offt = 0x200;
     const Xbyak::Reg64 reg_EVEX_max_8b_offt = rbp;
@@ -285,7 +282,7 @@ public:
     }
 
     void preamble() {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
       /*
 	 |                        |
 	 |------------------------|
@@ -334,7 +331,7 @@ public:
 
 	CodeGeneratorAArch64::mov(x4, CodeGeneratorAArch64::sp); /* Intel64's stack register is 4-th register. */
 	CodeGeneratorAArch64::sub_imm(X_TRANSLATOR_STACK, x4, xt_stack_offset, X_TMP_0, X_TMP_1);
-#else //#ifdef XBYAK_TRANSLATE_AARCH64
+#else //#ifdef DNNL_INDIRECT_JIT_AARCH64
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len); // subtract by imm
             for (size_t i = 0; i < xmm_to_preserve; ++i)
@@ -342,7 +339,7 @@ public:
         }
         for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
             push(Xbyak::Reg64(abi_save_gpr_regs[i]));
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
         if (mayiuse(avx512_common)) {
             mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
         }
@@ -369,7 +366,7 @@ public:
     }
 
     void postamble() {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
         CodeGeneratorAArch64::add(x29, CodeGeneratorAArch64::sp, xreg_len * 2);
 
 	CodeGeneratorAArch64::eor(P_ALL_ONE.b, P_ALL_ONE/xa::T_z, P_ALL_ONE.b, P_ALL_ONE.b);
@@ -391,7 +388,7 @@ public:
                 xa::post_ptr(CodeGeneratorAArch64::sp,
                         static_cast<int64_t>(preserved_stack_size)));
 	CodeGeneratorAArch64::ret();
-#else //#ifdef XBYAK_TRANSLATE_AARCH64
+#else //#ifdef DNNL_INDIRECT_JIT_AARCH64
         for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
             pop(Xbyak::Reg64(abi_save_gpr_regs[num_abi_save_gpr_regs - 1 - i]));
         if (xmm_to_preserve) {
@@ -401,7 +398,7 @@ public:
         }
         uni_vzeroupper();
         ret();
-#endif //#ifdef XBYAK_TRANSLATE_AARCH64
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
     }
 
     template <typename T>
@@ -1005,7 +1002,7 @@ public:
 	          std::cout << "dump size=" << getSize() << std::endl;
             // Failure to dump code is not fatal
             if (fp) {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
                 size_t unused = fwrite(code, getSize() * 4, 1, fp);
 #else
                 size_t unused = fwrite(code, getSize(), 1, fp);
