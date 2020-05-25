@@ -523,7 +523,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     const int n_loads = jcp.is % jcp.fma_step;
                     for (int i_fma = 0; i_fma < jcp.fma_step; i_fma++) {
                         if (i_fma < n_loads){
-                           load_load(i_reduce + load_scale * i_fma, i_load, i_fma); // @@@ todo floating point l2 access miss
+                            load_load(i_reduce + load_scale * i_fma, i_load, i_fma);
                         }else
                             CGA64::fmov(vreg_load_s(i_load, i_fma));
                     }
@@ -549,54 +549,18 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             }
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
-              //if( i_ur < num_reg4bcast){
-              //  CGA64::mov(vreg_bcast_s(), xa::WReg(reg_base_idx + i_ur));
-              //}else{
-
-              bool next_iter = false;
-              if (one_of(jcp.prop_kind, backward_weights)) {
-                prev_bcast_ofs
-                  = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
-              }
-              //}
-              else { // forward, backward_data
-                if (ur == 1) {
-                  prev_bcast_ofs
-                    = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
-                } else if (i_ur % 2 == 0) {
-                  /* load input x2 */
-                  prev_bcast_ofs
-                    = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
-                  if (i_ur + 1 < ur) {
-                    prev_bcast_ofs
-                      = bcast_load(i_reduce, i_ur, prev_bcast_ofs, true);
-                  }
-                }
-
-                if (i_ur % 2 == 1) {
-                  next_iter = true;
-                }
-              }
-
-              for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
-                CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
-                            vreg_load_s(i_load, 0), vreg_bcast_s(next_iter));
-                prefetch_callback(ur, i_reduce, i_ur, i_load,
-                                  last_block, wraparound, reduce_step);
-              }
-            }
-
-            for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
               for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
                 CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
                             vreg_load_s(i_load, 0), vreg_bcast_s(bcast_reg_ofs + (i_ur % num_bcast_regs)));
+		prefetch_callback(ur, i_reduce, i_ur, i_load,
+				  last_block, wraparound, reduce_step);
+
               }
               if((num_bcast_load + i_ur) < ur)
                 prev_bcast_ofs = bcast_load(i_reduce, num_bcast_load+i_ur, prev_bcast_ofs, bcast_reg_ofs + ((i_ur + num_bcast_load) % num_bcast_regs));
             }
         }
     };
-
 
     xa::LabelAArch64 reduce_loop;
     xa::LabelAArch64 reduce_loop_tail;
@@ -1043,7 +1007,6 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
             }
         }
 
-        // @todo L1D$ aliasing for reduce blocking
         if (jcp.prop_kind == backward_data)
            jcp.loop_order = loop_lbr;
         else
@@ -1133,7 +1096,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                                /* kernel_size - */
                                - 2 * jcp.load_block * reduce_blocking
                                - jcp.ur * reduce_blocking // ic size
-                               - 3 * 1024); // @todo for 48threads
+                               - 3 * 1024);
 
         if (jcp.reduce_dim * jcp.bcast_dim > L2_capacity)
             space_for_bcast /= 2;
