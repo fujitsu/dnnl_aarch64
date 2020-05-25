@@ -166,11 +166,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         xa::LabelAArch64 init_zero;
 
         if (jcp.with_sum) {
-	  for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
-	    for (int i_ur = 0; i_ur < ur; ++i_ur) {
-	        prefetch_output(i_load, i_ur);
-	    }
-	  }
+          for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
+            for (int i_ur = 0; i_ur < ur; ++i_ur) {
+                prefetch_output(i_load, i_ur);
+            }
+          }
         }
 
         /* Read bias */
@@ -391,7 +391,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     };
 
     auto prefetch_callback = [=](int ur, int i_reduce, int i_ur, int i_load,
-    				 bool last_block, bool wraparound, int reduce_step)
+                                     bool last_block, bool wraparound, int reduce_step)
     {
         bool pf_ker_l1 = true;
         bool pf_ker_l2 = wraparound;
@@ -438,13 +438,13 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 ofs *= jcp.reduce_block;
             }
 
-	    ofs *= jcp.typesize_in;
-	    if(ofs <= PRFMMAX) {
-	      CGA64::prfm(xa::PLDL1KEEP, xa::ptr(pf_reg, static_cast<int32_t>(ofs)));
-	    }else{
-	      add_imm(reg_tmp_ofs, pf_reg, ofs);
-	      CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_tmp_ofs));
-	    }
+            ofs *= jcp.typesize_in;
+            if(ofs <= PRFMMAX) {
+              CGA64::prfm(xa::PLDL1KEEP, xa::ptr(pf_reg, static_cast<int32_t>(ofs)));
+            }else{
+              add_imm(reg_tmp_ofs, pf_reg, ofs);
+              CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_tmp_ofs));
+            }
         } else if (i_op >= pf_inp_ops && n_other_pf) {
             // remaining prefetches are spread among the rest of the
             // operations; prefetches for output take priority
@@ -459,38 +459,38 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                         ofs = (i_pf + (i_load + 1) * jcp.reduce_block)
                                 * jcp.load_block;
 
-		    ofs *= jcp.typesize_in;
-		    if(ofs <= PRFMMAX) {
-		      CGA64::prfm(xa::PLDL2KEEP, xa::ptr(aux_reg_load_data, static_cast<int32_t>(ofs)));
-		    }else{
-		      add_imm(reg_tmp_ofs, aux_reg_load_data, ofs);
-		      CGA64::prfm(xa::PLDL2KEEP, xa::ptr(reg_tmp_ofs));
-		    }
+                    ofs *= jcp.typesize_in;
+                    if(ofs <= PRFMMAX) {
+                      CGA64::prfm(xa::PLDL2KEEP, xa::ptr(aux_reg_load_data, static_cast<int32_t>(ofs)));
+                    }else{
+                      add_imm(reg_tmp_ofs, aux_reg_load_data, ofs);
+                      CGA64::prfm(xa::PLDL2KEEP, xa::ptr(reg_tmp_ofs));
+                    }
                 } else if (i_pf < n_pf_ker_l2 + n_pf_ker_l1) {
-		  i_pf -= n_pf_ker_l2;
-		  auto pf_reg = last_block ? reg_load_data
-		    : aux_reg_load_data;
-		  int ofs = (i_pf + i_load * jcp.reduce_dim
-			     + (last_block
-				? (wraparound ? jcp.reduce_dim : 0)
-				: jcp.reduce_block))
-		    * jcp.load_block;
-		    ofs *= jcp.typesize_in;
-		    if(ofs <= PRFMMAX) {
-		      CGA64::prfm(xa::PLDL1KEEP, xa::ptr(pf_reg, static_cast<int32_t>(ofs)));
-		    }else{
-		      add_imm(reg_tmp_ofs, pf_reg, ofs);
-		      CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_tmp_ofs));
-		    }
+                  i_pf -= n_pf_ker_l2;
+                  auto pf_reg = last_block ? reg_load_data
+                    : aux_reg_load_data;
+                  int ofs = (i_pf + i_load * jcp.reduce_dim
+                             + (last_block
+                                ? (wraparound ? jcp.reduce_dim : 0)
+                                : jcp.reduce_block))
+                    * jcp.load_block;
+                    ofs *= jcp.typesize_in;
+                    if(ofs <= PRFMMAX) {
+                      CGA64::prfm(xa::PLDL1KEEP, xa::ptr(pf_reg, static_cast<int32_t>(ofs)));
+                    }else{
+                      add_imm(reg_tmp_ofs, pf_reg, ofs);
+                      CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_tmp_ofs));
+                    }
                 } else if (i_pf < n_pf_ker_l1 + n_pf_ker_l2 + n_pf_out_l1) {
                     i_pf -= n_pf_ker_l1 + n_pf_ker_l2;
                     int ofs = i_pf * jcp.load_block * jcp.typesize_out;
-		    if(ofs <= PRFMMAX) {
-		      CGA64::prfm(xa::PSTL1KEEP, xa::ptr(aux_reg_output_data, static_cast<int32_t>(ofs)));
-		    }else{
-		      add_imm(reg_tmp_ofs, aux_reg_output_data, ofs);
-		      CGA64::prfm(xa::PSTL1KEEP, xa::ptr(reg_tmp_ofs));
-		    }
+                    if(ofs <= PRFMMAX) {
+                      CGA64::prfm(xa::PSTL1KEEP, xa::ptr(aux_reg_output_data, static_cast<int32_t>(ofs)));
+                    }else{
+                      add_imm(reg_tmp_ofs, aux_reg_output_data, ofs);
+                      CGA64::prfm(xa::PSTL1KEEP, xa::ptr(reg_tmp_ofs));
+                    }
                 }
             }
         }
@@ -523,7 +523,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     const int n_loads = jcp.is % jcp.fma_step;
                     for (int i_fma = 0; i_fma < jcp.fma_step; i_fma++) {
                         if (i_fma < n_loads){
-                 	  load_load(i_reduce + load_scale * i_fma, i_load, i_fma); // @@@ todo floating point l2 access miss
+                           load_load(i_reduce + load_scale * i_fma, i_load, i_fma); // @@@ todo floating point l2 access miss
                         }else
                             CGA64::fmov(vreg_load_s(i_load, i_fma));
                     }
@@ -549,48 +549,48 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             }
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
-	      //if( i_ur < num_reg4bcast){
-	      //  CGA64::mov(vreg_bcast_s(), xa::WReg(reg_base_idx + i_ur));
-	      //}else{
+              //if( i_ur < num_reg4bcast){
+              //  CGA64::mov(vreg_bcast_s(), xa::WReg(reg_base_idx + i_ur));
+              //}else{
 
               bool next_iter = false;
-	      if (one_of(jcp.prop_kind, backward_weights)) {
-		prev_bcast_ofs
-		  = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
-	      }
-	      //}
-	      else { // forward, backward_data
-		if (ur == 1) {
-		  prev_bcast_ofs
-		    = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
-		} else if (i_ur % 2 == 0) {
-		  /* load input x2 */
-		  prev_bcast_ofs
-		    = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
-		  if (i_ur + 1 < ur) {
-		    prev_bcast_ofs
-		      = bcast_load(i_reduce, i_ur, prev_bcast_ofs, true);
-		  }
-		}
+              if (one_of(jcp.prop_kind, backward_weights)) {
+                prev_bcast_ofs
+                  = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
+              }
+              //}
+              else { // forward, backward_data
+                if (ur == 1) {
+                  prev_bcast_ofs
+                    = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
+                } else if (i_ur % 2 == 0) {
+                  /* load input x2 */
+                  prev_bcast_ofs
+                    = bcast_load(i_reduce, i_ur, prev_bcast_ofs, false);
+                  if (i_ur + 1 < ur) {
+                    prev_bcast_ofs
+                      = bcast_load(i_reduce, i_ur, prev_bcast_ofs, true);
+                  }
+                }
 
-		if (i_ur % 2 == 1) {
-		  next_iter = true;
-		}
-	      }
+                if (i_ur % 2 == 1) {
+                  next_iter = true;
+                }
+              }
 
-	      for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
-		CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
-			    vreg_load_s(i_load, 0), vreg_bcast_s(next_iter));
-		prefetch_callback(ur, i_reduce, i_ur, i_load,
-				  last_block, wraparound, reduce_step);
-	      }
-	    }
+              for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
+                CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
+                            vreg_load_s(i_load, 0), vreg_bcast_s(next_iter));
+                prefetch_callback(ur, i_reduce, i_ur, i_load,
+                                  last_block, wraparound, reduce_step);
+              }
+            }
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
-	            for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
-		            CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
-			            vreg_load_s(i_load, 0), vreg_bcast_s(bcast_reg_ofs + (i_ur % num_bcast_regs)));
-	            }
+              for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
+                CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
+                            vreg_load_s(i_load, 0), vreg_bcast_s(bcast_reg_ofs + (i_ur % num_bcast_regs)));
+              }
               if((num_bcast_load + i_ur) < ur)
                 prev_bcast_ofs = bcast_load(i_reduce, num_bcast_load+i_ur, prev_bcast_ofs, bcast_reg_ofs + ((i_ur + num_bcast_load) % num_bcast_regs));
             }
@@ -939,8 +939,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
         jcp.expl_bcast = true;
 
         if (jcp.load_dim > 128 && jcp.load_dim < BIG_LOAD_DIM
-	    && spatial > SMALL_SPATIAL && spatial < BIG_SPATIAL
-	    && jcp.reduce_dim < 256) {
+            && spatial > SMALL_SPATIAL && spatial < BIG_SPATIAL
+            && jcp.reduce_dim < 256) {
             max_regs = 6;
             min_regs = 5;
         }
@@ -1055,7 +1055,7 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 jcp.loop_order = reduce_src ? loop_lbr : loop_rlb;
             else
                 jcp.loop_order = reduce_src ? loop_rbl : loop_rlb;
-	}
+        }
         load_blocking = jcp.load_dim;
 
         /* Number of weight elements to be loaded for dest */
