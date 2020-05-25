@@ -541,6 +541,13 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 }
             }
 
+            int num_bcast_load = 0;
+            for(int i_ur = 0; i_ur < ur; ++i_ur){
+              if( (bcast_reg_ofs + i_ur) >= 32) break;
+              prev_bcast_ofs = bcast_load(i_reduce, i_ur, prev_bcast_ofs, bcast_reg_ofs + (i_ur % num_bcast_regs));
+              num_bcast_load++;
+            }
+
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
 	      //if( i_ur < num_reg4bcast){
 	      //  CGA64::mov(vreg_bcast_s(), xa::WReg(reg_base_idx + i_ur));
@@ -577,6 +584,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 		prefetch_callback(ur, i_reduce, i_ur, i_load,
 				  last_block, wraparound, reduce_step);
 	      }
+	    }
 
             for (int i_ur = 0; i_ur < ur; ++i_ur) { // HW
 	            for (int i_load = 0; i_load < load_loop_blk; ++i_load) { // OC
