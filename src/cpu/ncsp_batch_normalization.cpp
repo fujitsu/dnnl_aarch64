@@ -308,7 +308,7 @@ void ncsp_batch_normalization_bwd_t<data_type>::execute_backward() const {
         int S_ithr = 0, S_nthr = 0, S_s = 0, S_e = 0;
         int C_blk_gl_s = 0, C_blk_gl_e = 0, C_blk_s = 0, C_blk_e = 0;
         if (do_blocking) {
-            size_t working_set_size = 2 * N * SP * sizeof(data_t);
+            size_t working_set_size = (size_t)sizeof(data_t) * 2 * N * SP;
             bnorm_utils::cache_balance(
                     working_set_size, C, C_blks_per_iter, iters);
         } else
@@ -339,23 +339,23 @@ void ncsp_batch_normalization_bwd_t<data_type>::execute_backward() const {
                 SP_N_ithr = N_ithr * S_nthr + S_ithr;
                 SP_N_nthr = N_nthr * S_nthr;
             }
-            size_t C_off = it * C_blks_per_iter;
+            size_t C_off = (size_t)it * C_blks_per_iter;
             // On the last iteration the access pattern to ws_reduce
             // might change (due to re-balance on C). Since sync is not always
             // possible (in case of TBB) use different parts of ws for each
             // iteration if threads are not synced by the algorithm.
-            size_t ws_iter_off = (mkldnn_thr_syncable() ? 0 : 1) * 2 * C_off;
+            size_t ws_iter_off = (size_t)C_off * (mkldnn_thr_syncable() ? 0 : 1) * 2;
 
             acc_data_t *diff_gamma_blk = diff_scaleshift + C_off;
             acc_data_t *diff_beta_blk = diff_scaleshift + C + C_off;
             for (int c = C_blk_s; c < C_blk_e; c++) {
-                size_t off = c + C_off;
+                size_t off = (size_t)C_off + c;
                 acc_data_t diff_gamma = 0.0, diff_beta = 0.0;
                 acc_data_t v_mean = mean[off];
                 for (int n = N_s; n < N_e; ++n) {
                     const acc_data_t *_diff_dst;
                     const acc_data_t *_src;
-                    size_t s_off = off * SP + n * C * SP;
+                    size_t s_off = (size_t)off * SP + n * C * SP;
                     if (data_type == data_type::bf16) {
                         // convert diff_dst from b16 to f32
                         acc_data_t *tmp_diff_dst = tmp_data_ + ithr * SP_cl_align;
@@ -373,9 +373,11 @@ void ncsp_batch_normalization_bwd_t<data_type>::execute_backward() const {
                         _diff_dst = reinterpret_cast<const acc_data_t *>(diff_dst + s_off);
                         _src = reinterpret_cast<const acc_data_t *>(src + s_off);
                     }
+#if !defined(__FUJITSU) and !defined(__CLANG_FUJITSU)
                     PRAGMA_OMP_SIMD(reduction(+ : diff_gamma, diff_beta))
+#endif
                     for (int sp = S_s; sp < S_e; ++sp) {
-                        const size_t d_off = s_off + sp;
+                        const size_t d_off = (size_t)s_off + sp;
                         acc_data_t dd;
                         if (fuse_bn_relu && !ws[d_off])
                             dd = 0;
@@ -412,7 +414,7 @@ void ncsp_batch_normalization_bwd_t<data_type>::execute_backward() const {
             if (SP_N_nthr > 1) mkldnn_thr_barrier();
 
             for (int c = C_blk_s; c < C_blk_e; c++) {
-                size_t off = c + C_off;
+                size_t off = (size_t)C_off + c;
                 acc_data_t gamma = use_scaleshift ? scaleshift[off] : 1;
                 acc_data_t sqrt_variance = static_cast<acc_data_t>(
                         1.0f / sqrtf(variance[off] + eps));
@@ -421,7 +423,7 @@ void ncsp_batch_normalization_bwd_t<data_type>::execute_backward() const {
                     acc_data_t *_diff_src;
                     const acc_data_t *_diff_dst;
                     const acc_data_t *_src;
-                    size_t s_off = off * SP + n * C * SP;
+                    size_t s_off = (size_t)off * SP + n * C * SP;
                     if (data_type == data_type::bf16) {
                         // store diff_src to f32 buffer
                         _diff_src = tmp_data_ + ithr * SP_cl_align;
@@ -449,7 +451,7 @@ void ncsp_batch_normalization_bwd_t<data_type>::execute_backward() const {
                     PRAGMA_OMP_SIMD()
 #endif
                     for (int sp = S_s; sp < S_e; ++sp) {
-                        const size_t d_off = s_off + sp;
+                        const size_t d_off = (size_t)s_off + sp;
                         acc_data_t v_diff_src;
                         if (fuse_bn_relu && !ws[d_off])
                             v_diff_src = 0;
