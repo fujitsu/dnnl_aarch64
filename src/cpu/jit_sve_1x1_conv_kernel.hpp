@@ -42,8 +42,7 @@
 
 using namespace mkldnn::impl::types;
 
-#define PRFWMAX    31
-#define PRFMMAX 32760
+#define PRFMMAX    31
 #define LDRMAX    255
 #define LDRWMAX   252
 #define ADDMAX   4095
