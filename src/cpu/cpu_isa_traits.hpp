@@ -65,10 +65,10 @@ typedef enum {
     avx512_mic,
     avx512_mic_4ops,
     avx512_core_bf16,
-#ifdef XBYAK_AARCH64_FOR_DNNL
+#ifdef __ARM_ARCH
     simd,
     sve,
-#endif
+#endif // #ifdef __ARM_ARCH
 } cpu_isa_t;
 
 template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
@@ -106,7 +106,7 @@ template <> struct cpu_isa_traits<avx512_mic_4ops>:
 template <> struct cpu_isa_traits<avx512_core_bf16>:
     public cpu_isa_traits<avx512_common> {};
 
-#ifdef XBYAK_AARCH64_FOR_DNNL
+#ifdef __ARM_ARCH
 template <>
 struct cpu_isa_traits<simd> {
     typedef Xbyak::Xbyak_aarch64::VReg4S Vmm;
@@ -122,7 +122,7 @@ template <> struct cpu_isa_traits<sve> {
 	static constexpr int vlen = 64;
 	static constexpr int n_vregs = 32;
 };
-#endif //#ifdef XBYAK_AARCH64_FOR_DNNL
+#endif // #ifdef __ARM_ARCH
 
 namespace {
 
@@ -167,14 +167,14 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa) {
         return true
             && mayiuse(avx512_core_vnni)
             && cpu.has(Cpu::tAVX512_BF16);
-#ifdef XBYAK_AARCH64_FOR_DNNL
+#ifdef __ARM_ARCH
     case simd: 
         return true
             && cpu.has(Cpu::tSIMD);
     case sve:
         return true
             && cpu.has(Cpu::tSVE);
-#endif //#ifdef XBYAK_AARCH64_FOR_DNNL
+#endif // #ifdef __ARM_ARCH
     case isa_any:
         return true;
     }

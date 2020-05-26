@@ -54,9 +54,7 @@ jit_avx512_core_f32_copy_an_kern::jit_avx512_core_f32_copy_an_kern() :
 
 #endif
 
-#ifndef XBYAK_TRANSLATOR_AARCH64
 inLocalLabel();
-#endif
 {
 
 Xbyak::Label l115c;
@@ -2348,9 +2346,7 @@ L(l28a4);
 
     postamble();
 }
-#ifndef XBYAK_TRANSLATOR_AARCH64
 outLocalLabel();
-#endif
 
 #undef M
 #undef N

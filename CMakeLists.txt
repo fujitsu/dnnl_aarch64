@@ -105,18 +105,23 @@ enable_testing()
 
 include_directories(include)
 
-
 if(DNNL_INDIRECT_JIT_AARCH64)
     append(CMAKE_C_FLAGS "-DDNNL_INDIRECT_JIT_AARCH64")
     append(CMAKE_CXX_FLAGS "-DDNNL_INDIRECT_JIT_AARCH64")
 
     append(CMAKE_C_FLAGS "-DXBYAK_TRANSLATE_AARCH64")
     append(CMAKE_CXX_FLAGS "-DXBYAK_TRANSLATE_AARCH64")
+endif()
 
+if(DNNL_INDIRECT_JIT_AARCH64 OR DNNL_NATIVE_JIT_AARCH64)
     append(CMAKE_C_FLAGS "-DXBYAK_AARCH64_FOR_DNNL")
     append(CMAKE_CXX_FLAGS "-DXBYAK_AARCH64_FOR_DNNL")
 endif()
 
+if(DNNL_NATIVE_JIT_AARCH64)
+    append(CMAKE_C_FLAGS "-DDNNL_NATIVE_JIT_AARCH64")
+    append(CMAKE_CXX_FLAGS "-DDNNL_NATIVE_JIT_AARCH64")
+endif()
 
 add_subdirectory(src)
 add_subdirectory(examples)
