@@ -337,7 +337,7 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     h->uni_vmovups(h->ptr[h->rsp + 2 * vlen], vmm_aux2);
     h->uni_vmovups(h->ptr[h->rsp + 3 * vlen], vmm_src);
     if (isa == avx512_common) {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
         h->Xbyak_aarch64::CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
         h->Xbyak_aarch64::CodeGeneratorAArch64::str(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
 #else
@@ -352,7 +352,7 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
     h->uni_vmovups(vmm_aux2, h->ptr[h->rsp + 2 * vlen]);
     h->uni_vmovups(vmm_src, h->ptr[h->rsp + 3 * vlen]);
     if (isa == avx512_common) {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
         h->Xbyak_aarch64::CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_mask.getIdx()), Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
         h->Xbyak_aarch64::CodeGeneratorAArch64::add(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
 #else
@@ -789,7 +789,7 @@ void jit_uni_eltwise_injector_f32<isa>::prepare_table(bool gen_table) {
         case eltwise_square: break;
         default: assert(!"unsupported eltwise algorithm");
     }
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 	h->binCommit();
 #endif
     }
@@ -1021,7 +1021,7 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
             for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
                 dw(_idx[i]);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 	    binCommit();
 #endif
         }
@@ -1205,7 +1205,7 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
             for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
                 dw(_idx[i]);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 	    binCommit();
 #endif
         }

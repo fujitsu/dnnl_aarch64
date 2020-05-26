@@ -434,7 +434,7 @@ void jit_avx2_kernel_sgemm_kern::generate() {
     postamble();
 }
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 jit_avx2_kernel_sgemm_kern::jit_avx2_kernel_sgemm_kern(bool beta_zero)
     : jit_generator(nullptr, 65536*1024) {
 #else

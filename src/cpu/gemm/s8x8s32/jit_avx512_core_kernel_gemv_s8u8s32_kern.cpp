@@ -259,7 +259,7 @@ T jit_avx512_core_gemv_s8u8s32_kern::generate(int use_vnni) {
 
     // setup register of ones when VNNI instructions not available
     if (!use_vnni) {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
       CodeGeneratorAArch64::adr(X_TMP_ADDR, one_label);
       CodeGeneratorAArch64::ldr(Xbyak::Xbyak_aarch64::ZReg(one.getIdx()), Xbyak::Xbyak_aarch64::ptr(X_TMP_ADDR));
 #else
@@ -401,7 +401,7 @@ T jit_avx512_core_gemv_s8u8s32_kern::generate(int use_vnni) {
         for (i = 0; i < size_vec_reg_/8; i++)
             dq(0x0001000100010001);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
         binCommit();
 #endif
     }
