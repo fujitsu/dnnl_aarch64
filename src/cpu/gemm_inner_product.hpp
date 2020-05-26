@@ -74,8 +74,8 @@ struct gemm_inner_product_fwd_t: public cpu_primitive_t {
         
         pp_kernel_ = new inner_product_utils::pp_kernel_t<data_type, data_type>(
                 apd);
-    } 
-    ~gemm_inner_product_fwd_t() { delete pp_kernel_;}
+    }
+    ~gemm_inner_product_fwd_t() { delete pp_kernel_; }
 
     typedef typename prec_traits<data_type>::type data_t;
 

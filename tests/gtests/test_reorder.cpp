@@ -163,6 +163,8 @@ INSTANTIATE_TEST_SUITE_P(TestReorder, reorder_padded_test_data_f32_f32,
             cfg_f32{eng::cpu, fmt::nhwc, fmt::nChw8c, {3, 28, 3, 4}},
             cfg_f32{eng::cpu, fmt::nChw8c, fmt::nhwc, {3, 28, 3, 4}},
 
+            cfg_f32{eng::cpu, fmt::nchw, fmt::nChw16c, {2, 28, 3, 4}},
+            cfg_f32{eng::cpu, fmt::nChw16c, fmt::nchw, {2, 28, 3, 4}},
             cfg_f32{eng::cpu, fmt::nchw, fmt::nChw16c, {32, 3, 224, 224}},
             cfg_f32{eng::cpu, fmt::nChw16c, fmt::nchw, {32, 3, 224, 224}},
             cfg_f32{eng::cpu, fmt::nchw, fmt::nChw16c, {32, 64, 56, 56}},
