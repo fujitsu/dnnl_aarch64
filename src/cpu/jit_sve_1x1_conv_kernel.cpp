@@ -233,11 +233,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       ofs = jcp.typesize_in * ofs;
       int tmp_ofs = ofs;
       if( (ofs <= PRFMMAX) && (ofs >= 0)){
-        CGA64::prfm(xa::PSTL1KEEP, xa::ptr(aux_reg_bcast_data, static_cast<int32_t>(ofs)));
+        CGA64::prfm(xa::PLDL1KEEP, xa::ptr(aux_reg_bcast_data, static_cast<int32_t>(ofs)));
       }else{
         if((prev_ofs != -1) && ((ofs - prev_ofs)>=0)
             &&((ofs - prev_ofs) <= PRFMMAX) ){
-          CGA64::prfm(xa::PSTL1KEEP, xa::ptr(reg_prev_bcast_addr, static_cast<int32_t>(ofs-prev_ofs)));
+          CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_prev_bcast_addr, static_cast<int32_t>(ofs-prev_ofs)));
         }else{
           if((prev_ofs != -1) && ((ofs - prev_ofs)>=0)){
             ofs = ofs - prev_ofs;
@@ -247,7 +247,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
           }
           prev_ofs = tmp_ofs;
 
-          CGA64::prfm(xa::PSTL1KEEP, xa::ptr(reg_prev_bcast_addr));
+          CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_prev_bcast_addr));
         }
       }
       return prev_ofs;
