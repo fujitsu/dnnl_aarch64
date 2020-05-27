@@ -74,15 +74,8 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
         compute_vregs_per_iter_++;
     }
 
-    if (!mayiuse(avx512_core)) {
-        // use fallback code for older CPUs since they do not have optimized
-        // x8s8s32 GEMM anyways. The configuration variables above are used by
-        // the fallback code.
-        if (do_eltwise_)
-            ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
-                    eltwise_.alg, eltwise_.alpha, eltwise_.beta);
-        return;
-    } else {
+#ifdef __ARM_ARCH
+    if ( mayiuse(avx512_core) && !mayiuse(sve)) {
         isa_ = mayiuse(avx512_core_bf16) ? avx512_core_bf16 : avx512_core;
         if (dst_type == data_type::bf16 && isa_ != avx512_core_bf16) {
             idx_compute_vreg_max_ = 27;
@@ -102,6 +95,16 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
                     this, eltwise_, true, eltwise_reserved_1_,
                     eltwise_reserved_2_);
         generate();
+    } else 
+#endif //#ifdef __ARM_ARCH
+    {
+        // use fallback code for older CPUs since they do not have optimized
+        // x8s8s32 GEMM anyways. The configuration variables above are used by
+        // the fallback code.
+        if (do_eltwise_)
+            ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
+                    eltwise_.alg, eltwise_.alpha, eltwise_.beta);
+        return;
     }
 }
 
