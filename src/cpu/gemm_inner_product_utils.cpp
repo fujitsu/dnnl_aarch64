@@ -74,8 +74,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
         compute_vregs_per_iter_++;
     }
 
-    //if (!mayiuse(avx512_core)) {
-    if (1) {
+    if (!mayiuse(avx512_core)) {
         // use fallback code for older CPUs since they do not have optimized
         // x8s8s32 GEMM anyways. The configuration variables above are used by
         // the fallback code.

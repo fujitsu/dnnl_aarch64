@@ -253,8 +253,9 @@ struct rtus_driver_t: public jit_generator {
         using namespace Xbyak;
         assert(isa == avx2 || isa == avx512_common
                 || isa == avx512_core || isa == avx512_mic);
-
+#ifdef __ARM_ARCH
         preamble();
+#endif // #ifdef __ARM_ARCH
 
 #if defined(_WIN32)
         assert(reg_src == abi_not_param1 && abi_not_param1 == rdi);
@@ -311,8 +312,11 @@ struct rtus_driver_t: public jit_generator {
 #endif
 
         uni_vzeroupper();
-        //ret();
+#ifdef __ARM_ARCH
         postamble();
+#else // #ifdef __ARM_ARCH
+        ret();
+#endif // #ifdef __ARM_ARCH
         this->ker_ = reinterpret_cast<decltype(ker_)>(const_cast<uint8_t*>(
                     this->getCode()));
     }

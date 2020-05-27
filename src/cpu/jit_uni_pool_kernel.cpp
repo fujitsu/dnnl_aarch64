@@ -562,7 +562,7 @@ void jit_uni_pool_kernel<isa>::maybe_zero_diff_src() {
         mov(zero_size, ptr[reg_param + GET_OFF(oh)]);
         mov(tmp_gpr, jpp.ih * jpp.iw * jpp.c_block * jpp.dt_size);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 	CodeGeneratorAArch64::mul(Xbyak_aarch64::XReg(zero_size.getIdx()), Xbyak_aarch64::XReg(zero_size.getIdx()), Xbyak_aarch64::XReg(tmp_gpr.getIdx()));
 #else
         imul(zero_size, tmp_gpr);
@@ -657,7 +657,7 @@ void jit_uni_pool_kernel<isa>::generate() {
         if (isa == avx) {
             mov(reg_shuf_mask, 0x0c080400);
         } else if (isa >= avx512_common) {
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 	  CodeGeneratorAArch64::mov(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), uint64_t(0x000000000000ffff));
 	  CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
 	  CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
@@ -787,7 +787,7 @@ void jit_uni_pool_kernel<isa>::generate() {
         for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
             dw(_idx[i]);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 	binCommit();
 #endif
     }

@@ -2047,7 +2047,7 @@ void jit_avx512_core_bf16_conv_bwd_weights_kernel_f32::generate()
     for (size_t i = 0; i < 32; ++i)
         dw(dst_prm_array[i]);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     binCommit();
 #endif
 #endif

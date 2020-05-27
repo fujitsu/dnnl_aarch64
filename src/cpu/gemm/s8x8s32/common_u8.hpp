@@ -19,7 +19,7 @@
 
 #include "jit_generator.hpp"
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 #define U8_COPY_KERNEL_CODE_SIZE          (4096L * 4 * 16)
 #else
 #define U8_COPY_KERNEL_CODE_SIZE          (4096L * 4)

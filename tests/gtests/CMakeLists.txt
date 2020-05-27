@@ -46,22 +46,13 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak/translator/third_party/xbyak_aarch64/xbyak_aarch64
                     )
 
-if(XBYAK_TRANSLATE_AARCH64)
-    if(XBYAK_XED_LIB_ARCH_IS_AARCH64)
-        find_library(XED
-            NAMES "xed"
-            HINTS ../../third_party/build_xed_aarch64/kits/xed/lib)
-        include_directories(
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/build_xed_aarch64/kits/xed/include
-            )
-        else()
-        find_library(XED
-            NAMES "xed"
-            HINTS ../../third_party/build_xed_x86_64/kits/xed/lib)
-        include_directories(
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/build_xed_x86_64/kits/xed/include
-            )
-    endif()
+if(DNNL_INDIRECT_JIT_AARCH64)
+    find_library(XED
+        NAMES "xed"
+        HINTS ../../third_party/build_xed_aarch64/kits/xed/lib)
+    include_directories(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/build_xed_aarch64/kits/xed/include
+    )
 
     if(NOT XED)
         message(FATAL_ERROR, "libxed not found!")
@@ -113,8 +104,8 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_convolution_backward_weights_s16s16s32.cpp
                               test_deconvolution.cpp
                               test_gemm_f32.cpp
-                              test_gemm_s8u8s32.cpp
-                              test_gemm_s8s8s32.cpp
+                              # test_gemm_s8u8s32.cpp
+                              # test_gemm_s8s8s32.cpp
                               # test_gemm_bf16bf16f32.cpp
                               test_rnn_forward.cpp
                               )

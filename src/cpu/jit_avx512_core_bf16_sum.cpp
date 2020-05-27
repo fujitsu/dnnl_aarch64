@@ -216,7 +216,7 @@ void jit_avx512_core_bf16_sum_kernel::generate()
     for (size_t i = 0; i < sizeof(_idx) / sizeof(_idx[0]); ++i)
         dw(_idx[i]);
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
     binCommit();
 #endif
 }

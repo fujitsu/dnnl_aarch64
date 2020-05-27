@@ -19,7 +19,7 @@
 
 #include "jit_generator.hpp"
 
-#ifdef XBYAK_TRANSLATE_AARCH64
+#ifdef DNNL_INDIRECT_JIT_AARCH64
 #define F32_COPY_KERNEL_CODE_SIZE          (4096L * 10 * 100)
 #else
 #define F32_COPY_KERNEL_CODE_SIZE          (4096L * 5 * 10)
