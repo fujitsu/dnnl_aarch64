@@ -71,7 +71,6 @@ struct gemm_inner_product_fwd_t: public cpu_primitive_t {
              has_eltwise = pd()->attr()->post_ops_.len_ == 1,
              has_scale = !pd()->attr()->output_scales_.has_default_values();
         postops_in_ip_ = has_bias || has_eltwise || has_scale;
-        
         pp_kernel_ = new inner_product_utils::pp_kernel_t<data_type, data_type>(
                 apd);
     }
