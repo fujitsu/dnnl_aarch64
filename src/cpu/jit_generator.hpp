@@ -993,7 +993,6 @@ public:
             counter++;
 
             FILE *fp = mkldnn_fopen(fname, "w+");
-	          std::cout << "dump size=" << getSize() << std::endl;
             // Failure to dump code is not fatal
             if (fp) {
 #ifdef DNNL_INDIRECT_JIT_AARCH64
@@ -1019,7 +1018,6 @@ public:
 
             FILE *fp = mkldnn_fopen(fname, "w+");
 
-	    std::cout << "dump size=" << getSize() << std::endl;
 	    // Failure to dump code is not fatal
             if (fp) {
                 size_t unused = fwrite(code, getSize()*4, 1, fp);
