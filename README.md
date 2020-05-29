@@ -53,11 +53,10 @@ Currently, DNNL_aarch64 is intended to run on CPUs of ARMv8-A with SVE. If you r
 git clone https://github.com/fujitsu/dnnl_aarch64.git
 ```
 
-2. Switch branch to **fjdev** from master and **update submodule**
+2. Update submodule
 
 ```
 cd dnnl_aarch64/
-git checkout -b fjdev origin/fjdev
 git submodule update --init --recursive
 ```
 
