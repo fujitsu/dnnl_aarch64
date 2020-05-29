@@ -95,14 +95,14 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
 
   private:
     using reg64_t = const xa::XReg;
-    const xa::PReg reg_p_all_ones  = p1;
+    const xa::PReg reg_p_all_ones  = p2;
 
     /* Flags and loop variables */
     reg64_t reg_reduce_pos_flag     = x1;
     reg64_t reduce_loop_iter        = x2;
     reg64_t bcast_loop_iter         = x3;
-    reg64_t reg_relu_ns             = x4;  // For forward
-    reg64_t reg_output_stride       = x4;  // For backward
+    reg64_t reg_relu_ns             = x20;  // For forward
+    reg64_t reg_output_stride       = x20;  // For backward
 
     /* Pointer */
     reg64_t reg_bcast_data          = x5;  // Input

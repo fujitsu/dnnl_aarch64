@@ -64,7 +64,7 @@ struct _jit_sve_conv_fwd_kernel : public jit_generator {
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
     {
         if (jcp.with_eltwise)
-            eltwise_injector_ = new jit_uni_eltwise_injector_f32<sve>(
+            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
                     this, jcp.eltwise);
 
         generate();
@@ -88,14 +88,14 @@ private:
         ker_reg_base_idx = 28,
     };
 
-    const xa::PReg reg_p_all_ones  = p1;
+    const xa::PReg reg_p_all_ones  = p2;
 
     reg64_t param               = abi_param1_aarch64;
     reg64_t reg_inp             = x1;  
     reg64_t reg_ker             = x2;  
     reg64_t reg_out             = x3;  
 
-    reg64_t reg_inp_prf         = x4;  
+    reg64_t reg_inp_prf         = x18;  
     reg64_t reg_ker_prf         = x5;  
     reg64_t reg_owb             = x5;  
     reg64_t reg_out_prf         = x6;  
@@ -127,11 +127,11 @@ private:
 
     reg64_t aux_reg_ic          = x5;  
     reg64_t reg_binp            = x13; 
-    reg64_t reg_bout            = x4;  
+    reg64_t reg_bout            = x18;  
     reg64_t aux1_reg_inp        = x11; 
     reg64_t aux_reg_out         = x12; 
 
-    reg64_t reg_long_offt       = x4;  
+    reg64_t reg_long_offt       = x18;  
     reg64_t reg_out_long_offt   = x7;  
 
     reg64_t imm_addr64          = x8; 
@@ -158,7 +158,7 @@ private:
         }
     }
 
-    jit_uni_eltwise_injector_f32<sve> *eltwise_injector_;
+    jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);

@@ -213,10 +213,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
 
     CGA64::L_aarch64(eltwise_label);
     if (jcp.with_eltwise) {
-        assert(!jcp.with_eltwise);
-#if 0
-        cmp(reg_channel, jcp.nb_ic - 1);
-        b(LT, store_label);
+        CGA64::cmp(reg_channel, jcp.nb_ic - 1);
+        CGA64::b(xa::LT, store_label);
 
         {
             if (ur_w == jcp.ur_w) {
@@ -228,7 +226,6 @@ void _jit_sve_conv_fwd_kernel<Vmm>::store_output(int ur_w)
                             k * jcp.ur_w + ur_w);
             }
         }
-#endif
     }
 
     auto out_str = [=](int j, int k, int aux_output_offset){
@@ -737,10 +734,8 @@ void _jit_sve_conv_fwd_kernel<Vmm>::generate()
     }
     postamble();
 
-#if 0
     if (jcp.with_eltwise)
         eltwise_injector_->prepare_table();
-#endif
 }
 
 bool jit_sve_conv_fwd_kernel::post_ops_ok(
@@ -861,7 +856,7 @@ status_t jit_sve_conv_fwd_kernel::init_conf(
     const int eltwise_ind = p.find(primitive_kind::eltwise);
     jcp.with_eltwise = eltwise_ind != -1;
     if (jcp.with_eltwise) {
-#if 1
+#if 0
         return status::unimplemented;
 #else
         jcp.eltwise = p.entry_[eltwise_ind].eltwise;
