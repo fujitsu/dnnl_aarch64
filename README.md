@@ -66,7 +66,7 @@ git submodule update --init --recursive
 ```
 mkdir third_party/build_xed_aarch64
 pushd third_party/build_xed_aarch64/
-../xbyak/translator/third_party/xed/mfile.py --shared examples install
+../xbyak_translator_aarch64/translator/third_party/xed/mfile.py --shared examples install
 cd kits/
 ln -sf xed-install-base-* xed
 popd
