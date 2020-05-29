@@ -51,10 +51,12 @@
 /* TODO: _SX should also define USE_CBLAS in case the later is available */
 extern "C" {
 #include "cblas.h" // CHECK: does SX also have a fortran API sgemm?
+#undef MB
 }
 
 #elif defined(USE_CBLAS)
 #include "cblas.h" // Maybe a system/cmake cblas works for you?
+#undef MB
 #else
 /* put the stubs to make a code compilable but not workable */
 #define cblas_sgemm(...) assert(!"CBLAS is unavailable")
