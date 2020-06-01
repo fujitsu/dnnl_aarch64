@@ -72,7 +72,7 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
         load_table_addr();
 
-#ifdef DNNL_NATIVE_JIT_AARCH64_
+#ifdef DNNL_NATIVE_JIT_AARCH64
 	h->CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
 	h->CodeGeneratorAArch64::str(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
 	h->CodeGeneratorAArch64::ptrue(p.s, Xbyak::Xbyak_aarch64::ALL);
@@ -133,12 +133,12 @@ void jit_uni_eltwise_injector_f32<isa>::injector_postamble() {
     if (preserved_vecs_count)
         h->add(h->rsp, preserved_vecs_count * vlen);
 
-    h->pop(p_table);
-
-#ifdef DNNL_NATIVE_JIT_AARCH64_
+#ifdef DNNL_NATIVE_JIT_AARCH64
     h->CodeGeneratorAArch64::ldr(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
     h->CodeGeneratorAArch64::add(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
 #endif
+
+    h->pop(p_table);
 }
 
 
