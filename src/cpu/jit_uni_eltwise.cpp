@@ -72,7 +72,7 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
         load_table_addr();
 
-#ifdef DNNL_NATIVE_JIT_AARCH64
+#ifdef DNNL_NATIVE_JIT_AARCH64_
 	h->CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
 	h->CodeGeneratorAArch64::str(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
 	h->CodeGeneratorAArch64::ptrue(p.s, Xbyak::Xbyak_aarch64::ALL);
@@ -81,7 +81,9 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
     assign_regs();
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-    this->assign_reg_values();
+    if(alg_ == alg_kind::eltwise_exp) {
+        this->assign_reg_values();
+    }
 #endif
 }
 
@@ -133,7 +135,7 @@ void jit_uni_eltwise_injector_f32<isa>::injector_postamble() {
 
     h->pop(p_table);
 
-#ifdef DNNL_NATIVE_JIT_AARCH64
+#ifdef DNNL_NATIVE_JIT_AARCH64_
     h->CodeGeneratorAArch64::ldr(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
     h->CodeGeneratorAArch64::add(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
 #endif
@@ -177,13 +179,17 @@ void jit_uni_eltwise_injector_f32<avx512_common>::assign_reg_values() {
     using namespace Xbyak::Xbyak_aarch64;
     Xbyak::Xbyak_aarch64::XReg tblPtr{static_cast<uint32_t>(p_table.getIdx())};
 
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, AdrScImm(tblPtr, 0));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, AdrScImm(tblPtr, 1));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, AdrScImm(tblPtr, 2));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, AdrScImm(tblPtr, 3));
+    //    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, AdrScImm(tblPtr, 0));
+    //    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, AdrScImm(tblPtr, 4));
+    //    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, AdrScImm(tblPtr, 8));
+    //    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, AdrScImm(tblPtr, 12));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, ptr(tblPtr, 0));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, ptr(tblPtr, 4));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, ptr(tblPtr, 8));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, ptr(tblPtr, 12));
 
-    for (size_t i = 0; i < expN; i++) {
-        h->CodeGeneratorAArch64::ld1rw(ZRegS(expCoeff[i].getIdx()), p/T_z, AdrScImm(tblPtr, 2+i));
+    for (int i = 0; i < static_cast<int>(expN); i++) {
+        h->CodeGeneratorAArch64::ld1rw(ZRegS(expCoeff[i].getIdx()), p/T_z, ptr(tblPtr, 16+4*i));
     }
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
