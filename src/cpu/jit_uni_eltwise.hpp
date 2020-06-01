@@ -35,12 +35,23 @@ struct jit_uni_eltwise_injector_f32 {
     using Vmm = typename utils::conditional3<isa == sse42, Xbyak::Xmm,
             isa == avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
 
+
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    jit_uni_eltwise_injector_f32(jit_generator *host, alg_kind_t alg,
+            float alpha, float beta, bool save_state = true,
+            Xbyak::Reg64 p_table = Xbyak::util::rax,
+            Xbyak::Opmask k_mask = Xbyak::Opmask(1),
+            Xbyak::Xbyak_aarch64::PReg p = Xbyak::Xbyak_aarch64::PReg(0))
+        : alg_(alg), alpha_(alpha), beta_(beta), h(host)
+        , save_state_(save_state), p_table(p_table), k_mask(k_mask), p(p)
+#else //#ifdef DNNL_INDIRECT_JIT_AARCH64
     jit_uni_eltwise_injector_f32(jit_generator *host, alg_kind_t alg,
             float alpha, float beta, bool save_state = true,
             Xbyak::Reg64 p_table = Xbyak::util::rax,
             Xbyak::Opmask k_mask = Xbyak::Opmask(1))
         : alg_(alg), alpha_(alpha), beta_(beta), h(host)
         , save_state_(save_state), p_table(p_table), k_mask(k_mask)
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
     {
         using namespace alg_kind;
         assert(utils::one_of(isa, sse42, avx2, avx512_common));
@@ -85,8 +96,11 @@ private:
 
     size_t vlen = cpu_isa_traits<isa>::vlen;
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    const static size_t preserved_vecs_max = 11;
+#else
     const static size_t preserved_vecs_max = 5;
-
+#endif
     size_t vecs_to_preserve = 0;
     size_t vecs_count = isa == avx512_common ? 32 : 16;
     size_t preserved_vecs_count = 0;
@@ -94,7 +108,11 @@ private:
     size_t start_idx_tail = 0;
 
     Vmm vmm_mask, vmm_aux0, vmm_aux1, vmm_aux2, vmm_aux3, vmm_aux4;
-
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    const static size_t expN = 5;
+    Vmm log2, log2_e, expMin, expMax, expCoeff[5];
+    const Xbyak::Xbyak_aarch64::PReg p;
+#endif  
     Xbyak::Address table_val(int index)
     { return h->ptr[p_table + index * vlen]; }
 
@@ -105,7 +123,9 @@ private:
     void injector_preamble_tail(size_t start_idx);
     void injector_postamble();
     void assign_regs();
-
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    void assign_reg_values();
+#endif
     void exp_compute_vector(const Vmm &vmm_src);
     void relu_compute_vector(const Vmm &vmm_src);
     void relu_zero_ns_compute_vector(const Vmm &vmm_src);
@@ -120,6 +140,9 @@ private:
     void logistic_compute_vector(const Vmm &vmm_src);
     void gelu_compute_vector(const Vmm &vmm_src);
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    void exp_prepare_table();
+#endif
     void relu_prepare_table();
     void elu_prepare_table();
     void soft_relu_prepare_table();
