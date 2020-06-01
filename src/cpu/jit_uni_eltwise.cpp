@@ -81,8 +81,17 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
     assign_regs();
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-    if(alg_ == alg_kind::eltwise_exp) {
+    switch(alg_) {
+    case alg_kind::eltwise_exp:
+    case alg_kind::eltwise_elu:
+    case alg_kind::eltwise_tanh:
+    case alg_kind::eltwise_logistic:
+        // elu, tanh and logistic uses JIT-ed code of exp
         this->assign_reg_values();
+	break;
+    default:
+	// Do noghitng
+        break;
     }
 #endif
 }
@@ -154,6 +163,8 @@ void jit_uni_eltwise_injector_f32<isa>::assign_regs() {
 #ifdef DNNL_INDIRECT_JIT_AARCH64
 template <>
 void jit_uni_eltwise_injector_f32<avx512_common>::assign_regs() {
+    /* exp is used in elu, tanh, logistic so that
+       vmm_aux(0-4) are assigned not to conflict others. */
     vmm_mask = Vmm(preserved_vec_idxs[0]);
     vmm_aux0 = Vmm(preserved_vec_idxs[0]);
     vmm_aux1 = Vmm(preserved_vec_idxs[1]);
@@ -161,11 +172,13 @@ void jit_uni_eltwise_injector_f32<avx512_common>::assign_regs() {
     vmm_aux3 = Vmm(preserved_vec_idxs[3]);
     vmm_aux4 = Vmm(preserved_vec_idxs[4]);
 
-    log2 = Vmm(preserved_vec_idxs[2]);
-    log2_e = Vmm(preserved_vec_idxs[3]);
+    log2 = Vmm(preserved_vec_idxs[5]);
+    log2_e = Vmm(preserved_vec_idxs[6]);
+    expMin = Vmm(preserved_vec_idxs[7]);
+    expMax = Vmm(preserved_vec_idxs[8]);
     
     for (size_t i = 0; i < expN; i++) {
-      expCoeff[i] = Vmm(preserved_vec_idxs[3+i]);
+      expCoeff[i] = Vmm(preserved_vec_idxs[9+i]);
     }
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
@@ -178,18 +191,20 @@ template <>
 void jit_uni_eltwise_injector_f32<avx512_common>::assign_reg_values() {
     using namespace Xbyak::Xbyak_aarch64;
     Xbyak::Xbyak_aarch64::XReg tblPtr{static_cast<uint32_t>(p_table.getIdx())};
-
-    //    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, AdrScImm(tblPtr, 0));
-    //    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, AdrScImm(tblPtr, 4));
-    //    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, AdrScImm(tblPtr, 8));
-    //    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, AdrScImm(tblPtr, 12));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, ptr(tblPtr, 0));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, ptr(tblPtr, 4));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, ptr(tblPtr, 8));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, ptr(tblPtr, 12));
+    int eluOffset = 25 * vlen / sizeof(float) * 4 /* h->dd(cvals[i]) */
+      + vlen / sizeof(float) * 4 /* h->dd(float2int(alpha_) */
+      + vlen / sizeof(float) * 4 /* h->dd(0) */;
+    assert(eluOffset % 4 == 0);
+    assert(eluOffset < (uint32_t(1) << 11));
+    
+    h->CodeGeneratorAArch64::add(h->X_TMP_ADDR, tblPtr, eluOffset);
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 0));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 4));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 8));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 12));
 
     for (int i = 0; i < static_cast<int>(expN); i++) {
-        h->CodeGeneratorAArch64::ld1rw(ZRegS(expCoeff[i].getIdx()), p/T_z, ptr(tblPtr, 16+4*i));
+        h->CodeGeneratorAArch64::ld1rw(ZRegS(expCoeff[i].getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 16 + 4*i));
     }
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
@@ -699,7 +714,7 @@ void jit_uni_eltwise_injector_f32<isa>::relu_prepare_table() {
 
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::exp_prepare_table() {
-  this->elu_prepare_table();
+  // Do nothing
 }
 
 #ifdef DNNL_NATIVE_JIT_AARCH64
@@ -717,9 +732,7 @@ void jit_uni_eltwise_injector_f32<avx512_common>::exp_prepare_table() {
             0x3c091331,
     };
 
-    for (size_t i = 0; i < sizeof(cvals) / sizeof(cvals[0]); ++i) {
-        for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(cvals[i]);
-    }
+    for (size_t i = 0; i < sizeof(cvals) / sizeof(float); ++i) h->dd(cvals[i]);
 }
 #endif
 
@@ -832,18 +845,22 @@ template <cpu_isa_t isa>
 int jit_uni_eltwise_injector_f32<isa>::aux_vecs_count(alg_kind_t alg_) {
     switch (alg_) {
     case alg_kind::eltwise_relu: return (alpha_ == 0.f) ? 0 : 2;
-    case alg_kind::eltwise_elu: return 4;
-    case alg_kind::eltwise_tanh: return 5;
     case alg_kind::eltwise_square: return 0;
     case alg_kind::eltwise_abs: return 0;
     case alg_kind::eltwise_sqrt: return 2;
     case alg_kind::eltwise_linear: return 1;
     case alg_kind::eltwise_bounded_relu: return 0;
     case alg_kind::eltwise_soft_relu: return 4;
-    case alg_kind::eltwise_logistic: return 4;
 #ifdef DNNL_NATIVE_JIT_AARCH64
-    case alg_kind::eltwise_exp: return 11;
+    // elu, tanh and logistic uses JIT-ed code of exp
+    case alg_kind::eltwise_elu: return 14;
+    case alg_kind::eltwise_tanh: return 14;
+    case alg_kind::eltwise_logistic: return 14;
+    case alg_kind::eltwise_exp: return 14;
 #else
+    case alg_kind::eltwise_elu: return 4;
+    case alg_kind::eltwise_tanh: return 5;
+    case alg_kind::eltwise_logistic: return 4;
     case alg_kind::eltwise_exp: return 3;
 #endif
     case alg_kind::eltwise_gelu: return 5;
@@ -905,11 +922,10 @@ void jit_uni_eltwise_injector_f32<isa>::prepare_table(bool gen_table) {
         case eltwise_tanh:
         case eltwise_logistic:
         case eltwise_exp:
-#ifdef DNNL_NATIVE_JIT_AARCH64
-	  this->exp_prepare_table(); break;
-#endif
         case eltwise_gelu:
-            elu_prepare_table(); break;
+            elu_prepare_table();
+	    this->exp_prepare_table();
+	    break;
         case eltwise_soft_relu: soft_relu_prepare_table(); break;
         case eltwise_abs: abs_prepare_table(); break;
         case eltwise_sqrt: sqrt_prepare_table(); break;

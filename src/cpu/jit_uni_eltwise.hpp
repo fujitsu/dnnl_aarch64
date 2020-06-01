@@ -97,7 +97,7 @@ private:
     size_t vlen = cpu_isa_traits<isa>::vlen;
 
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-    const static size_t preserved_vecs_max = 11;
+    const static size_t preserved_vecs_max = 14;
 #else
     const static size_t preserved_vecs_max = 5;
 #endif
