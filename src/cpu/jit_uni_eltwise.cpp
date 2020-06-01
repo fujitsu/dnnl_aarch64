@@ -60,6 +60,12 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
     assert(preserved_vecs_count == vecs_to_preserve);
 
+#ifdef DNNL_NATIVE_JIT_AARCH64
+    h->CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
+    h->CodeGeneratorAArch64::str(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
+    h->CodeGeneratorAArch64::ptrue(p.s, Xbyak::Xbyak_aarch64::ALL);
+#endif
+
     if (save_state_) {
         h->push(p_table);
 
@@ -72,11 +78,6 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
         load_table_addr();
 
-#ifdef DNNL_NATIVE_JIT_AARCH64
-	h->CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
-	h->CodeGeneratorAArch64::str(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
-	h->CodeGeneratorAArch64::ptrue(p.s, Xbyak::Xbyak_aarch64::ALL);
-#endif
     }
 
     assign_regs();
@@ -133,6 +134,11 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble_tail(size_t start_idx)
 
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::injector_postamble() {
+#ifdef DNNL_NATIVE_JIT_AARCH64
+    h->CodeGeneratorAArch64::ldr(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
+    h->CodeGeneratorAArch64::add(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
+#endif
+
     if (!save_state_) return;
 
     for (size_t i = 0; i < preserved_vecs_count; ++i)
@@ -142,10 +148,6 @@ void jit_uni_eltwise_injector_f32<isa>::injector_postamble() {
     if (preserved_vecs_count)
         h->add(h->rsp, preserved_vecs_count * vlen);
 
-#ifdef DNNL_NATIVE_JIT_AARCH64
-    h->CodeGeneratorAArch64::ldr(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
-    h->CodeGeneratorAArch64::add(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
-#endif
 
     h->pop(p_table);
 }
@@ -191,20 +193,21 @@ template <>
 void jit_uni_eltwise_injector_f32<avx512_common>::assign_reg_values() {
     using namespace Xbyak::Xbyak_aarch64;
     Xbyak::Xbyak_aarch64::XReg tblPtr{static_cast<uint32_t>(p_table.getIdx())};
+    Xbyak::Xbyak_aarch64::XReg addrReg{28};
     int eluOffset = 25 * vlen / sizeof(float) * 4 /* h->dd(cvals[i]) */
       + vlen / sizeof(float) * 4 /* h->dd(float2int(alpha_) */
       + vlen / sizeof(float) * 4 /* h->dd(0) */;
     assert(eluOffset % 4 == 0);
     assert(eluOffset < (uint32_t(1) << 11));
     
-    h->CodeGeneratorAArch64::add(h->X_TMP_ADDR, tblPtr, eluOffset);
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 0));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 4));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 8));
-    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 12));
+    h->CodeGeneratorAArch64::add(addrReg, tblPtr, eluOffset);
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, ptr(addrReg, 0));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, ptr(addrReg, 4));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, ptr(addrReg, 8));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, ptr(addrReg, 12));
 
     for (int i = 0; i < static_cast<int>(expN); i++) {
-        h->CodeGeneratorAArch64::ld1rw(ZRegS(expCoeff[i].getIdx()), p/T_z, ptr(h->X_TMP_ADDR, 16 + 4*i));
+        h->CodeGeneratorAArch64::ld1rw(ZRegS(expCoeff[i].getIdx()), p/T_z, ptr(addrReg, 16 + 4*i));
     }
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
@@ -276,8 +279,9 @@ void jit_uni_eltwise_injector_f32<avx512_common>::exp_compute_vector(const Vmm &
     ZRegS tmpLog2(log2.getIdx());
     ZRegS tmpLog2_e(log2_e.getIdx());
     ZRegS src(vmm_src.getIdx());
-    ZRegS aux0(vmm_aux0.getIdx());
+    // Intel's exp used aux1 and aux2 as temporal registers.
     ZRegS aux1(vmm_aux1.getIdx());
+    ZRegS aux2(vmm_aux2.getIdx());
     ZRegS coeff[5] = { ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0} } ;
 
     for (size_t i = 0; i < expN; i++) {
@@ -287,17 +291,17 @@ void jit_uni_eltwise_injector_f32<avx512_common>::exp_compute_vector(const Vmm &
     h->CodeGeneratorAArch64::fmin(src, p/T_m, max);
     h->CodeGeneratorAArch64::fmax(src, p/T_m, min);
     h->CodeGeneratorAArch64::fmul(src, src, tmpLog2_e);
-    h->CodeGeneratorAArch64::frintn(aux1, p/T_m, src); // rounding : float -> float
-    h->CodeGeneratorAArch64::fcvtzs(aux0, p/T_m, aux1); // float -> int
-    h->CodeGeneratorAArch64::fsub(aux1, src, aux1);
-    h->CodeGeneratorAArch64::fmul(aux1, aux1, tmpLog2);
+    h->CodeGeneratorAArch64::frintn(aux2, p/T_m, src); // rounding : float -> float
+    h->CodeGeneratorAArch64::fcvtzs(aux1, p/T_m, aux2); // float -> int
+    h->CodeGeneratorAArch64::fsub(aux2, src, aux2);
+    h->CodeGeneratorAArch64::fmul(aux2, aux2, tmpLog2);
     h->CodeGeneratorAArch64::movprfx(src, p, coeff[4]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux1, coeff[3]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux1, coeff[2]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux1, coeff[1]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux1, coeff[0]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux1, coeff[0]);
-    h->CodeGeneratorAArch64::fscale(src, p, aux0); // src *= 2^aux0
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[3]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[2]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[1]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
+    h->CodeGeneratorAArch64::fscale(src, p, aux1); // src *= 2^aux0
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
@@ -333,11 +337,16 @@ void jit_uni_eltwise_injector_f32<isa>::relu_zero_ns_compute_vector(
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::elu_compute_vector(const Vmm &vmm_src) {
     const int alpha_off = 25, zero_off = 26;
-
+    Xbyak::Xbyak_aarch64::LabelAArch64 l0;
+    
     // compute exponent
     h->uni_vmovups(vmm_aux3, vmm_src);
     exp_compute_vector(vmm_src);
 
+    h->L_aarch64(l0);
+    h->nop();
+    h->b(l0);
+    
     // alpha * (exp(x) - 1)
     h->uni_vsubps(vmm_src, vmm_src, table_val(0));
     h->uni_vmulps(vmm_src, vmm_src, table_val(alpha_off));
