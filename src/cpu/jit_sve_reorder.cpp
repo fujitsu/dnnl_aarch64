@@ -609,9 +609,6 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                     sqxtn(xmm.b8, xmm.h8); // signed 16-bit -> signed 8-bit
                 }
                 if (idt == u8) { // u8 -> s8
-                    /* sqadd = ssigned saturating add
-                      入力はu8、出力s8なので、128以上の場合に127に丸めればよい。
-                     */
                     /* sqadd : signed saturating add
                      * Input is u8, and output is s8.
                      * If input is larger than 127, the value should be round to 127.*/
