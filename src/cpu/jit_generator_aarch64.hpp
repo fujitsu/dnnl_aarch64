@@ -239,12 +239,12 @@ public:
         CodeGeneratorAArch64::mov(x9, CodeGeneratorAArch64::sp);
 
         if (vreg_to_preserve) {
-            st4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve*4));
-            st4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
+            st4((v8.d - v11.d)[0], post_ptr(x9, vreg_len_preserve*4));
+            st4((v12.d - v15.d)[0], post_ptr(x9, vreg_len_preserve*4));
         }
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
             stp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i]),
-                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x29, xreg_len*2));
+                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x9, xreg_len*2));
     }
     }
 #else
