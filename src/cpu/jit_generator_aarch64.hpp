@@ -227,15 +227,24 @@ public:
     inline size_t get_size_of_abi_save_regs() { return size_of_abi_save_regs; }
 
     void preamble() {
-      stp(x29, x30, pre_ptr(sp, -(static_cast<int64_t>(preserved_stack_size))));
-      add(x29, sp, xreg_len * 2);
+        CodeGeneratorAArch64::stp(x29, x30,
+                pre_ptr(CodeGeneratorAArch64::sp,
+			    -16));
+	/* x29 is a frame pointer. */
+	CodeGeneratorAArch64::mov(x29, CodeGeneratorAArch64::sp);
+
+	CodeGeneratorAArch64::sub(sp, sp, static_cast<int64_t>(preserved_stack_size) - 16);
+
+	/* x9 can be used as a temporal register. */
+        CodeGeneratorAArch64::mov(x9, CodeGeneratorAArch64::sp);
+
         if (vreg_to_preserve) {
-            st4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve*4));
-            st4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
+            st4((v8.d - v11.d)[0], post_ptr(x9, vreg_len_preserve*4));
+            st4((v12.d - v15.d)[0], post_ptr(x9, vreg_len_preserve*4));
         }
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
             stp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i]),
-                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x29, xreg_len*2));
+                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x9, xreg_len*2));
     }
     }
 #else
@@ -289,19 +298,20 @@ public:
     }
 
     void postamble() {
-        add(x29, sp, xreg_len * 2);
+        CodeGeneratorAArch64::mov(x9, CodeGeneratorAArch64::sp);
 
         if (vreg_to_preserve) {
-            ld4((v8.d - v11.d)[0], post_ptr(x29, vreg_len_preserve*4));
-              ld4((v12.d - v15.d)[0], post_ptr(x29, vreg_len_preserve*4));
+            ld4((v8.d - v11.d)[0], post_ptr(x9, vreg_len_preserve*4));
+              ld4((v12.d - v15.d)[0], post_ptr(x9, vreg_len_preserve*4));
         }
 
         for (size_t i = 0; i < num_abi_save_gpr_regs; i += 2) {
             ldp(Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i]),
-                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x29, xreg_len*2));
+                    Xbyak::Xbyak_aarch64::XReg(abi_save_gpr_regs_aarch64[i + 1]), post_ptr(x9, xreg_len*2));
         }
 
-        ldp(x29, x30, post_ptr(sp, static_cast<int64_t>(preserved_stack_size)));
+        add(sp, sp, static_cast<int64_t>(preserved_stack_size) - 16);
+        ldp(x29, x30, post_ptr(CodeGeneratorAArch64::sp, 16));
         ret();
     }
 #else
