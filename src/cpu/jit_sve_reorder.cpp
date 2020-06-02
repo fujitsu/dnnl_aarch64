@@ -1000,15 +1000,10 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                             scale_load_type = scale_load_type_t::load;
 
                     if (scale_load_type == scale_load_type_t::bcast) {
-                        if(rsvdOffsetScale != s_off[ur] * stype_sz) {
-                            add_imm(reg_tmpScale, reg_ptr_scale, s_off[ur] * stype_sz, reg_tmp, reg_tmp1);
-                            rsvdOffsetScale = s_off[ur] * stype_sz;
-                        }
 
-                        AdrPostImm addr(reg_tmpScale, 4);
-
-                        ld1((xmm_scale.s4)[0], addr);
-                        rsvdOffsetScale += 4;
+                        add_imm(reg_tmpScale, reg_ptr_scale, s_off[ur] * stype_sz, reg_tmp, reg_tmp1);
+                        add(reg_tmpScale, reg_tmpScale, reg_off_scale);
+                        ld1((xmm_scale.s4)[0], ptr(reg_tmpScale));
 
                         dup(xmm_scale.s4, (xmm_scale.s4)[0]);
                         fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
@@ -1022,15 +1017,11 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
                     if (scale_load_type == scale_load_type_t::load) {
                         int64_t tmpOffset = s_off[ur] * stype_sz;
-                        if(rsvdOffsetScale != tmpOffset) {
-                            add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
-                            rsvdOffsetScale = tmpOffset;
-                        }
+                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                        add(reg_tmpScale, reg_tmpScale, reg_off_scale);
 
-                        AdrPostImm addr(reg_tmpScale, 4);
 
-                        ld1(xmm_scale.s4, addr);
-                        rsvdOffsetScale += 4;
+                        ld1(xmm_scale.s4, ptr(reg_tmpScale));
                         fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
                         continue;
                     }
@@ -1039,12 +1030,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                     // so gather the scale factors one by one
                     for (int r = ur; r < ur + ur_step; ++r) {
                         int64_t tmpOffset = s_off[r] * stype_sz;
-                        if(rsvdOffsetScale != tmpOffset) {
-                            add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
-                            rsvdOffsetScale = tmpOffset;
-                        }
-                        AdrPostImm addr(reg_tmpScale, 4);
-                        ld1((xmm_scale.s4)[r - ur], addr);
+                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                        add(reg_tmpScale, reg_tmpScale, reg_off_scale);
+                        ld1((xmm_scale.s4)[r - ur], ptr(reg_tmpScale));
                     }
                     fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
                 }
