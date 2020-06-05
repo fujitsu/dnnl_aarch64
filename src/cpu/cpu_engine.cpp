@@ -46,6 +46,8 @@
 
 #include "cpu/jit_sve_1x1_convolution.hpp"
 #include "cpu/jit_sve_convolution.hpp"
+#include "cpu/jit_sve_x8s8s32x_1x1_convolution.hpp"
+#include "cpu/jit_sve_x8s8s32x_convolution.hpp"
 
 #else
 
@@ -54,12 +56,12 @@
 #include "cpu/jit_avx512_core_bf16_1x1_convolution.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_convolution.hpp"
 
 #endif // #ifndef __ARM_ARCH
 
 #include "cpu/jit_avx512_core_fp32_wino_conv_4x3.hpp"
 #include "cpu/jit_avx512_common_convolution_winograd.hpp"
-#include "cpu/jit_avx512_core_x8s8s32x_convolution.hpp"
 #include "cpu/jit_avx512_core_bf16_convolution.hpp"
 #include "cpu/jit_avx512_common_convolution.hpp"
 #include "cpu/jit_sse42_1x1_convolution.hpp"
@@ -175,6 +177,22 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_sve_convolution_fwd_t<f32>),
     INSTANCE(jit_sve_convolution_bwd_data_t<f32>),
     INSTANCE(jit_sve_convolution_bwd_weights_t<f32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<u8,f32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<u8,s32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<u8,u8>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<u8,s8>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<s8,f32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<s8,s32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<s8,u8>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<s8,s8>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<u8,f32>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<u8,s32>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<u8,u8>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<u8,s8>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<s8,f32>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<s8,s32>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<s8,u8>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<s8,s8>),
 #endif //#ifndef __ARM_ARCH
     INSTANCE(gemm_convolution_fwd_t),
     INSTANCE(gemm_convolution_bwd_data_t),
