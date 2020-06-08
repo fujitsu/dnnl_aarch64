@@ -343,10 +343,6 @@ void jit_uni_eltwise_injector_f32<isa>::elu_compute_vector(const Vmm &vmm_src) {
     h->uni_vmovups(vmm_aux3, vmm_src);
     exp_compute_vector(vmm_src);
 
-    h->L_aarch64(l0);
-    h->nop();
-    h->b(l0);
-    
     // alpha * (exp(x) - 1)
     h->uni_vsubps(vmm_src, vmm_src, table_val(0));
     h->uni_vmulps(vmm_src, vmm_src, table_val(alpha_off));
