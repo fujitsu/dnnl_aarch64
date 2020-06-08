@@ -153,8 +153,8 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         using namespace data_type;
 
         bool ok = true && p.ndims > 0
-                && utils::one_of(p.itype, f32, s32, s8, u8)
-                && utils::one_of(p.otype, f32, s32, s8, u8)
+                && utils::one_of(p.itype, f32 /*, s32, s8, u8*/)
+                && utils::one_of(p.otype, f32 /*, s32, s8, u8*/)
                 && utils::everyone_is(0, p.ioff, p.ooff) /* do we need this? */
                 && utils::one_of(p.beta, 0.f, 1.f) /* anything else? */
                 && simple_impl_desc_init(p, nullptr) && mayiuse(sve);
@@ -321,197 +321,176 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
     }
 
     bool process_direct_copy_sve(int len) {
-        using namespace data_type;
+      using namespace data_type;
 
-        const int simd_w = cpu_isa_traits<sve>::vlen / itype_sz;
-        bool isSameType = prb_.itype == prb_.otype ? true : false;
+      const int simd_w = cpu_isa_traits<sve>::vlen / itype_sz;
+      bool isSameType = prb_.itype == prb_.otype ? true : false;
 
-        bool can_do = true && mayiuse(sve)
-                && utils::everyone_is(1, os(0), is(0))
-                && (false || isSameType
-                        || (prb_.itype == s32 && prb_.otype == f32)
-                        || (prb_.itype == f32 && prb_.otype == s32))
-                && len % simd_w == 0 && n(0) % len == 0
-                && prb_.scale_type == scale_type_t::NONE && prb_.beta == 0.f;
-        if (!can_do)
-            return false;
+      bool can_do = true && mayiuse(sve)
+                         && utils::everyone_is(1, os(0), is(0))
+                         && (false || isSameType
+                            || (prb_.itype == s32 && prb_.otype == f32))
+                         && len % simd_w == 0 && n(0) % len == 0
+                         && prb_.scale_type == scale_type_t::NONE && prb_.beta == 0.f;
+      if (!can_do)
+        return false;
 
-        ptrue(reg_p_all_one.b); // Set all bits to 1.
+      ptrue(reg_p_all_one.b); // Set all bits to 1.
 
-        for (int off = 0; off < len;) {
-            int ur;
-            const int unroll = nstl::min(32,
-                    (len - off) / simd_w); // Max # of unroll data is decided by #
-                                       // of SVE registers and their width.
+      for (int off = 0; off < len;) {
+        int ur;
 
-            if(rsvdOffsetIn != off * itype_sz) {
-                add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp, reg_tmp1);
-                rsvdOffsetIn = off * itype_sz;
-            }
-            ur = 0;
-           while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
-                ld4w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpIn));
+        // Max # of unroll data is decided by #
+        // of SVE registers and their width.
+        const int unroll = nstl::min(32, (len - off) / simd_w);
 
-                ur += 4;
-                if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
-                    add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
-                    rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
-                }
-            }
+        ur = 0;
 
-            while ((unroll - ur >= 1) && (ur + 1 <= cpu_isa_traits<sve>::n_vregs)) {
-                ld1w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpIn));
-
-                ur += 1;
-                if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
-                    add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
-                    rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
-                }
-            }
-            if (prb_.itype != prb_.otype) {
-                for (int ur = 0; ur < unroll; ++ur) {
-                    ZRegS zs(ur);
-                    
-                    if (prb_.itype == s32 && prb_.otype == f32)
-                        fcvtzs(zs, reg_p_all_one.s, zs);
-                    else if (prb_.itype == f32 && prb_.otype == s32)
-                        scvtf(zs, reg_p_all_one.s, zs);
-                    else
-                        assert(!"unreachable");
-                }
-            }
-
-            if(rsvdOffsetOut != off * otype_sz) {
-                add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp, reg_tmp1);
-                rsvdOffsetOut = off * otype_sz;
-            }
-            ur = 0;
-
-            while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
-                st4w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpOut));
-                ur += 4;
-                if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
-                    add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
-                    rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
-                }
-            }
-
-
-            while ((unroll - ur >= 1) && (ur + 1 <= cpu_isa_traits<sve>::n_vregs)) {
-                st1w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpOut));
-                ur += 1;
-                if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
-                    add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
-                    rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
-                }
-
-            }
-
-            off += unroll * simd_w;
+        while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
+          add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
+          add(reg_tmpIn, reg_tmpIn, reg_off_in);
+          rsvdOffsetIn = off * itype_sz;
+          ld4w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpIn));
+          ur += 4;
         }
 
-        return true;
+        while (((unroll - ur) >= 1) && ((ur + 1) <= cpu_isa_traits<sve>::n_vregs)) {
+          add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w)* itype_sz, reg_tmp, reg_tmp1);
+          add(reg_tmpIn, reg_tmpIn, reg_off_in);
+          rsvdOffsetIn = off * itype_sz;
+
+          ld1w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpIn));
+
+          ur += 1;
+        }
+        if (prb_.itype != prb_.otype) {
+          for (ur = 0; ur < unroll; ++ur) {
+            ZRegS zs(ur);
+            if (prb_.itype == s32 && prb_.otype == f32)
+              scvtf(zs, reg_p_all_one.s, zs);
+            else if (prb_.itype == f32 && prb_.otype == s32)
+              fcvtzs(zs, reg_p_all_one.s, zs);
+            else
+              assert(!"unreachable");
+          }
+        }
+
+        ur = 0;
+
+        while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<sve>::n_vregs)) {
+          add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
+          add(reg_tmpOut, reg_tmpOut, reg_off_out);
+          rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
+
+          st4w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpOut));
+          ur += 4;
+        }
+
+        while (((unroll - ur) >= 1) && ((ur + 1) <= cpu_isa_traits<sve>::n_vregs)) {
+          add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
+          add(reg_tmpOut, reg_tmpOut, reg_off_out);
+          rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
+          st1w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpOut));
+          ur += 1;
+        }
+        off += unroll * simd_w;
+      }
+      return true;
     }
 
-	bool process_direct_copy_simd(int len) {
-		using namespace data_type;
+    bool process_direct_copy_simd(int len) {
+      using namespace data_type;
 
-		const int simd_w = cpu_isa_traits<simd>::vlen / itype_sz;
-		bool isSameType = prb_.itype == prb_.otype ? true : false;
+      const int simd_w = cpu_isa_traits<simd>::vlen / itype_sz;
+      bool isSameType = prb_.itype == prb_.otype ? true : false;
 
-		bool can_do = true && mayiuse(simd)
-			&& utils::everyone_is(1, os(0), is(0))
-			&& (false || isSameType
-				|| (prb_.itype == s32 && prb_.otype == f32)
-				|| (prb_.itype == f32 && prb_.otype == s32))
-			&& len % simd_w == 0 && n(0) % len == 0
-			&& prb_.scale_type == scale_type_t::NONE && prb_.beta == 0.f;
-		if (!can_do)
-			return false;
+      bool can_do = true && mayiuse(simd)
+                    && utils::everyone_is(1, os(0), is(0))
+                    && (false || isSameType
+                      || (prb_.itype == s32 && prb_.otype == f32)
+                      || (prb_.itype == f32 && prb_.otype == s32))
+                    && len % simd_w == 0 && n(0) % len == 0
+                    && prb_.scale_type == scale_type_t::NONE && prb_.beta == 0.f;
 
-		ptrue(reg_p_all_one.b); // Set all bits to 1.
+      if (!can_do)
+        return false;
 
-		for (int off = 0; off < len;) {
-			int ur;
-			const int unroll = nstl::min(32,
-				(len - off)
-				/ simd_w); // Max # of unroll data is decided by #
-						   // of SVE registers and their width.
+      ptrue(reg_p_all_one.b); // Set all bits to 1.
 
-			if(rsvdOffsetIn != off * itype_sz) {
-			  add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp, reg_tmp1);
-			  rsvdOffsetIn = off * itype_sz;
-			}
-			ur = 0;
-			while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<simd>::n_vregs)) {
-                ld4((VReg(ur).s4 - VReg(ur + 3).s4), post_ptr(reg_tmpIn, 64));
-				rsvdOffsetIn += 64;
-				ur += 4;
-			}
+      for (int off = 0; off < len;) {
+        int ur;
+        // Max # of unroll data is decided by #
+        // of SVE registers and their width.
+        const int unroll = nstl::min(32,
+                          (len - off) / simd_w);
 
-			// Residual
-			if (unroll - ur >= 3) {
-                ld3((VReg(ur).s4 - VReg(ur + 2).s4), post_ptr(reg_tmpIn, 48));
-				rsvdOffsetIn += 48;
-				ur += 3;
-			}
-			else if (unroll - ur >= 2) {
-                ld2((VReg(ur).s4 - VReg(ur + 1).s4), post_ptr(reg_tmpIn, 32));
-				rsvdOffsetIn += 32;
-				ur += 2;
-			}
-			else if (unroll - ur >= 1) {
-				ld1(VReg(ur).s, post_ptr(reg_tmpIn, 16));
-				rsvdOffsetIn += 16;
-				ur += 1;
-			}
+        if(rsvdOffsetIn != off * itype_sz) {
+          add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp, reg_tmp1);
+          rsvdOffsetIn = off * itype_sz;
+        }
+        ur = 0;
+        while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<simd>::n_vregs)) {
+          ld4((VReg(ur).s4 - VReg(ur + 3).s4), post_ptr(reg_tmpIn, 64));
+          rsvdOffsetIn += 64;
+          ur += 4;
+        }
 
-			if (prb_.itype != prb_.otype) {
-				for (int ur = 0; ur < unroll; ++ur) {
-					ZRegS zs(ur);
+        // Residual
+        if (unroll - ur >= 3) {
+          ld3((VReg(ur).s4 - VReg(ur + 2).s4), post_ptr(reg_tmpIn, 48));
+          rsvdOffsetIn += 48;
+          ur += 3;
+        }else if (unroll - ur >= 2) {
+          ld2((VReg(ur).s4 - VReg(ur + 1).s4), post_ptr(reg_tmpIn, 32));
+          rsvdOffsetIn += 32;
+          ur += 2;
+        }else if (unroll - ur >= 1) {
+          ld1(VReg(ur).s, post_ptr(reg_tmpIn, 16));
+          rsvdOffsetIn += 16;
+          ur += 1;
+        }
 
-					if (prb_.itype == s32 && prb_.otype == f32)
-						fcvtzs(zs, reg_p_all_one.s, zs);
-					else if (prb_.itype == f32 && prb_.otype == s32)
-						scvtf(zs, reg_p_all_one.s, zs);
-					else
-						assert(!"unreachable");
-				}
-			}
+        if (prb_.itype != prb_.otype) {
+          for (int ur = 0; ur < unroll; ++ur) {
+            if (prb_.itype == s32 && prb_.otype == f32)
+              scvtf(VReg(ur).s4, VReg(ur).s4);
+            else if (prb_.itype == f32 && prb_.otype == s32)
+              fcvtas(VReg(ur).s4, VReg(ur).s4);
+            else
+              assert(!"unreachable");
+          }
+        }
 
-			if(rsvdOffsetOut != off * otype_sz) {
-			  add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp, reg_tmp1);
-			  rsvdOffsetOut = off * otype_sz;
-			}
-			ur = 0;
-			while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<simd>::n_vregs)) {
-                st4((VReg(ur).s4 - VReg(ur + 3).s4), post_ptr(reg_tmpOut, 64));
-				rsvdOffsetOut += 64;
-				ur += 4;
-			}
+        if(rsvdOffsetOut != off * otype_sz) {
+          add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp, reg_tmp1);
+          rsvdOffsetOut = off * otype_sz;
+        }
+        ur = 0;
+        while ((unroll - ur >= 4) && (ur + 4 <= cpu_isa_traits<simd>::n_vregs)) {
+          st4((VReg(ur).s4 - VReg(ur + 3).s4), post_ptr(reg_tmpOut, 64));
+          rsvdOffsetOut += 64;
+          ur += 4;
+        }
 
-			// Residual
-			if (unroll - ur >= 3) {
-                st3((VReg(ur).s4 - VReg(ur + 2).s4), post_ptr(reg_tmpOut, 48));
-				rsvdOffsetOut += 48;
-				ur += 3;
-			}
-			else if (unroll - ur >= 2) {
-                st2((VReg(ur).s4 - VReg(ur + 1).s4), post_ptr(reg_tmpOut, 32));
-				rsvdOffsetOut += 32;
-				ur += 2;
-			}
-			else if (unroll - ur >= 1) {
-                st1(VReg(ur).s, post_ptr(reg_tmpOut, 16));
-				rsvdOffsetOut += 16;
-				ur += 1;
-			}
+        // Residual
+        if (unroll - ur >= 3) {
+          st3((VReg(ur).s4 - VReg(ur + 2).s4), post_ptr(reg_tmpOut, 48));
+          rsvdOffsetOut += 48;
+          ur += 3;
+        }else if (unroll - ur >= 2) {
+          st2((VReg(ur).s4 - VReg(ur + 1).s4), post_ptr(reg_tmpOut, 32));
+          rsvdOffsetOut += 32;
+          ur += 2;
+        }else if (unroll - ur >= 1) {
+          st1(VReg(ur).s, post_ptr(reg_tmpOut, 16));
+          rsvdOffsetOut += 16;
+          ur += 1;
+        }
 
-			off += unroll * simd_w;
-		}
-
-		return true;
-	}
+        off += unroll * simd_w;
+      }
+      return true;
+    }
 	
 	void process_unroll_generic_step(int reg_unroll, const int *i_off,
             const int *o_off, const int *s_off) {
@@ -589,7 +568,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             switch (odt) {
             case s32:
                 if (idt == f32) { // f32 -> s32
-                    fcvtzs(xmm.s4, xmm.s4);
+                    fcvtas(xmm.s4, xmm.s4);
                 } else if (idt == data_type::s8) { // f32 -> s8
                     sxtl(xmm.h8, xmm.b8); // signed 8-bit -> signed 16-bit
                     sxtl(xmm.s4, xmm.h4); // signed 16-bit -> signed 32-bit
@@ -602,7 +581,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 break;
             case data_type::s8:
                 if (idt == f32) { // f32 -> s8
-                    fcvtzs(xmm.s4, xmm.s4); // f32 -> signed 32-bit
+                    fcvtas(xmm.s4, xmm.s4); // f32 -> signed 32-bit
                 }
                 if (idt == f32 || idt == s32) { // signed 32-bit -> signed 8-bit
                     sqxtn(xmm.h4, xmm.s4); // signed 32-bit -> signed 16-bit
@@ -617,7 +596,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 break;
             case u8:
                 if (idt == f32) { // f32 -> u8
-                    fcvtzu(xmm.s4, xmm.s4); // f32 -> unsigned 32-bit
+                    fcvtau(xmm.s4, xmm.s4); // f32 -> unsigned 32-bit
                 }
                 if (idt == f32
                         || idt == s32) { // unsigned 32-bit -> unsigned 8-bit
