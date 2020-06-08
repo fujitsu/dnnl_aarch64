@@ -1,0 +1,33 @@
+variables:
+    GIT_STRATEGY: clone
+
+stages:
+  - test
+    
+before_script:
+
+job0:
+  stage: test
+  image: 779e2bd88ba7
+  script:
+  - git submodule sync --recursive
+  - git submodule update --init --recursive
+  - mkdir third_party/build_xed_aarch64
+  - pushd third_party/build_xed_aarch64/
+  - ../xbyak/translator/third_party/xed/mfile.py --shared examples install
+  - cd kits/
+  - ln -sf xed-install-base-* xed
+  - popd
+  - mkdir build_aarch64
+  - cd build_aarch64/
+  - cmake ..
+  - make -j40
+  - cd tests/gtests
+  - ctest
+#  - ctest -R test_concat
+  - cd ../benchdnn
+  - ./benchdnn --conv --batch=inputs/conv_resnet_50
+  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
+
+#  tags:
+#    - instruction_unit

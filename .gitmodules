@@ -1,3 +1,3 @@
 [submodule "third_party/xbyak"]
 	path = third_party/xbyak
-	url = ssh://git@kaiseki-juku.parc.flab.fujitsu.co.jp/postk_dl/xbyak.git
+	url = ../../postk_dl/xbyak.git

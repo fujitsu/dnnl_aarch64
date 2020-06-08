@@ -352,8 +352,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         // Convert FP <-> Int, if needed.
         for (int i = 0; i < 4; i++) {
             if (prb_.itype == s32 && prb_.otype == f32) {
-                fcvtzs(ZReg(i).s, p0 / Xbyak::Xbyak_aarch64::T_m, ZReg(i).s);
+                scvtf(ZReg(i).s, p0 / Xbyak::Xbyak_aarch64::T_m, ZReg(i).s);
             } else if (prb_.itype == f32 && prb_.otype == s32) {
+                frinti(ZReg(i).s, p0 / Xbyak::Xbyak_aarch64::T_m, ZReg(i).s);
                 fcvtzs(ZReg(i).s, p0 / Xbyak::Xbyak_aarch64::T_m, ZReg(i).s);
             }
         }
@@ -524,11 +525,16 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                     ZRegS zs(ur);
                     
                     if (prb_.itype == s32 && prb_.otype == f32)
-                        fcvtzs(zs, reg_p_all_one.s, zs);
-                    else if (prb_.itype == f32 && prb_.otype == s32)
                         scvtf(zs, reg_p_all_one.s, zs);
+                    else if (prb_.itype == f32 && prb_.otype == s32)
+                        frinti(zs, reg_p_all_one.s, zs);
                     else
                         assert(!"unreachable");
+                }
+                for (int ur = 0; ur < unroll; ++ur) {
+                    ZRegS zs(ur);
+                    if (prb_.itype == f32 && prb_.otype == s32)
+                        fcvtzs(zs, reg_p_all_one.s, zs);
                 }
             }
 
@@ -654,10 +660,11 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 					ZRegS zs(ur);
 
 					if (prb_.itype == s32 && prb_.otype == f32)
-						fcvtzs(zs, reg_p_all_one.s, zs);
-					else if (prb_.itype == f32 && prb_.otype == s32)
 						scvtf(zs, reg_p_all_one.s, zs);
-					else
+					else if (prb_.itype == f32 && prb_.otype == s32) {
+						frinti(zs, reg_p_all_one.s, zs);
+						fcvtzs(zs, reg_p_all_one.s, zs);
+					} else
 						assert(!"unreachable");
 				}
 			}
@@ -768,51 +775,47 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             switch (odt) {
             case s32:
                 if (idt == f32) { // f32 -> s32
+                    frinti(xmm.s4, xmm.s4);
                     fcvtzs(xmm.s4, xmm.s4);
-                } else if (idt == data_type::s8) { // f32 -> s8
+                } else if (idt == data_type::s8) { // s8 -> s32
                     sxtl(xmm.h8, xmm.b8); // signed 8-bit -> signed 16-bit
                     sxtl(xmm.s4, xmm.h4); // signed 16-bit -> signed 32-bit
-                    scvtf(xmm.s4, xmm.s4); // s32 -> f32
-                } else if (idt == u8) { // f32 -> u8
+                } else if (idt == u8) { // u8 -> s32
                     uxtl(xmm.h8, xmm.b8); // unsigned 8-bit -> unsigned 16-bit
                     uxtl(xmm.s4, xmm.h4); // unsigned 16-bit -> unsigned 32-bit
-                    ucvtf(xmm.s4, xmm.s4); // unsigned 32-bit -> f32
                 }
                 break;
             case data_type::s8:
                 if (idt == f32) { // f32 -> s8
+                    frinti(xmm.s4, xmm.s4);
                     fcvtzs(xmm.s4, xmm.s4); // f32 -> signed 32-bit
                 }
                 if (idt == f32 || idt == s32) { // signed 32-bit -> signed 8-bit
-		  //                    sqrshrn(xmm.h4, xmm.s4,                            16); // signed 32-bit -> signed 16-bit
-		  //                    sqrshrn(xmm.b8, xmm.h8, 8); // signed 16-bit -> signed 8-bit
                     sqxtn(xmm.h4, xmm.s4); // signed 32-bit -> signed 16-bit
                     sqxtn(xmm.b8, xmm.h8); // signed 16-bit -> signed 8-bit
                 }
                 if (idt == u8) { // u8 -> s8
-                    /* sqadd = ssigned saturating add
-                      入力はu8、出力s8なので、128以上の場合に127に丸めればよい。
-                     */
-                    sqadd(xmm.b16, xmm.b16, xmm_zero.b16);
+                    mov(xmm_tmp.b16, xmm.b16);
+                    cmge(xmm.b16, xmm.b16, 0);
+                    bsl(xmm.b16, xmm_tmp.b16, xmm_4x127b.b16);
                 }
                 break;
             case u8:
                 if (idt == f32) { // f32 -> u8
+                    frinti(xmm.s4, xmm.s4);
                     fcvtzu(xmm.s4, xmm.s4); // f32 -> unsigned 32-bit
+                    uqxtn(xmm.h4, xmm.s4); // unsigned 32-bit -> unsigned 16-bit
+                    uqxtn(xmm.b8, xmm.h8); // unsigned 16-bit -> unsigned 8-bit
                 }
-                if (idt == f32
-                        || idt == s32) { // unsigned 32-bit -> unsigned 8-bit
-		  //                    uqrshrn(xmm.h4, xmm.s4, 16); // unsigned 32-bit -> unsigned 16-bit
-		  //                    uqrshrn(xmm.b8, xmm.h8, 8); // unsigned 16-bit -> unsigned 8-bit
+                if (idt == s32) { // signed 32-bit -> unsigned 8-bit
+                    cmge(xmm_tmp.s4, xmm.s4, 0);
+                    and_(xmm.b16, xmm.b16, xmm_tmp.b16);
                     uqxtn(xmm.h4, xmm.s4); // unsigned 32-bit -> unsigned 16-bit
                     uqxtn(xmm.b8, xmm.h8); // unsigned 16-bit -> unsigned 8-bit
                 }
                 if (idt == data_type::s8) { // s8 -> u8
-                    /*
-                       入力s8、出力u8なので、負の場合に0に丸めればよい。
-                     */
-                    usqadd(xmm.b16, xmm_zero.b16); // Op1
-                                         // はsigned、Op2はunsignedとして加算して、unsignedにsaturateする。
+                    cmge(xmm_tmp.b16, xmm.b16, 0);
+                    and_(xmm.b16, xmm.b16, xmm_tmp.b16);
                 }
                 break;
             default: assert(!"unreachable");
@@ -1000,15 +1003,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                             scale_load_type = scale_load_type_t::load;
 
                     if (scale_load_type == scale_load_type_t::bcast) {
-                        if(rsvdOffsetScale != s_off[ur] * stype_sz) {
-                            add_imm(reg_tmpScale, reg_ptr_scale, s_off[ur] * stype_sz, reg_tmp, reg_tmp1);
-                            rsvdOffsetScale = s_off[ur] * stype_sz;
-                        }
-
-                        AdrPostImm addr(reg_tmpScale, 4);
-
-                        ld1((xmm_scale.s4)[0], addr);
-                        rsvdOffsetScale += 4;
+                        add_imm(reg_tmpScale, reg_ptr_scale, s_off[ur] * stype_sz, reg_tmp, reg_tmp1);
+                        add(reg_tmpScale, reg_tmpScale, reg_off_scale);
+                        ld1((xmm_scale.s4)[0], ptr(reg_tmpScale));
 
                         dup(xmm_scale.s4, (xmm_scale.s4)[0]);
                         fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
@@ -1022,15 +1019,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
                     if (scale_load_type == scale_load_type_t::load) {
                         int64_t tmpOffset = s_off[ur] * stype_sz;
-                        if(rsvdOffsetScale != tmpOffset) {
-                            add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
-                            rsvdOffsetScale = tmpOffset;
-                        }
-
-                        AdrPostImm addr(reg_tmpScale, 4);
-
-                        ld1(xmm_scale.s4, addr);
-                        rsvdOffsetScale += 4;
+                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                        add(reg_tmpScale, reg_tmpScale, reg_off_scale);
+                        ld1(xmm_scale.s4, ptr(reg_tmpScale));
                         fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
                         continue;
                     }
@@ -1039,12 +1030,9 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                     // so gather the scale factors one by one
                     for (int r = ur; r < ur + ur_step; ++r) {
                         int64_t tmpOffset = s_off[r] * stype_sz;
-                        if(rsvdOffsetScale != tmpOffset) {
-                            add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
-                            rsvdOffsetScale = tmpOffset;
-                        }
-                        AdrPostImm addr(reg_tmpScale, 4);
-                        ld1((xmm_scale.s4)[r - ur], addr);
+                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                        add(reg_tmpScale, reg_tmpScale, reg_off_scale);
+                        ld1((xmm_scale.s4)[r - ur], ptr(reg_tmpScale));
                     }
                     fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
                 }
@@ -1341,7 +1329,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
             if (prb_.itype == data_type::u8
                     && prb_.otype == data_type::s8) { // Generate mask
-                movi(xmm_zero.b16, 0x7f);
+                movi(xmm_4x127b.b16, 0x7f);
             }
         }
 
