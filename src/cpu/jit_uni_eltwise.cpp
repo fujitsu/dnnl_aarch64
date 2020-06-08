@@ -730,8 +730,8 @@ void jit_uni_eltwise_injector_f32<isa>::exp_prepare_table() {
 template <>
 void jit_uni_eltwise_injector_f32<avx512_common>::exp_prepare_table() {
     const unsigned int cvals[] = {
-            0x3e9a209a, // log2 = std::log(2.0f)
-            0x40549a78, // log2_e = 1.0f / log2;
+            0x3f317218, // log2 = std::log(2.0f)
+            0x3fb8aa3b, // log2_e = 1.0f / log2;
             0xc2aeac50, // expMin
             0x42b17218, // expMax
             0x3f800000,
