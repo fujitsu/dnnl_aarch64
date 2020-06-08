@@ -232,10 +232,10 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
       ofs = jcp.typesize_in * ofs;
       int tmp_ofs = ofs;
-      if( (ofs <= PRFMMAX) && (ofs >= 0)){
+      if( (ofs <= PRFMMAX) && (ofs >= PRFMMIN)){
         CGA64::prfm(xa::PLDL1KEEP, xa::ptr(aux_reg_bcast_data, static_cast<int32_t>(ofs)));
       }else{
-        if((prev_ofs != -1) && ((ofs - prev_ofs)>=0)
+        if((prev_ofs != -1) && ((ofs - prev_ofs)>=PRFMMIN)
             &&((ofs - prev_ofs) <= PRFMMAX) ){
           CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_prev_bcast_addr, static_cast<int32_t>(ofs-prev_ofs)));
         }else{
