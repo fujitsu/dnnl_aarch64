@@ -28,6 +28,14 @@
 #include "xmmintrin.h"
 #endif
 
+#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+# define _FPU_GETCW(fpcr) \
+  __asm__ __volatile__ ("mrs    %0, fpcr" : "=r" (fpcr))
+
+# define _FPU_SETCW(fpcr) \
+  __asm__ __volatile__ ("msr    fpcr, %0" : : "r" (fpcr))
+#endif
+
 namespace mkldnn {
 namespace impl {
 
@@ -91,7 +99,15 @@ FILE *mkldnn_fopen(const char *filename, const char *mode) {
 #endif
 }
 
+#if defined(__ARM_ARCH)
+#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+thread_local unsigned long fpcr_save;
+#else
+thread_local unsigned int fpcr_save;
+#endif
+#else
 thread_local unsigned int mxcsr_save;
+#endif
 
 void set_rnd_mode(round_mode_t rnd_mode) {
 #if defined(MKLDNN_X86_64)
@@ -103,6 +119,27 @@ void set_rnd_mode(round_mode_t rnd_mode) {
     default: assert(!"unreachable");
     }
     if (mxcsr != mxcsr_save) _mm_setcsr(mxcsr);
+#elif defined(__ARM_ARCH)
+#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+    /* for FCC */
+    _FPU_GETCW(fpcr_save);
+    unsigned long fpcr = fpcr_save & ~(static_cast<unsigned long>(3u) << 22);
+#else //#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+    /* GCC aarch64 */
+    fpcr_save = __builtin_aarch64_get_fpcr();
+    unsigned int fpcr = fpcr_save & ~(3u << 22);
+#endif //#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+    switch (rnd_mode) {
+    case round_mode::nearest: fpcr |= (0u << 22); break;
+    case round_mode::down: fpcr |= (2u << 22); break;
+    default: assert(!"unreachable");
+    }
+    if (fpcr != fpcr_save)
+#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+    _FPU_SETCW(fpcr);
+#else //#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+    __builtin_aarch64_set_fpcr(fpcr);
+#endif //#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
 #else
     UNUSED(rnd_mode);
 #endif
@@ -111,6 +148,12 @@ void set_rnd_mode(round_mode_t rnd_mode) {
 void restore_rnd_mode() {
 #if defined(MKLDNN_X86_64)
     _mm_setcsr(mxcsr_save);
+#elif defined(__CLANG_FUJITSU) || defined(__FUJITSU) || defined(__ARM_ARCH)
+#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+    _FPU_SETCW(fpcr_save);
+#else
+    __builtin_aarch64_set_fpcr(fpcr_save);
+#endif
 #endif
 }
 
@@ -154,3 +197,8 @@ mkldnn_status_t mkldnn_set_jit_dump(int dump) {
     mkldnn::impl::initialized = true;
     return success;
 }
+
+#if defined(__CLANG_FUJITSU) || defined(__FUJITSU)
+#undef _FPU_GETCW
+#undef _FPU_SETCW
+#endif
