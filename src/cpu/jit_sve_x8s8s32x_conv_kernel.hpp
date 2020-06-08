@@ -194,6 +194,33 @@ private:
     void cvt2ps(data_type_t type_in, Vmm ymm_in, const Xbyak::Operand &op,
         bool mask_flag);
     const Vmm vmm_mask(const Vmm vmm_in, bool mask_flag, bool store = false);
+    Xbyak::Address SVE_compress_addr(Xbyak::Reg64 base, int raw_offt)
+    {
+        using Xbyak::Zmm;
+        using Xbyak::Reg64;
+        using Xbyak::Address;
+        using Xbyak::RegExp;
+
+        assert(raw_offt <= INT_MAX);
+        auto offt = static_cast<int>(raw_offt);
+
+        int scale = 0;
+
+        if (EVEX_max_8b_offt <= offt && offt < 3 * EVEX_max_8b_offt) {
+            offt = offt - 2 * EVEX_max_8b_offt;
+            scale = 1;
+        } else if (3 * EVEX_max_8b_offt <= offt && offt < 5 * EVEX_max_8b_offt) {
+            offt = offt - 4 * EVEX_max_8b_offt;
+            scale = 2;
+        }
+
+        auto re = base + offt;
+        if (scale)
+            re = re + (2 * EVEX_max_8b_offt) * scale;
+
+        return zword [re];
+    }
+
 };
 
 struct jit_sve_x8s8s32x_fwd_kernel {

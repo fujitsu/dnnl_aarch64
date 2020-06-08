@@ -79,7 +79,7 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::bcast_loop(int load_loop_blk)
     mov(aux_reg_bcast_data, reg_bcast_data);
 
     mov(aux_reg_output_data, reg_output_data);
-    mov(bcast_loop_iter, EVEX_compress_addr(rsp, bcast_loop_work_off));
+    mov(bcast_loop_iter, SVE_compress_addr(rsp, bcast_loop_work_off));
 
     Label bcast_loop;
     Label bcast_loop_tail;
@@ -147,17 +147,17 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     };
 
     auto bias_ptr = [=](int i_load) {
-        return EVEX_compress_addr(reg_bias_data,
+        return SVE_compress_addr(reg_bias_data,
                                   jcp.typesize_bia * jcp.oc_block * i_load);
     };
 
     // auto comp_ptr = [=](int i_load) {
-    //     return EVEX_compress_addr(reg_comp_data,
+    //     return SVE_compress_addr(reg_comp_data,
     //                               sizeof(int32_t) * jcp.oc_block * i_load);
     // };
 
     auto scale_ptr = [=](int i_load) {
-        return EVEX_compress_addr(reg_ptr_scales,
+        return SVE_compress_addr(reg_ptr_scales,
                     jcp.is_oc_scale * (sizeof(float) * jcp.oc_block * i_load));
     };
 
@@ -168,7 +168,7 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         int _offt = (jcp.ic_without_padding * i_ur + i_reduce);
 
-        // return EVEX_compress_addr(aux_reg_bcast_data, jcp.typesize_in * _offt,
+        // return SVE_compress_addr(aux_reg_bcast_data, jcp.typesize_in * _offt,
         //                         bcast);
 
         auto base = aux_reg_bcast_data;
@@ -211,13 +211,13 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
         int offt = (i_load * jcp.reduce_dim + u0) * jcp.load_block;
 
-        return EVEX_compress_addr(aux_reg_load_data,
+        return SVE_compress_addr(aux_reg_load_data,
                                   u1 * jcp.reduce_loop_load_step
                                   + jcp.typesize_in * offt);
     };
 
     auto output_ptr = [=](int i_load, int i_ur) {
-        return EVEX_compress_addr(aux_reg_output_data,
+        return SVE_compress_addr(aux_reg_output_data,
             jcp.typesize_out * (jcp.oc_without_padding * i_ur
                                 + i_load * jcp.load_block));
     };
@@ -236,10 +236,10 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         const float *p_sum_scale = (sum_idx != -1)
             ? &p.entry_[sum_idx].sum.scale
             : nullptr;
-        mov(EVEX_compress_addr(rsp, reg_bcast_data_off), reg_bcast_data);
-        mov(reg_ptr_scales, EVEX_compress_addr(rsp, reg_ptr_sum_scale_off));
+        mov(SVE_compress_addr(rsp, reg_bcast_data_off), reg_bcast_data);
+        mov(reg_ptr_scales, SVE_compress_addr(rsp, reg_ptr_sum_scale_off));
         if (p_sum_scale && *p_sum_scale != 1.f) {
-            mov(EVEX_compress_addr(rsp, reg_load_data_off), reg_load_data);
+            mov(SVE_compress_addr(rsp, reg_load_data_off), reg_load_data);
             mov(reg_ptr_sum_scale, (size_t)p_sum_scale);
         }
         for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
@@ -327,9 +327,9 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 }
             }
         }
-        mov(reg_bcast_data, EVEX_compress_addr(rsp, reg_bcast_data_off));
+        mov(reg_bcast_data, SVE_compress_addr(rsp, reg_bcast_data_off));
         if (p_sum_scale && *p_sum_scale != 1.f)
-            mov(reg_load_data, EVEX_compress_addr(rsp, reg_load_data_off));
+            mov(reg_load_data, SVE_compress_addr(rsp, reg_load_data_off));
     };
 
     auto compute = [=](Zmm vreg_acc, Zmm vreg_wei, Zmm vreg_src) {
@@ -404,7 +404,7 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
     if (jcp.oc_without_padding != jcp.oc) {
         Label end_store, common_store;
-        mov(EVEX_compress_addr(rsp, reg_bcast_data_off), reg_bcast_data);
+        mov(SVE_compress_addr(rsp, reg_bcast_data_off), reg_bcast_data);
 
         /*Check if it is the last load_loop_blk*/
         sub(reg_load_loop_work, load_loop_blk * jcp.load_loop_iter_step);
@@ -453,14 +453,14 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::generate()
     if (jcp.with_bias)
         mov(reg_bias_data, ptr[param1 + GET_OFF(bias_data)]);
     mov(reg_ptr_scales, ptr[param1 + GET_OFF(scales)]);
-    mov(EVEX_compress_addr(rsp, reg_ptr_sum_scale_off), reg_ptr_scales);
+    mov(SVE_compress_addr(rsp, reg_ptr_sum_scale_off), reg_ptr_scales);
     mov(reg_bcast_data, ptr[param1 + GET_OFF(bcast_data)]);
     mov(reg_load_data, ptr[param1 + GET_OFF(load_data)]);
     mov(reg_output_data, ptr[param1 + GET_OFF(output_data)]);
 
     mov(reg_load_loop_work, ptr[param1 + GET_OFF(load_dim)]);
     mov(reg_bcast_loop_work, ptr[param1 + GET_OFF(bcast_dim)]);
-    mov(EVEX_compress_addr(rsp, bcast_loop_work_off), reg_bcast_loop_work);
+    mov(SVE_compress_addr(rsp, bcast_loop_work_off), reg_bcast_loop_work);
     mov(reg_reduce_loop_work, ptr[param1 + GET_OFF(reduce_dim)]);
     mov(reg_reduce_pos_flag, ptr[param1 + GET_OFF(first_last_flag)]);
 
@@ -472,12 +472,12 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::generate()
             add(reg_bias_data,
                 load_loop_blk * jcp.load_block * jcp.typesize_bia);
         }
-        mov(EVEX_compress_addr(rsp, reg_bcast_data_off), reg_bcast_data);
-        mov(reg_ptr_scales, EVEX_compress_addr(rsp, reg_ptr_sum_scale_off));
+        mov(SVE_compress_addr(rsp, reg_bcast_data_off), reg_bcast_data);
+        mov(reg_ptr_scales, SVE_compress_addr(rsp, reg_ptr_sum_scale_off));
         add(reg_ptr_scales,
             jcp.is_oc_scale * load_loop_blk * jcp.load_block * sizeof(float));
-        mov(EVEX_compress_addr(rsp, reg_ptr_sum_scale_off), reg_ptr_scales);
-        mov(reg_bcast_data, EVEX_compress_addr(rsp, reg_bcast_data_off));
+        mov(SVE_compress_addr(rsp, reg_ptr_sum_scale_off), reg_ptr_scales);
+        mov(reg_bcast_data, SVE_compress_addr(rsp, reg_bcast_data_off));
         add(reg_output_data,
             load_loop_blk * jcp.load_block * jcp.typesize_out);
         sub(reg_load_loop_work, load_loop_blk * jcp.load_loop_iter_step);

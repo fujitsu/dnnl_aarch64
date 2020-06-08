@@ -163,12 +163,12 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
         int scale_offset = jcp.is_oc_scale * (sizeof(float) * k * oc_block);
         if (jcp.with_bias) {
             int bias_offset = jcp.typesize_bia * k * oc_block;
-            auto bias_addr = EVEX_compress_addr(reg_bias, bias_offset);
+            auto bias_addr = SVE_compress_addr(reg_bias, bias_offset);
 
             cvt2ps(jcp.bia_dt, vmm_bias, bias_addr, mask_flag);
         }
         /* add to zmm_accum: compensation, bias and permute */
-        // vmovups(vmm_comp, EVEX_compress_addr(reg_ptr_scales, scale_offset));
+        // vmovups(vmm_comp, SVE_compress_addr(reg_ptr_scales, scale_offset));
         for (int j = 0; j < ur_w; j++) {
             Vmm vmm = vmm_out(j, k);
             if (jcp.is_fast_depthwise)
@@ -179,7 +179,7 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
 
             const Vmm vmm_k = vmm_mask(vmm, mask_flag);
             vmulps(vmm_k, vmm,
-                    EVEX_compress_addr(reg_ptr_scales, scale_offset));
+                    SVE_compress_addr(reg_ptr_scales, scale_offset));
             // vmulps(vmm_k, vmm, vmm_comp);
         }
     }
@@ -194,7 +194,7 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
                         = jcp.typesize_out
                         * (k * oc_block
                                   + j * jcp.oc_without_padding * jcp.ngroups);
-                auto addr = EVEX_compress_addr(reg_out, aux_output_offset);
+                auto addr = SVE_compress_addr(reg_out, aux_output_offset);
                 Vmm vmm = vmm_out(j, k);
                 cvt2ps(jcp.dst_dt, vmm_prev_dst, addr, mask_flag);
                 if (*p_sum_scale == 1.f)
@@ -240,7 +240,7 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
         for (int j = 0; j < ur_w; j++) {
             int aux_output_offset = jcp.typesize_out
                     * (k * oc_block + j * jcp.oc_without_padding * jcp.ngroups);
-            auto addr = EVEX_compress_addr(reg_out, aux_output_offset);
+            auto addr = SVE_compress_addr(reg_out, aux_output_offset);
 
             Vmm vmm = vmm_out(j, k);
             const Vmm r_vmm = vmm_mask(vmm, mask_flag, true);
@@ -325,10 +325,10 @@ void _jit_sve_x8s8s32x_fwd_kernel<Zmm>::compute_ker_dw(
                 if (jcp.is_fast_depthwise) {
                     assert(!mask_flag);
                     vbroadcasti32x4(zmm_inp_msk,
-                            EVEX_compress_addr(aux_reg_inp, aux_input_offset));
+                            SVE_compress_addr(aux_reg_inp, aux_input_offset));
                 } else {
                     vpmovzxbd(zmm_inp_msk,
-                            EVEX_compress_addr(aux_reg_inp, aux_input_offset));
+                            SVE_compress_addr(aux_reg_inp, aux_input_offset));
                 }
             }
         }
@@ -336,11 +336,11 @@ void _jit_sve_x8s8s32x_fwd_kernel<Zmm>::compute_ker_dw(
             int aux_kernel_offset = kernel_offset(ci, ki);
             if (jcp.is_fast_depthwise) {
                 vbroadcasti32x4(zmm_wei,
-                        EVEX_compress_addr(aux_reg_ker, aux_kernel_offset));
+                        SVE_compress_addr(aux_reg_ker, aux_kernel_offset));
                 vmovdqu8(zmm_wei | kblend_mask | T_z, zmm_wei);
             } else {
                 vpmovsxbd(zmm_wei,
-                        EVEX_compress_addr(aux_reg_ker, aux_kernel_offset));
+                        SVE_compress_addr(aux_reg_ker, aux_kernel_offset));
             }
             if (h_padded) {
                 assert(jcp.signed_input);
@@ -362,11 +362,11 @@ void _jit_sve_x8s8s32x_fwd_kernel<Zmm>::compute_ker_dw(
                             if (jcp.is_fast_depthwise) {
                                 assert(!mask_flag);
                                 vbroadcasti32x4(r_zmm_src,
-                                        EVEX_compress_addr(aux_reg_inp,
+                                        SVE_compress_addr(aux_reg_inp,
                                                         aux_input_offset));
                             } else {
                                 vpmovzxbd(r_zmm_src,
-                                        EVEX_compress_addr(aux_reg_inp,
+                                        SVE_compress_addr(aux_reg_inp,
                                                   aux_input_offset));
                             }
                         }
@@ -438,7 +438,7 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::compute_ker(int ur_w, int pad_l,
                             vpbroadcastd(vmm_inp(jj, nb_oc_block), xmm_tmp);
                         } else {
                             // vpbroadcastd(vmm_inp(jj, nb_oc_block),
-                            //         EVEX_compress_addr(
+                            //         SVE_compress_addr(
                             //                      aux_reg_inp, aux_input_offset));
 
                             auto base = aux_reg_inp;
@@ -484,13 +484,13 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::compute_ker(int ur_w, int pad_l,
                 if(ii == 0) {
                     int aux_kernel_offset = kernel_offset(ii, ic, ki);
                     vmovups(vmm_wei,
-                            EVEX_compress_addr(aux_reg_ker, aux_kernel_offset));
+                            SVE_compress_addr(aux_reg_ker, aux_kernel_offset));
                 }
                 if((ii+1) < nb_oc_block) {
                     int aux_kernel_offset = kernel_offset((ii+1), ic, ki);
                     auto _vmm_wei = ((ii % 2) == 0)? vmm_comp : vmm_wei;
                     vmovups(_vmm_wei,
-                            EVEX_compress_addr(aux_reg_ker, aux_kernel_offset));
+                            SVE_compress_addr(aux_reg_ker, aux_kernel_offset));
                 }
                 for (int jj = _start; jj < _end; jj++)  {
                     auto _vmm_wei = ((ii % 2) == 0)? vmm_wei : vmm_comp;
