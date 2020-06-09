@@ -168,7 +168,8 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
             cvt2ps(jcp.bia_dt, vmm_bias, bias_addr, mask_flag);
         }
         /* add to zmm_accum: compensation, bias and permute */
-        // vmovups(vmm_comp, SVE_compress_addr(reg_ptr_scales, scale_offset));
+        if (!jcp.is_fast_depthwise)
+            vmovups(vmm_comp, SVE_compress_addr(reg_ptr_scales, scale_offset));
         for (int j = 0; j < ur_w; j++) {
             Vmm vmm = vmm_out(j, k);
             if (jcp.is_fast_depthwise)
@@ -178,9 +179,11 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
                 vaddps(vmm, vmm, vmm_bias);
 
             const Vmm vmm_k = vmm_mask(vmm, mask_flag);
-            vmulps(vmm_k, vmm,
-                    SVE_compress_addr(reg_ptr_scales, scale_offset));
-            // vmulps(vmm_k, vmm, vmm_comp);
+            if (!jcp.is_fast_depthwise)
+                vmulps(vmm_k, vmm, vmm_comp);
+            else
+                vmulps(vmm_k, vmm,
+                       SVE_compress_addr(reg_ptr_scales, scale_offset));
         }
     }
 
