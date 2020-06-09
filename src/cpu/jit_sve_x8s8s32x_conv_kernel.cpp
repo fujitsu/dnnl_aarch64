@@ -174,7 +174,8 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
             Vmm vmm = vmm_out(j, k);
             if (jcp.is_fast_depthwise)
                 vpermd(zmm_out(j, k), zmm_permute, zmm_out(j, k));
-            vcvtdq2ps(vmm, vmm);
+            // vcvtdq2ps(vmm, vmm);
+            CGA64::scvtf(xa::ZRegS(vmm.getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ZRegS(vmm.getIdx()));
             if (jcp.with_bias)
                 vaddps(vmm, vmm, vmm_bias);
 
