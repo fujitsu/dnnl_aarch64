@@ -361,6 +361,54 @@ void jit_uni_eltwise_injector_f32<isa>::elu_compute_vector(const Vmm &vmm_src) {
     }
 }
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+template <>
+void jit_uni_eltwise_injector_f32<avx512_common>::tanh_compute_vector(const Vmm &vmm_src) {
+    using namespace Xbyak::Xbyak_aarch64;
+
+    ZRegS min(expMin.getIdx());
+    ZRegS max(expMax.getIdx());
+    ZRegS tmpLog2(log2.getIdx());
+    ZRegS tmpLog2_e(log2_e.getIdx());
+    ZRegS src(vmm_src.getIdx());
+    // Intel's exp used aux1 and aux2 as temporal registers.
+    ZRegS aux1(vmm_aux1.getIdx());
+    ZRegS aux2(vmm_aux2.getIdx());
+    ZRegS coeff[5] = { ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0} } ;
+
+    for (size_t i = 0; i < expN; i++) {
+        coeff[i] = ZRegS(expCoeff[i].getIdx());
+    }
+    // 2x
+    h->CodeGeneratorAArch64::fadd(src, src, src);
+    // exp(2x)
+    h->CodeGeneratorAArch64::fmin(src, p/T_m, max);
+    h->CodeGeneratorAArch64::fmax(src, p/T_m, min);
+    h->CodeGeneratorAArch64::fmul(src, src, tmpLog2_e);
+    h->CodeGeneratorAArch64::frintn(aux2, p/T_m, src); // rounding : float -> float
+    h->CodeGeneratorAArch64::fcvtzs(aux1, p/T_m, aux2); // float -> int
+    h->CodeGeneratorAArch64::fsub(aux2, src, aux2);
+    h->CodeGeneratorAArch64::fmul(aux2, aux2, tmpLog2);
+    h->CodeGeneratorAArch64::movprfx(src, p, coeff[4]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[3]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[2]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[1]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
+    h->CodeGeneratorAArch64::fscale(src, p, aux1); // src *= 2^aux0
+    // 1+exp(2x)
+    h->CodeGeneratorAArch64::fadd(src, src, coeff[0]); // 1
+    // 1/(1+exp(2x))
+    h->CodeGeneratorAArch64::frecpe(aux1, src);
+    h->CodeGeneratorAArch64::frecps(src, src, aux1);
+    h->CodeGeneratorAArch64::fmul(src, src, aux1);
+    // 2/(1+exp(2x))
+    h->CodeGeneratorAArch64::fadd(src, src, src);
+    // 1-2/(1+exp(2x))
+    h->CodeGeneratorAArch64::fsub(src, coeff[0], src);
+}
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
+
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
 {
