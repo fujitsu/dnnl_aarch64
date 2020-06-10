@@ -439,8 +439,7 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::compute_ker(int ur_w, int pad_l,
                             for (int r = 0; r < tail_size; ++r)
                                 vpinsrb(xmm_tmp, xmm_tmp,
                                     ptr[aux_reg_inp + aux_input_offset + r], r);
-                            // vpbroadcastd(vmm_inp(jj, nb_oc_block), xmm_tmp);
-                            CGA64::ld1rw(xa::ZRegS(vmm_inp(jj, nb_oc_block).getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(xa::XReg(xmm_tmp.getIdx())));
+                            vpbroadcastd(vmm_inp(jj, nb_oc_block), xmm_tmp);
                         } else {
                             // vpbroadcastd(vmm_inp(jj, nb_oc_block),
                             //         SVE_compress_addr(

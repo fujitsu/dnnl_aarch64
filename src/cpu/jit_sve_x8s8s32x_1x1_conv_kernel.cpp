@@ -352,8 +352,7 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     for (int r = 0; r < tail_size; ++r)
                         vpinsrb(xmm_bcast, xmm_bcast, ptr[aux_reg_bcast_data
                         + jcp.ic_without_padding * i_ur + i_reduce + r], r);
-                    // vpbroadcastd(zmm_bcast, xmm_bcast);
-                    CGA64::ld1rw(xa::ZRegS(zmm_bcast.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(xa::XReg(xmm_bcast.getIdx())));
+                    vpbroadcastd(zmm_bcast, xmm_bcast);
                 } else {
                   if(i_ur == 0) {
                       // vpbroadcastd(zmm_bcast, bcast_ptr(i_reduce, i_ur, false));
