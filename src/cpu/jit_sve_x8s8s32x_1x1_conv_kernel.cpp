@@ -195,12 +195,10 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             assert(!"unimplemented"); 
         else {
           if((-0x40 <= re) && (re < 0x40) && ((re%4) == 0))
-            CGA64::ld1rw(xa::ZRegS(bcast_reg.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(xa::XReg(base.getIdx()), static_cast<int32_t>(re)));
+              CGA64::ld1rw(xa::ZRegS(bcast_reg.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(xa::XReg(base.getIdx()), static_cast<int32_t>(re)));
           else {
-            auto re = RegExp() + base + offt;
-            if (scale)
-                re = re + (2 * EVEX_max_8b_offt) * scale;
-            vpbroadcastd(bcast_reg, zword [re]);
+              add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re);
+              CGA64::ld1rw(xa::ZRegS(bcast_reg.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(reg_tmp_adr));
           }
         }
     };
@@ -354,7 +352,8 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     for (int r = 0; r < tail_size; ++r)
                         vpinsrb(xmm_bcast, xmm_bcast, ptr[aux_reg_bcast_data
                         + jcp.ic_without_padding * i_ur + i_reduce + r], r);
-                    vpbroadcastd(zmm_bcast, xmm_bcast);
+                    // vpbroadcastd(zmm_bcast, xmm_bcast);
+                    CGA64::ld1rw(xa::ZRegS(zmm_bcast.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(xa::XReg(xmm_bcast.getIdx())));
                 } else {
                   if(i_ur == 0) {
                       // vpbroadcastd(zmm_bcast, bcast_ptr(i_reduce, i_ur, false));

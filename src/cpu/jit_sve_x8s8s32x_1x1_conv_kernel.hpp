@@ -40,9 +40,15 @@
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise.hpp"
 
+#define ADDMAX  4095
+#define MOVMAX 65535
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
+
+#define CGA64 CodeGeneratorAArch64
+namespace xa = Xbyak::Xbyak_aarch64;
 
 struct jit_sve_x8s8s32x_1x1_conv_kernel: public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sve_x8s8s32x_1x1_conv_fwd_ker_t)
@@ -110,6 +116,10 @@ struct jit_sve_x8s8s32x_1x1_conv_kernel: public jit_generator {
     reg64_t aux_reg_output_data = abi_not_param1;
     reg64_t reduce_loop_iter = abi_param1;
 
+    /* Temporay registers */
+    xa::XReg reg_tmp_imm = x18; // tmp for add_imm
+    xa::XReg reg_tmp_adr = x19; // tmp for address value
+
     reg64_t reg_last_load = r8;
     mask_t ktail_mask = k6;
 
@@ -160,6 +170,22 @@ struct jit_sve_x8s8s32x_1x1_conv_kernel: public jit_generator {
             re = re + (2 * EVEX_max_8b_offt) * scale;
 
         return zword [re];
+    }
+
+    void add_imm(xa::XReg out, xa::XReg in, long long int value){
+        long long int val = (value >= 0) ? value : -1 * value;
+        if( val <= ADDMAX ){
+            if( value >= 0 )  CGA64::add(out, in, val);
+            else              CGA64::sub(out, in, val);
+        }else{
+            CGA64::mov(reg_tmp_imm, val&0xffff);
+            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
+            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
+            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
+
+            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
+            else              CGA64::sub(out, in, reg_tmp_imm);
+        }
     }
 };
 

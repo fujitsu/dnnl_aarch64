@@ -122,7 +122,7 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::cvt2ps(data_type_t type_in,
     default: assert(!"unsupported data type");
     }
     if (type_in != data_type::f32)
-        vcvtdq2ps(vmm_in, vmm_in);
+        CGA64::scvtf(xa::ZRegS(vmm_in.getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ZRegS(vmm_in.getIdx())); //< vcvtdq2ps(vmm_in, vmm_in);
 }
 
 template<typename Vmm>
@@ -439,7 +439,8 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::compute_ker(int ur_w, int pad_l,
                             for (int r = 0; r < tail_size; ++r)
                                 vpinsrb(xmm_tmp, xmm_tmp,
                                     ptr[aux_reg_inp + aux_input_offset + r], r);
-                            vpbroadcastd(vmm_inp(jj, nb_oc_block), xmm_tmp);
+                            // vpbroadcastd(vmm_inp(jj, nb_oc_block), xmm_tmp);
+                            CGA64::ld1rw(xa::ZRegS(vmm_inp(jj, nb_oc_block).getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(xa::XReg(xmm_tmp.getIdx())));
                         } else {
                             // vpbroadcastd(vmm_inp(jj, nb_oc_block),
                             //         SVE_compress_addr(
@@ -466,12 +467,10 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::compute_ker(int ur_w, int pad_l,
                                 re = re + (2 * EVEX_max_8b_offt) * scale;
 
                             if((-0x40 <= re) && (re < 0x40) && ((re%4) == 0))
-                              CGA64::ld1rw(xa::ZRegS(vmm_inp(jj, nb_oc_block).getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(xa::XReg(base.getIdx()), static_cast<int32_t>(re)));
+                                CGA64::ld1rw(xa::ZRegS(vmm_inp(jj, nb_oc_block).getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(xa::XReg(base.getIdx()), static_cast<int32_t>(re)));
                             else {
-                              auto reptr = RegExp() + base + offt;
-                              if (scale)
-                                  reptr  = reptr +  (2 * EVEX_max_8b_offt) * scale;
-                              vpbroadcastd(vmm_inp(jj, nb_oc_block), zword [reptr]);
+                                add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re);
+                                CGA64::ld1rw(xa::ZRegS(vmm_inp(jj, nb_oc_block).getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(reg_tmp_adr));
                             }
                         }
                     } else {

@@ -42,6 +42,9 @@
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise.hpp"
 
+#define ADDMAX  4095
+#define MOVMAX 65535
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -108,6 +111,10 @@ private:
     const Xbyak::Reg64 reg_kj = reg_ptr_scales;
     const Xbyak::Reg64 reg_overflow = reg_ptr_scales;
     const Xbyak::Reg64 reg_icb = reg_bias;
+
+    /* Temporay registers */
+    xa::XReg reg_tmp_imm = x18; // tmp for add_imm
+    xa::XReg reg_tmp_adr = x19; // tmp for address value
 
     const Xbyak::Opmask ktail_mask = Xbyak::Opmask(2);
     const Xbyak::Opmask kblend_mask = Xbyak::Opmask(3);
@@ -221,6 +228,21 @@ private:
         return zword [re];
     }
 
+    void add_imm(xa::XReg out, xa::XReg in, long long int value){
+        long long int val = (value >= 0) ? value : -1 * value;
+        if( val <= ADDMAX ){
+            if( value >= 0 )  CGA64::add(out, in, val);
+            else              CGA64::sub(out, in, val);
+        }else{
+            CGA64::mov(reg_tmp_imm, val&0xffff);
+            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
+            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
+            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
+
+            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
+            else              CGA64::sub(out, in, reg_tmp_imm);
+        }
+    }
 };
 
 struct jit_sve_x8s8s32x_fwd_kernel {
