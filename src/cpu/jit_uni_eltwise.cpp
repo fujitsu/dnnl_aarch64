@@ -910,13 +910,14 @@ int jit_uni_eltwise_injector_f32<isa>::aux_vecs_count(alg_kind_t alg_) {
     case alg_kind::eltwise_tanh: return 14;
     case alg_kind::eltwise_logistic: return 14;
     case alg_kind::eltwise_exp: return 14;
+    case alg_kind::eltwise_gelu: return 14;
 #else
     case alg_kind::eltwise_elu: return 4;
     case alg_kind::eltwise_tanh: return 5;
     case alg_kind::eltwise_logistic: return 4;
     case alg_kind::eltwise_exp: return 3;
-#endif
     case alg_kind::eltwise_gelu: return 5;
+#endif
     default: assert(!"unsupported eltwise algorithm");
     }
 
