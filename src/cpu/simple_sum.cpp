@@ -90,28 +90,35 @@ void simple_sum_t<src_data_type, dst_data_type>::execute() const {
         }
     };
 
-    parallel(0, [&](const int ithr, const int nthr) {
-        size_t start{0}, end{0};
-        balance211(blocks_number, nthr, ithr, start, end);
+    if (nelems <= 256) {
+      if (src_data_type == data_type::bf16)
+	sum_block_bf16(0, nelems, 0);
+      else
+	sum_block(0, nelems, 0);
+    } else {
+      parallel(0, [&](const int ithr, const int nthr) {
+          size_t start{0}, end{0};
+          balance211(blocks_number, nthr, ithr, start, end);
 
-        for (size_t nb = start; nb < end; ++nb) {
-            size_t start_e = nb * block_size;
-            size_t end_e = start_e + block_size;
-            if (src_data_type == data_type::bf16)
-                sum_block_bf16(start_e, end_e, ithr);
-            else
-                sum_block(start_e, end_e, ithr);
-        }
+          for (size_t nb = start; nb < end; ++nb) {
+              size_t start_e = nb * block_size;
+              size_t end_e = start_e + block_size;
+              if (src_data_type == data_type::bf16)
+                  sum_block_bf16(start_e, end_e, ithr);
+              else
+                  sum_block(start_e, end_e, ithr);
+          }
 
-        if (tail != 0 && ithr == nthr - 1) {
-            size_t start_e = nelems - tail;
-            size_t end_e = nelems;
-            if (src_data_type == data_type::bf16)
-                sum_block_bf16(start_e, end_e, ithr);
-            else
-                sum_block(start_e, end_e, ithr);
-        }
-    });
+          if (tail != 0 && ithr == nthr - 1) {
+              size_t start_e = nelems - tail;
+              size_t end_e = nelems;
+              if (src_data_type == data_type::bf16)
+                  sum_block_bf16(start_e, end_e, ithr);
+              else
+                  sum_block(start_e, end_e, ithr);
+          }
+      });
+    }
 }
 
 template struct simple_sum_t<data_type::f32, data_type::f32>;
