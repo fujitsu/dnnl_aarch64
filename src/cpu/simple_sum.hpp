@@ -77,9 +77,13 @@ struct simple_sum_t: public cpu_primitive_t {
         size_t block_size_, nelems_, blocks_number_, tail_;
 
         private:
-
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+            const size_t cacheline_size_ = 256; // bytes
+            const size_t half_L1_size_ = 32 * 1024; // bytes
+#else //#ifdef DNNL_INDIRECT_JIT_AARCH64
             const size_t cacheline_size_ = 64; // bytes
             const size_t half_L1_size_ = 16 * 1024; // bytes
+#endif
 
             void compute_blocking() {
                 block_size_ = (src_data_type == data_type::bf16
