@@ -127,7 +127,12 @@ L(l20);
     mov(A1, A);
     add(A, 0x30);
     mov(I, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0x2);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0);
+#else
     sar(I, 0x2);
+#endif
     jle(l170, T_NEAR);
     align(4);
 
@@ -255,7 +260,12 @@ L(l240);
     mov(A1, A);
     add(A, 0x20);
     mov(I, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0x2);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0);
+#else
     sar(I, 0x2);
+#endif
     jle(l32c, T_NEAR);
     align(4);
 
@@ -354,7 +364,12 @@ L(l3cc);
     mov(A1, A);
     add(A, 0x10);
     mov(I, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0x2);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0);
+#else
     sar(I, 0x2);
+#endif
     jle(l454, T_NEAR);
     align(4);
 
@@ -427,7 +442,12 @@ L(l4c4);
     mov(A1, A);
     add(A, 0x8);
     mov(I, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0);
+#else
     sar(I, 0x3);
+#endif
     jle(l570, T_NEAR);
     align(4);
 
@@ -524,7 +544,12 @@ L(l628);
     mov(A1, A);
     add(A, 0x4);
     mov(I, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0);
+#else
     sar(I, 0x3);
+#endif
     jle(l6b0, T_NEAR);
     align(4);
 
@@ -611,7 +636,12 @@ L(l758);
     mov(A1, A);
     add(A, 0x2);
     mov(LDA3, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), 0);
+#else
     sar(LDA3, 0x3);
+#endif
     jle(l804, T_NEAR);
     align(4);
 
@@ -712,7 +742,12 @@ L(l8bc);
     mov(A1, A);
     add(A, 0x1);
     mov(LDA3, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), 0);
+#else
     sar(LDA3, 0x3);
+#endif
     jle(l944, T_NEAR);
     align(4);
 
