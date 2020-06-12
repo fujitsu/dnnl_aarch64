@@ -90,13 +90,15 @@ void simple_sum_t<src_data_type, dst_data_type>::execute() const {
         }
     };
 
-    if (nelems <= 256) {
+    if (nelems <= MAX_NUM_SINGLE) {
       if (src_data_type == data_type::bf16)
-	sum_block_bf16(0, nelems, 0);
+	      sum_block_bf16(0, nelems, 0);
       else
-	sum_block(0, nelems, 0);
+	      sum_block(0, nelems, 0);
     } else {
-      parallel(0, [&](const int ithr, const int nthr) {
+      int num_threads = std::min<long unsigned int>(max_num_threads, 
+                      ((nelems*sizeof(src_data_t)+pd_t::half_L1_size_-1)/pd_t::half_L1_size_));
+      parallel(num_threads, [&](const int ithr, const int nthr) {
           size_t start{0}, end{0};
           balance211(blocks_number, nthr, ithr, start, end);
 

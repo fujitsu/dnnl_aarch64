@@ -17,9 +17,12 @@
 #ifndef SIMPLE_SUM_HPP
 #define SIMPLE_SUM_HPP
 
+#include <thread>
 #include "cpu_sum.hpp"
 #include "cpu_isa_traits.hpp"
 #include "bfloat16_utils.hpp"
+
+#define MAX_NUM_SINGLE 4096
 
 namespace mkldnn {
 namespace impl {
@@ -42,6 +45,7 @@ struct simple_sum_t: public cpu_primitive_t {
         pd_t(const memory_desc_t *output_d, int n, const float *scales,
              const cpu_memory_pd_t **input_pds, const primitive_attr_t *attr)
             : cpu_sum_pd_t(output_d, n, scales, input_pds, attr) {}
+
 
         DECLARE_CPU_SUM_PD_T("simple:any", simple_sum_t);
 
@@ -75,16 +79,15 @@ struct simple_sum_t: public cpu_primitive_t {
 
         sum_bf16_params_t bf16_p_;
         size_t block_size_, nelems_, blocks_number_, tail_;
-
-        private:
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-            const size_t cacheline_size_ = 256; // bytes
-            const size_t half_L1_size_ = 32 * 1024; // bytes
+        static const size_t cacheline_size_ = 256; // bytes
+        static const size_t half_L1_size_ = 32 * 1024; // bytes
 #else //#ifdef DNNL_INDIRECT_JIT_AARCH64
-            const size_t cacheline_size_ = 64; // bytes
-            const size_t half_L1_size_ = 16 * 1024; // bytes
+        static const size_t cacheline_size_ = 64; // bytes
+        static const size_t half_L1_size_ = 16 * 1024; // bytes
 #endif
 
+        private:
             void compute_blocking() {
                 block_size_ = (src_data_type == data_type::bf16
                         ?  16 * cacheline_size_
@@ -123,19 +126,26 @@ struct simple_sum_t: public cpu_primitive_t {
     simple_sum_t(const pd_t *apd, const input_vector &inputs,
             const output_vector &outputs)
         : cpu_primitive_t(apd, inputs, outputs) {
-    }
+            max_num_threads = std::thread::hardware_concurrency();
+            char* ont;
+            ont = getenv("OMP_NUM_THREADS");
+            max_num_threads = (ont != NULL) ? 
+                                std::atoi(ont) : max_num_threads;
+        }
 
     virtual void execute(event_t *e) const {
         execute();
         e->set_state(event_t::ready);
     }
 
+    long unsigned int max_num_threads;
     enum {max_num_arrs = 16 };
     typedef typename prec_traits<src_data_type>::type src_data_t;
     typedef typename prec_traits<dst_data_type>::type dst_data_t;
     typedef typename prec_traits<data_type::f32>::type acc_data_t;
 
 private:
+
     void execute() const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 };
