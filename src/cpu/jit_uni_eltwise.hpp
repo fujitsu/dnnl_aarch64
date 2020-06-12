@@ -97,7 +97,7 @@ private:
     size_t vlen = cpu_isa_traits<isa>::vlen;
 
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-    const static size_t preserved_vecs_max = 14;
+    const static size_t preserved_vecs_max = 15;
 #else
     const static size_t preserved_vecs_max = 5;
 #endif
@@ -111,6 +111,7 @@ private:
 #ifdef DNNL_INDIRECT_JIT_AARCH64
     const static size_t expN = 5;
     Vmm log2, log2_e, expMin, expMax, expCoeff[5];
+    Vmm f0p5;
     const Xbyak::Xbyak_aarch64::PReg p;
 #endif  
     Xbyak::Address table_val(int index)

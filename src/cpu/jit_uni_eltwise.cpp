@@ -182,6 +182,7 @@ void jit_uni_eltwise_injector_f32<avx512_common>::assign_regs() {
     for (size_t i = 0; i < expN; i++) {
       expCoeff[i] = Vmm(preserved_vec_idxs[9+i]);
     }
+    f0p5 = Vmm(preserved_vec_idxs[9+expN]);
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
   
@@ -724,6 +725,39 @@ void jit_uni_eltwise_injector_f32<isa>::soft_relu_compute_vector(
     h->uni_vmovups(vmm_src, vmm_aux1);
 }
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+template <>
+void jit_uni_eltwise_injector_f32<avx512_common>::logistic_compute_vector(
+        const Vmm &vmm_src) {
+    using namespace Xbyak::Xbyak_aarch64;
+printf("logistic_compute_vector=%p\n", h->getCurr());
+
+    ZRegS min(expMin.getIdx());
+    ZRegS max(expMax.getIdx());
+    ZRegS tmpLog2(log2.getIdx());
+    ZRegS tmpLog2_e(log2_e.getIdx());
+    ZRegS src(vmm_src.getIdx());
+    // Intel's exp used aux1 and aux2 as temporal registers.
+    ZRegS aux1(vmm_aux1.getIdx());
+    ZRegS aux2(vmm_aux2.getIdx());
+    ZRegS coeff[5] = { ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0} } ;
+
+    for (size_t i = 0; i < expN; i++) {
+        coeff[i] = ZRegS(expCoeff[i].getIdx());
+    }
+    // exp(x)
+	expSVE(h, src, aux1, aux2, p, min, max, tmpLog2, tmpLog2_e, coeff);
+    // exp(x) + 1
+    h->CodeGeneratorAArch64::fadd(aux1, src, coeff[0]); // 1
+    // 1/(exp(x) + 1)
+    h->CodeGeneratorAArch64::frecpe(aux2, aux1);
+    h->CodeGeneratorAArch64::frecps(aux1, aux1, aux2);
+    h->CodeGeneratorAArch64::fmul(aux1, aux1, aux2);
+    // exp(x)/(exp(x) + 1)
+    h->CodeGeneratorAArch64::fmul(src, src, aux1);
+}
+#endif
+
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::logistic_compute_vector(
         const Vmm &vmm_src) {
@@ -774,11 +808,16 @@ void jit_uni_eltwise_injector_f32<avx512_common>::exp_prepare_table() {
             0x3fb8aa3b, // log2_e = 1.0f / log2;
             0xc2aeac50, // expMin
             0x42b17218, // expMax
+            // exp
             0x3f800000,
             0x3effff12,
             0x3e2aaa56,
             0x3d2b89cc,
             0x3c091331,
+            // gelu approx constants
+            0x3f000000, //[ 9] 0.5f
+            0x3d372713, //[10] 0.044715
+            0x3f4c4229, //[11] sqrt(2/pi)
     };
 
     for (size_t i = 0; i < sizeof(cvals) / sizeof(float); ++i) h->dd(cvals[i]);
@@ -902,11 +941,12 @@ int jit_uni_eltwise_injector_f32<isa>::aux_vecs_count(alg_kind_t alg_) {
     case alg_kind::eltwise_soft_relu: return 4;
 #ifdef DNNL_NATIVE_JIT_AARCH64
     // elu, tanh and logistic uses JIT-ed code of exp
-    case alg_kind::eltwise_elu: return 14;
-    case alg_kind::eltwise_tanh: return 14;
-    case alg_kind::eltwise_logistic: return 14;
-    case alg_kind::eltwise_exp: return 14;
-    case alg_kind::eltwise_gelu: return 14;
+    case alg_kind::eltwise_elu:
+    case alg_kind::eltwise_tanh:
+    case alg_kind::eltwise_logistic:
+    case alg_kind::eltwise_exp:
+    case alg_kind::eltwise_gelu:
+      return preserved_vecs_max;
 #else
     case alg_kind::eltwise_elu: return 4;
     case alg_kind::eltwise_tanh: return 5;
