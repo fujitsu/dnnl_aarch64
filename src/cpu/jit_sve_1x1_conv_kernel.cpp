@@ -462,23 +462,12 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             CGA64::L_aarch64(store_noeltwise);
         }
 
-        auto store_output = [=](bool output_is_aligned) {
-            int prev_ofs = -1;
-            for (int i_ur = 0; i_ur < ur; ++i_ur)
-                for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
-                    prev_ofs = out_str(i_load, i_ur, prev_ofs);
-                }
-        };
+        prev_ofs = -1;
+        for (int i_ur = 0; i_ur < ur; ++i_ur)
+            for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
+                prev_ofs = out_str(i_load, i_ur, prev_ofs);
+            }
 
-        xa::LabelAArch64 unaligned_store, end_store;
-        CGA64::tst(aux_reg_output_data, cpu_isa_traits<sve>::vlen - 1);
-        CGA64::b(xa::NE, unaligned_store);
-        store_output(true);
-        CGA64::b(end_store);
-        CGA64::L_aarch64(unaligned_store); {
-            store_output(false);
-        }
-        CGA64::L_aarch64(end_store);
     };
 
     auto fma_block = [=](bool last_block) {
