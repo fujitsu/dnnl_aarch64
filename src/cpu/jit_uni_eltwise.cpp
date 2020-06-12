@@ -270,6 +270,29 @@ void jit_uni_eltwise_injector_f32<isa>::exp_compute_vector(const Vmm &vmm_src) {
     h->uni_vmulps(vmm_src, vmm_src, vmm_aux2);
 }
 #ifdef DNNL_INDIRECT_JIT_AARCH64
+// src = exp(src)
+// destroy t1, t2
+template<class T, class Z, class P>
+void expSVE(T *h, const Z& src, const Z& t1, const Z& t2, const P& p, const Z& min, const Z& max, const Z& log2, const Z& log2_e, const Z coeff[5])
+{
+    using namespace Xbyak::Xbyak_aarch64;
+
+    h->CodeGeneratorAArch64::fmin(src, p/T_m, max);
+    h->CodeGeneratorAArch64::fmax(src, p/T_m, min);
+    h->CodeGeneratorAArch64::fmul(src, src, log2_e);
+    h->CodeGeneratorAArch64::frintn(t2, p/T_m, src); // rounding : float -> float
+    h->CodeGeneratorAArch64::fcvtzs(t1, p/T_m, t2); // float -> int
+    h->CodeGeneratorAArch64::fsub(t2, src, t2);
+    h->CodeGeneratorAArch64::fmul(t2, t2, log2);
+    h->CodeGeneratorAArch64::movprfx(src, p, coeff[4]);
+    h->CodeGeneratorAArch64::fmad(src, p, t2, coeff[3]);
+    h->CodeGeneratorAArch64::fmad(src, p, t2, coeff[2]);
+    h->CodeGeneratorAArch64::fmad(src, p, t2, coeff[1]);
+    h->CodeGeneratorAArch64::fmad(src, p, t2, coeff[0]);
+    h->CodeGeneratorAArch64::fmad(src, p, t2, coeff[0]);
+    h->CodeGeneratorAArch64::fscale(src, p, t1); // src *= 2^t1
+}
+
 template <>
 void jit_uni_eltwise_injector_f32<avx512_common>::exp_compute_vector(const Vmm &vmm_src) {
     using namespace Xbyak::Xbyak_aarch64;
@@ -287,21 +310,7 @@ void jit_uni_eltwise_injector_f32<avx512_common>::exp_compute_vector(const Vmm &
     for (size_t i = 0; i < expN; i++) {
         coeff[i] = ZRegS(expCoeff[i].getIdx());
     }
-    
-    h->CodeGeneratorAArch64::fmin(src, p/T_m, max);
-    h->CodeGeneratorAArch64::fmax(src, p/T_m, min);
-    h->CodeGeneratorAArch64::fmul(src, src, tmpLog2_e);
-    h->CodeGeneratorAArch64::frintn(aux2, p/T_m, src); // rounding : float -> float
-    h->CodeGeneratorAArch64::fcvtzs(aux1, p/T_m, aux2); // float -> int
-    h->CodeGeneratorAArch64::fsub(aux2, src, aux2);
-    h->CodeGeneratorAArch64::fmul(aux2, aux2, tmpLog2);
-    h->CodeGeneratorAArch64::movprfx(src, p, coeff[4]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[3]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[2]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[1]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
-    h->CodeGeneratorAArch64::fscale(src, p, aux1); // src *= 2^aux0
+	expSVE(h, src, aux1, aux2, p, min, max, tmpLog2, tmpLog2_e, coeff);
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
@@ -382,20 +391,7 @@ void jit_uni_eltwise_injector_f32<avx512_common>::tanh_compute_vector(const Vmm 
     // 2x
     h->CodeGeneratorAArch64::fadd(src, src, src);
     // exp(2x)
-    h->CodeGeneratorAArch64::fmin(src, p/T_m, max);
-    h->CodeGeneratorAArch64::fmax(src, p/T_m, min);
-    h->CodeGeneratorAArch64::fmul(src, src, tmpLog2_e);
-    h->CodeGeneratorAArch64::frintn(aux2, p/T_m, src); // rounding : float -> float
-    h->CodeGeneratorAArch64::fcvtzs(aux1, p/T_m, aux2); // float -> int
-    h->CodeGeneratorAArch64::fsub(aux2, src, aux2);
-    h->CodeGeneratorAArch64::fmul(aux2, aux2, tmpLog2);
-    h->CodeGeneratorAArch64::movprfx(src, p, coeff[4]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[3]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[2]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[1]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
-    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
-    h->CodeGeneratorAArch64::fscale(src, p, aux1); // src *= 2^aux0
+	expSVE(h, src, aux1, aux2, p, min, max, tmpLog2, tmpLog2_e, coeff);
     // 1+exp(2x)
     h->CodeGeneratorAArch64::fadd(src, src, coeff[0]); // 1
     // 1/(1+exp(2x))
