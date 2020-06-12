@@ -313,14 +313,42 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 auto r = vreg_accum(i_load, i_ur);
                 zmm_t r_zmm = mask_flag ? r | ktail_mask : r;
 
+                auto base = aux_reg_output_data;
+                auto raw_offt = jcp.typesize_out * (jcp.oc_without_padding * i_ur + i_load * jcp.load_block);
+ 
+                assert(raw_offt <= INT_MAX);
+                auto offt = static_cast<int>(raw_offt);
+ 
+                int scale = 0;
+ 
+                if (EVEX_max_8b_offt <= offt && offt < 3 * EVEX_max_8b_offt) {
+                    offt = offt - 2 * EVEX_max_8b_offt;
+                    scale = 1;
+                } else if (3 * EVEX_max_8b_offt <= offt && offt < 5 * EVEX_max_8b_offt) {
+                    offt = offt - 4 * EVEX_max_8b_offt;
+                    scale = 2;
+                }
+ 
+                auto re = offt;
+                if (scale)
+                    re = re + (2 * EVEX_max_8b_offt) * scale;
+                add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re);
+
                 switch (jcp.dst_dt) {
                 case data_type::f32:
                 case data_type::s32:
                     vmovups(output_ptr(i_load, i_ur), r_zmm); break;
                 case data_type::s8:
-                    vpmovsdb(output_ptr(i_load, i_ur), r_zmm); break;
+                    // vpmovsdb(output_ptr(i_load, i_ur), r_zmm); break;
+                    CGA64::smin(xa::ZRegS(r_zmm.getIdx()), 127);
+                    CGA64::smax(xa::ZRegS(r_zmm.getIdx()), -128);
+                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(reg_tmp_adr));
+                    break;
                 case data_type::u8:
-                    vpmovusdb(output_ptr(i_load, i_ur), r_zmm); break;
+                    // vpmovusdb(output_ptr(i_load, i_ur), r_zmm); break;
+                    CGA64::umin(xa::ZRegS(r_zmm.getIdx()), 255);
+                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(reg_tmp_adr));
+                    break;
                 default: assert(!"unknown dst_dt");
                 }
             }

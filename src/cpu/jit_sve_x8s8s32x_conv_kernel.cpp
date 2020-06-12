@@ -246,14 +246,44 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
                     * (k * oc_block + j * jcp.oc_without_padding * jcp.ngroups);
             auto addr = SVE_compress_addr(reg_out, aux_output_offset);
 
+            auto base = reg_out;
+            auto raw_offt = aux_output_offset;
+ 
+            assert(raw_offt <= INT_MAX);
+            auto offt = static_cast<int>(raw_offt);
+ 
+            int scale = 0;
+ 
+            if (EVEX_max_8b_offt <= offt && offt < 3 * EVEX_max_8b_offt) {
+                offt = offt - 2 * EVEX_max_8b_offt;
+                scale = 1;
+            } else if (3 * EVEX_max_8b_offt <= offt && offt < 5 * EVEX_max_8b_offt) {
+                offt = offt - 4 * EVEX_max_8b_offt;
+                scale = 2;
+            }
+ 
+            auto re = offt;
+            if (scale)
+                re = re + (2 * EVEX_max_8b_offt) * scale;
+            add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re);
+
             Vmm vmm = vmm_out(j, k);
             const Vmm r_vmm = vmm_mask(vmm, mask_flag, true);
 
             switch (jcp.dst_dt) {
             case data_type::f32:
             case data_type::s32: vmovups(addr, r_vmm); break;
-            case data_type::s8: vpmovsdb(addr, r_vmm); break;
-            case data_type::u8: vpmovusdb(addr, r_vmm); break;
+            // case data_type::s8: vpmovsdb(addr, r_vmm); break;
+            case data_type::s8: 
+                CGA64::smin(xa::ZRegS(r_vmm.getIdx()), 127);
+                CGA64::smax(xa::ZRegS(r_vmm.getIdx()), -128);
+                CGA64::st1b(xa::ZRegS(r_vmm.getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(reg_tmp_adr));
+                break;
+            // case data_type::u8: //< vpmovusdb(addr, r_vmm); break;
+            case data_type::u8:
+                CGA64::umin(xa::ZRegS(r_vmm.getIdx()), 255);
+                CGA64::st1b(xa::ZRegS(r_vmm.getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(reg_tmp_adr));
+                break;
             default: assert(!"unknown dst_dt");
             }
         }
