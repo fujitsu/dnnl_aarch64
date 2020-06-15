@@ -94,15 +94,13 @@ private:
     reg64_t reg_inp             = x1;  
     reg64_t reg_ker             = x2;  
     reg64_t reg_out             = x3;  
-
-    reg64_t reg_inp_prf         = x18;  
+    reg64_t reg_inp_prf         = x4;   
     reg64_t reg_ker_prf         = x5;  
     reg64_t reg_owb             = x5;  
     reg64_t reg_out_prf         = x6;  
 
     reg64_t aux_reg_inp         = x7;  
     reg64_t aux_reg_ker         = x8;  
-
     reg64_t aux_reg_inp_prf     = x9;  
     reg64_t aux_reg_ker_prf     = x10; 
 
@@ -119,28 +117,26 @@ private:
     reg64_t reg_relu_ns         = x13; 
     reg64_t reg_oi              = x11; 
     reg64_t reg_kh              = x12; 
-
     reg64_t reg_ic_loop         = x10; 
     reg64_t reg_inp_loop        = x9;  
-
     reg64_t reg_init_flag       = x6;  
 
     reg64_t aux_reg_ic          = x5;  
     reg64_t reg_binp            = x13; 
-    reg64_t reg_bout            = x18;  
+    reg64_t reg_bout            = x4;   
     reg64_t aux1_reg_inp        = x11; 
     reg64_t aux_reg_out         = x12; 
-
-    reg64_t reg_long_offt       = x18;  
+    reg64_t reg_long_offt       = x4;   
     reg64_t reg_out_long_offt   = x7;  
-
-    reg64_t imm_addr64          = x8; 
 
     /* Temporary registers for ARM insts */
     reg64_t reg_tmp_addr        = x14;
     reg64_t reg_prev_bcast_addr = x15;
     reg64_t reg_prev_wei_addr   = x16;
     reg64_t reg_tmp_imm         = x17; 
+
+    reg64_t reg_out_org         = x18;
+    reg64_t reg_oi_org          = x19;
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
         long long int val = (value >= 0) ? value : -1 * value;
@@ -310,11 +306,16 @@ private:
     reg64_t reg_tmp             = x14; 
     reg64_t reg_long_offt       = x7;  
 
+    /* Temporary registers for ARM insts */
     reg64_t reg_prev_bcast_addr = x15; 
     reg64_t reg_tmp_imm         = x16; 
     reg64_t reg_tmp_addr        = x18; 
 
-    const xa::PReg reg_p_all_ones  = p1;
+    reg64_t reg_src_prf_org     = x19;
+    reg64_t reg_src_org         = x20;
+    reg64_t reg_oi_org          = x21;
+
+    const xa::PReg reg_p_all_ones  = p2;
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
         long long int val = (value >= 0) ? value : -1 * value;
@@ -418,9 +419,14 @@ private:
     reg64_t reg_add_tmp    = x14;
     reg64_t reg_tmp_imm    = x15;
 
+    reg64_t reg_kd_count_org = x16;
+    reg64_t reg_input_d_org  = x17;
+    reg64_t reg_output_d_org = x18;
+    reg64_t reg_d_index_org  = x19;
+
     xa::ZRegS zreg_idata   = xa::ZRegS(31);
 
-    const xa::PReg reg_p_all_ones = p1;
+    const xa::PReg reg_p_all_ones = p2;
 
     void mov_imm(reg64_t out, long long int value){
         assert(value >= 0);
