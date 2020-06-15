@@ -87,7 +87,7 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
     case alg_kind::eltwise_elu:
     case alg_kind::eltwise_tanh:
     case alg_kind::eltwise_logistic:
-        // elu, tanh and logistic uses JIT-ed code of exp
+    case alg_kind::eltwise_gelu:
         this->assign_reg_values();
 	break;
     default:
@@ -182,7 +182,8 @@ void jit_uni_eltwise_injector_f32<avx512_common>::assign_regs() {
     for (size_t i = 0; i < expN; i++) {
       expCoeff[i] = Vmm(preserved_vec_idxs[9+i]);
     }
-    f0p5 = Vmm(preserved_vec_idxs[9+expN]);
+    geluC1 = Vmm(preserved_vec_idxs[9+expN]);
+    geluC2 = Vmm(preserved_vec_idxs[10+expN]);
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
   
@@ -210,6 +211,9 @@ void jit_uni_eltwise_injector_f32<avx512_common>::assign_reg_values() {
     for (int i = 0; i < static_cast<int>(expN); i++) {
         h->CodeGeneratorAArch64::ld1rw(ZRegS(expCoeff[i].getIdx()), p/T_z, ptr(addrReg, 16 + 4*i));
     }
+    // geluC1, geluC2
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(geluC1.getIdx()), p/T_z, ptr(addrReg, 9 * 4));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(geluC2.getIdx()), p/T_z, ptr(addrReg, 10 * 4));
 }
 #endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
@@ -551,6 +555,58 @@ void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
         h->uni_vpxor(vmm_src, vmm_src, vmm_aux4);
     }
 }
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+template <>
+void jit_uni_eltwise_injector_f32<avx512_common>::gelu_compute_vector(const Vmm &vmm_src) {
+    using namespace Xbyak::Xbyak_aarch64;
+
+    /*
+        C = C1 + C2 x^2
+        gelu(x) = x(1 - 1/(1 + exp(C x)))
+    */
+    ZRegS min(expMin.getIdx());
+    ZRegS max(expMax.getIdx());
+    ZRegS tmpLog2(log2.getIdx());
+    ZRegS tmpLog2_e(log2_e.getIdx());
+    ZRegS src(vmm_src.getIdx());
+    ZRegS aux1(vmm_aux1.getIdx());
+    ZRegS aux2(vmm_aux2.getIdx());
+    ZRegS aux3(vmm_aux3.getIdx());
+    ZRegS coeff[5] = { ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0} } ;
+
+    for (size_t i = 0; i < expN; i++) {
+        coeff[i] = ZRegS(expCoeff[i].getIdx());
+    }
+    ZRegS C1(geluC1.getIdx());
+    ZRegS C2(geluC2.getIdx());
+
+    // x^2
+    h->CodeGeneratorAArch64::fmul(aux3, src, src);
+    h->CodeGeneratorAArch64::fmad(aux3, p, C2, C1);
+    // Cx
+    h->CodeGeneratorAArch64::fmul(aux3, aux3, src);
+    // exp(Cx)
+	expSVE(h, aux3, aux1, aux2, p, min, max, tmpLog2, tmpLog2_e, coeff);
+    // 1 + exp(Cx)
+    h->CodeGeneratorAArch64::fadd(aux3, aux3, coeff[0]);
+#if 1
+    // x / (1 + exp(Cx))
+    h->CodeGeneratorAArch64::movprfx(aux1, p, src);
+    h->CodeGeneratorAArch64::fdiv(aux1, p, aux3);
+    // G(x) = x - x/(1 + exp(Cx))
+    h->CodeGeneratorAArch64::fsub(src, src, aux1);
+#else
+    // 1 / (1 + exp(Cx))
+    h->CodeGeneratorAArch64::frecpe(aux1, aux3);
+    h->CodeGeneratorAArch64::frecps(aux3, aux3, aux1);
+    h->CodeGeneratorAArch64::fmul(aux3, aux3, aux1);
+    // 1 - 1/(1 + exp(Cx))
+    h->CodeGeneratorAArch64::fsub(aux3, coeff[0], aux3);
+    // G(x)
+    h->CodeGeneratorAArch64::fmul(src, src, aux3);
+#endif
+}
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::gelu_compute_vector(
@@ -815,9 +871,8 @@ void jit_uni_eltwise_injector_f32<avx512_common>::exp_prepare_table() {
             0x3d2b89cc,
             0x3c091331,
             // gelu approx constants
-            0x3f000000, //[ 9] 0.5f
-            0x3d372713, //[10] 0.044715
-            0x3f4c4229, //[11] sqrt(2/pi)
+            0x3fcc422a, //[ 9] geluC1
+            0x3d922279, //[10] geluC2
     };
 
     for (size_t i = 0; i < sizeof(cvals) / sizeof(float); ++i) h->dd(cvals[i]);
