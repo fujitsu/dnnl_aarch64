@@ -94,7 +94,7 @@ private:
     reg64_t reg_inp             = x1;  
     reg64_t reg_ker             = x2;  
     reg64_t reg_out             = x3;  
-    reg64_t reg_inp_prf         = x4;   
+    reg64_t reg_inp_prf         = x20;   
     reg64_t reg_ker_prf         = x5;  
     reg64_t reg_owb             = x5;  
     reg64_t reg_out_prf         = x6;  
@@ -123,10 +123,10 @@ private:
 
     reg64_t aux_reg_ic          = x5;  
     reg64_t reg_binp            = x13; 
-    reg64_t reg_bout            = x4;   
+    reg64_t reg_bout            = x20;   
     reg64_t aux1_reg_inp        = x11; 
     reg64_t aux_reg_out         = x12; 
-    reg64_t reg_long_offt       = x4;   
+    reg64_t reg_long_offt       = x20;   
     reg64_t reg_out_long_offt   = x7;  
 
     /* Temporary registers for ARM insts */
