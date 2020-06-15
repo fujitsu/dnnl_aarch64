@@ -96,7 +96,7 @@ void simple_sum_t<src_data_type, dst_data_type>::execute() const {
       else
 	      sum_block(0, nelems, 0);
     } else {
-      int num_threads = std::min<long unsigned int>(max_num_threads, 
+      int num_threads = std::min<long unsigned int>(mkldnn_get_max_threads(), 
                       ((nelems*sizeof(src_data_t)+pd_t::half_L1_size_-1)/pd_t::half_L1_size_));
       parallel(num_threads, [&](const int ithr, const int nthr) {
           size_t start{0}, end{0};
