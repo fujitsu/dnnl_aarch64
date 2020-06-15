@@ -47,8 +47,6 @@
 #include "jit_sve_1x1_conv_kernel.hpp"
 
 #define GET_OFF(field) static_cast<int32_t>(offsetof(jit_1x1_conv_call_s, field))
-/* Get vector offsets, ofs / VL(VL: 512bits = 64Bytes) */
-#define VL_OFS(ofs) ((ofs)>>6)
 
 using namespace mkldnn::impl::types;
 
@@ -170,23 +168,8 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       }else{
         ofs = jcp.typesize_out * jcp.load_block * i_ur;
       }
-
-      if ((ofs&0xFF)==0) { /* Alined to the cache line size */
-        if((ofs <= PRFMMAX) && (ofs >= 0)) {
-          CGA64::prfm(xa::PSTL2KEEP, xa::ptr(r, static_cast<int32_t>(ofs)));
-        }else{
-          add_imm(reg_tmp_ofs, aux_reg_output_data, ofs);
-          CGA64::prfm(xa::PSTL2KEEP, xa::ptr(reg_tmp_ofs));
-        }
-      } else {
-        if((VL_OFS(ofs) <= PRFWMAX) &&
-           (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
-          CGA64::prfw(xa::PSTL2KEEP_SVE, reg_p_all_ones, xa::ptr(r, static_cast<int32_t>(VL_OFS(ofs))));
-        }else{
-          add_imm(reg_tmp_ofs, aux_reg_output_data, ofs);
-          CGA64::prfw(xa::PSTL2KEEP_SVE, reg_p_all_ones, xa::ptr(reg_tmp_ofs));
-        }
-      }
+      std::string op = "ST";
+      prefetch(op, 2, r, ofs);
     };
 
     auto init = [=]() {
@@ -470,6 +453,99 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
     };
 
+    auto prefetch_callback = [=](int ur, int i_reduce, int i_ur, int i_load,
+        bool last_block, bool wraparound, int reduce_step)
+    {
+        bool pf_ker_l1 = true;
+        bool pf_ker_l2 = wraparound;
+        int n_ops = (jcp.reduce_loop_unroll / reduce_step) * ur * load_loop_blk;
+        int i_op = (i_reduce / reduce_step) * ur * load_loop_blk +
+            i_ur * load_loop_blk + i_load;
+
+        int n_pf_ker_l1 = pf_ker_l1 ? jcp.reduce_block : 0;
+        int n_pf_ker_l2 = pf_ker_l2 && wraparound ? jcp.reduce_block : 0;
+        int n_pf_out_l1 = jcp.use_vmovntps ? 0 : ur;
+
+        int pf_inp_ops = n_ops / 2; // # of operations during which to pf input
+        int pf_inp_trigger;
+        if (jcp.prop_kind == backward_weights)
+            pf_inp_trigger = nstl::max(1, pf_inp_ops / jcp.reduce_block);
+        else
+            pf_inp_trigger = nstl::max(1, pf_inp_ops / ur);
+
+        int n_other_pf =
+            load_loop_blk * (n_pf_ker_l1 + n_pf_ker_l2 + n_pf_out_l1);
+        int n_other_pf_ops = n_ops - pf_inp_ops;
+        int other_pf_trigger
+                = n_other_pf ? nstl::max(1, n_other_pf_ops / n_other_pf) : 0;
+
+        if (i_op < pf_inp_ops && i_op % pf_inp_trigger == 0) {
+            // input prefetches have the highest priority b/c the
+            // first iteration of the kernel block touches all the
+            // cache lines
+            int i_pf = i_op / pf_inp_trigger;
+            auto pf_reg = wraparound && last_block
+                                  ? reg_bcast_data
+                                  : (last_block ? aux1_reg_bcast_data
+                                                : aux_reg_bcast_data);
+            int ofs = i_pf;
+            if (jcp.prop_kind == backward_weights) {
+                ofs += wraparound && last_block
+                                    ? 0
+                                    : (last_block ? jcp.is : jcp.reduce_block);
+                ofs *= jcp.bcast_block;
+            } else {
+                ofs += wraparound && last_block
+                                    ? 0
+                                    : (last_block ? jcp.ur : jcp.bcast_dim);
+                ofs *= jcp.reduce_block;
+            }
+            ofs *= jcp.typesize_in;
+            std::string op = "LD";
+            prefetch(op, 1, pf_reg, ofs);
+        } else if  (i_op >= pf_inp_ops && n_other_pf) {
+            // remaining prefetches are spread among the rest of the
+            // operations; prefetches for output take priority
+            // TODO: spread L2 prefetches among L1 prefetches
+            i_op -= pf_inp_ops;
+            if (i_op % other_pf_trigger == 0) {
+                int i_pf = i_op / (load_loop_blk * other_pf_trigger);
+                if (i_pf < n_pf_ker_l2) {
+                    int ofs = (i_pf + (i_load + 1) * jcp.reduce_dim)
+                        * jcp.load_block;
+                    if (jcp.prop_kind == backward_data && jcp.ver == ver_4vnni)
+                        ofs = (i_pf + (i_load + 1) * jcp.reduce_block)
+                                * jcp.load_block;
+
+                    ofs *= jcp.typesize_in;
+                    std::string op = "LD";
+                    prefetch(op, 2, aux_reg_load_data, ofs);
+                    // mic_prefetcht1(ptr[aux_reg_load_data + ofs * jcp.typesize_in]);
+                } else if (i_pf < n_pf_ker_l2 + n_pf_ker_l1) {
+                    i_pf -= n_pf_ker_l2;
+                    auto pf_reg = last_block ? reg_load_data
+                                             : aux_reg_load_data;
+                    int ofs = (i_pf + i_load * jcp.reduce_dim
+                        + (last_block
+                            ? (wraparound ? jcp.reduce_dim : 0)
+                            : jcp.reduce_block))
+                        * jcp.load_block;
+                     ofs *= jcp.typesize_in;
+                     std::string op = "LD";
+                     prefetch(op, 1, pf_reg, ofs);
+                    // mic_prefetcht0(ptr[pf_reg + ofs * jcp.typesize_in]);
+                } else if (i_pf < n_pf_ker_l1 + n_pf_ker_l2 + n_pf_out_l1) {
+                    i_pf -= n_pf_ker_l1 + n_pf_ker_l2;
+                    int ofs = i_pf * jcp.load_block;
+                    ofs *= jcp.typesize_out;
+                    std::string op = "ST";
+                    prefetch(op, 1, aux_reg_output_data, ofs);
+                    // mic_prefetcht0(ptr[aux_reg_output_data + ofs * jcp.typesize_out]);
+                }
+            }
+        }
+    };
+
     auto fma_block = [=](bool last_block) {
         assert(jcp.reduce_loop_unroll % jcp.fma_step == 0);
 
@@ -530,7 +606,10 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
                             vreg_load_s(i_load, 0),
                             vreg_bcast_s(bcast_reg_ofs + (i_ur % num_bcast_regs)));
+                prefetch_callback(ur, i_reduce, i_ur, i_load,
+                                  last_block, wraparound, reduce_step);
               }
+
               if((num_bcast_load + i_ur) < ur)
                 prev_bcast_ofs = bcast_load(i_reduce, num_bcast_load+i_ur,
                                             prev_bcast_ofs,
