@@ -786,7 +786,6 @@ template <>
 void jit_uni_eltwise_injector_f32<avx512_common>::logistic_compute_vector(
         const Vmm &vmm_src) {
     using namespace Xbyak::Xbyak_aarch64;
-printf("logistic_compute_vector=%p\n", h->getCurr());
 
     ZRegS min(expMin.getIdx());
     ZRegS max(expMax.getIdx());
@@ -810,7 +809,7 @@ printf("logistic_compute_vector=%p\n", h->getCurr());
     h->CodeGeneratorAArch64::frecps(aux1, aux1, aux2);
     h->CodeGeneratorAArch64::fmul(aux1, aux1, aux2);
     // exp(x)/(exp(x) + 1)
-    h->CodeGeneratorAArch64::fmul(src, src, aux1);
+    h->CodeGeneratorAArch64::fsub(src, coeff[0], aux1);
 }
 #endif
 
