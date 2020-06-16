@@ -37,7 +37,11 @@ jit_avx512_core_u8_copy_sum_bt_kern::jit_avx512_core_u8_copy_sum_bt_kern(bool s8
 #define A2  r8
 #define LDA3    r11
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+#define ARG_BIAS    stacksize+rsp
+#else
 #define ARG_BIAS    24+stacksize+rsp
+#endif
 
 #else
 
@@ -92,7 +96,11 @@ Xbyak::Label l7c8;
 Xbyak::Label l7e8;
 
     preamble();
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    auto stacksize = get_size_of_abi_save_regs_aarch64();
+#else
     auto stacksize = get_size_of_abi_save_regs();
+#endif
 #ifdef _WIN32
     mov(ALPHA, ptr[ARG_ALPHA]);
     mov(B, ptr[ARG_B]);
@@ -126,7 +134,12 @@ L(l20);
     pxor(xmm8, xmm8);
     pxor(xmm9, xmm9);
     mov(I, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0);
+#else
     sar(I, 0x3);
+#endif
     jle(l15c, T_NEAR);
     align(4);
 
@@ -292,7 +305,12 @@ L(l2b0);
     add(A, 0x4);
     pxor(xmm7, xmm7);
     mov(I, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(I.getIdx()), 0);
+#else
     sar(I, 0x3);
+#endif
     jle(l384, T_NEAR);
     align(4);
 
@@ -415,7 +433,12 @@ L(l474);
     add(A, 0x2);
     pxor(xmm7, xmm7);
     mov(LDA3, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), 0);
+#else
     sar(LDA3, 0x3);
+#endif
     jle(l550, T_NEAR);
     align(4);
 
@@ -545,7 +568,12 @@ L(l650);
     add(A, 0x1);
     pxor(xmm7, xmm7);
     mov(LDA3, M);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(LDA3.getIdx()), 0);
+#else
     sar(LDA3, 0x3);
+#endif
     jle(l700, T_NEAR);
     align(4);
 
