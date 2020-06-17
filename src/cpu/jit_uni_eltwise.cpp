@@ -60,6 +60,12 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
     assert(preserved_vecs_count == vecs_to_preserve);
 
+#ifdef DNNL_NATIVE_JIT_AARCH64
+    h->CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
+    h->CodeGeneratorAArch64::str(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
+    h->CodeGeneratorAArch64::ptrue(p.s, Xbyak::Xbyak_aarch64::ALL);
+#endif
+
     if (save_state_) {
         h->push(p_table);
 
@@ -71,9 +77,24 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
                     Vmm(preserved_vec_idxs[i]));
 
         load_table_addr();
+
     }
 
     assign_regs();
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    switch(alg_) {
+    case alg_kind::eltwise_exp:
+    case alg_kind::eltwise_elu:
+    case alg_kind::eltwise_tanh:
+    case alg_kind::eltwise_logistic:
+        // elu, tanh and logistic uses JIT-ed code of exp
+        this->assign_reg_values();
+	break;
+    default:
+	// Do noghitng
+        break;
+    }
+#endif
 }
 
 template <cpu_isa_t isa>
@@ -106,10 +127,18 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble_tail(size_t start_idx)
     }
 
     assign_regs();
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    this->assign_reg_values();
+#endif
 }
 
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::injector_postamble() {
+#ifdef DNNL_NATIVE_JIT_AARCH64
+    h->CodeGeneratorAArch64::ldr(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
+    h->CodeGeneratorAArch64::add(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
+#endif
+
     if (!save_state_) return;
 
     for (size_t i = 0; i < preserved_vecs_count; ++i)
@@ -119,8 +148,10 @@ void jit_uni_eltwise_injector_f32<isa>::injector_postamble() {
     if (preserved_vecs_count)
         h->add(h->rsp, preserved_vecs_count * vlen);
 
+
     h->pop(p_table);
 }
+
 
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::assign_regs() {
@@ -131,6 +162,55 @@ void jit_uni_eltwise_injector_f32<isa>::assign_regs() {
     vmm_aux3 = Vmm(preserved_vec_idxs[3]);
     vmm_aux4 = Vmm(preserved_vec_idxs[4]);
 }
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+template <>
+void jit_uni_eltwise_injector_f32<avx512_common>::assign_regs() {
+    /* exp is used in elu, tanh, logistic so that
+       vmm_aux(0-4) are assigned not to conflict others. */
+    vmm_mask = Vmm(preserved_vec_idxs[0]);
+    vmm_aux0 = Vmm(preserved_vec_idxs[0]);
+    vmm_aux1 = Vmm(preserved_vec_idxs[1]);
+    vmm_aux2 = Vmm(preserved_vec_idxs[2]);
+    vmm_aux3 = Vmm(preserved_vec_idxs[3]);
+    vmm_aux4 = Vmm(preserved_vec_idxs[4]);
+
+    log2 = Vmm(preserved_vec_idxs[5]);
+    log2_e = Vmm(preserved_vec_idxs[6]);
+    expMin = Vmm(preserved_vec_idxs[7]);
+    expMax = Vmm(preserved_vec_idxs[8]);
+    
+    for (size_t i = 0; i < expN; i++) {
+      expCoeff[i] = Vmm(preserved_vec_idxs[9+i]);
+    }
+}
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
+  
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+template <cpu_isa_t isa>
+void jit_uni_eltwise_injector_f32<isa>::assign_reg_values() {
+}
+template <>
+void jit_uni_eltwise_injector_f32<avx512_common>::assign_reg_values() {
+    using namespace Xbyak::Xbyak_aarch64;
+    Xbyak::Xbyak_aarch64::XReg tblPtr{static_cast<uint32_t>(p_table.getIdx())};
+    Xbyak::Xbyak_aarch64::XReg addrReg{28};
+    int eluOffset = 25 * vlen / sizeof(float) * 4 /* h->dd(cvals[i]) */
+      + vlen / sizeof(float) * 4 /* h->dd(float2int(alpha_) */
+      + vlen / sizeof(float) * 4 /* h->dd(0) */;
+    assert(eluOffset % 4 == 0);
+    assert(eluOffset < (uint32_t(1) << 11));
+    
+    h->CodeGeneratorAArch64::add(addrReg, tblPtr, eluOffset);
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2.getIdx()), p/T_z, ptr(addrReg, 0));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(log2_e.getIdx()), p/T_z, ptr(addrReg, 4));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMin.getIdx()), p/T_z, ptr(addrReg, 8));
+    h->CodeGeneratorAArch64::ld1rw(ZRegS(expMax.getIdx()), p/T_z, ptr(addrReg, 12));
+
+    for (int i = 0; i < static_cast<int>(expN); i++) {
+        h->CodeGeneratorAArch64::ld1rw(ZRegS(expCoeff[i].getIdx()), p/T_z, ptr(addrReg, 16 + 4*i));
+    }
+}
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::exp_compute_vector(const Vmm &vmm_src) {
@@ -189,6 +269,41 @@ void jit_uni_eltwise_injector_f32<isa>::exp_compute_vector(const Vmm &vmm_src) {
     // y = y * 2^n
     h->uni_vmulps(vmm_src, vmm_src, vmm_aux2);
 }
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+template <>
+void jit_uni_eltwise_injector_f32<avx512_common>::exp_compute_vector(const Vmm &vmm_src) {
+    using namespace Xbyak::Xbyak_aarch64;
+
+    ZRegS min(expMin.getIdx());
+    ZRegS max(expMax.getIdx());
+    ZRegS tmpLog2(log2.getIdx());
+    ZRegS tmpLog2_e(log2_e.getIdx());
+    ZRegS src(vmm_src.getIdx());
+    // Intel's exp used aux1 and aux2 as temporal registers.
+    ZRegS aux1(vmm_aux1.getIdx());
+    ZRegS aux2(vmm_aux2.getIdx());
+    ZRegS coeff[5] = { ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0} } ;
+
+    for (size_t i = 0; i < expN; i++) {
+        coeff[i] = ZRegS(expCoeff[i].getIdx());
+    }
+    
+    h->CodeGeneratorAArch64::fmin(src, p/T_m, max);
+    h->CodeGeneratorAArch64::fmax(src, p/T_m, min);
+    h->CodeGeneratorAArch64::fmul(src, src, tmpLog2_e);
+    h->CodeGeneratorAArch64::frintn(aux2, p/T_m, src); // rounding : float -> float
+    h->CodeGeneratorAArch64::fcvtzs(aux1, p/T_m, aux2); // float -> int
+    h->CodeGeneratorAArch64::fsub(aux2, src, aux2);
+    h->CodeGeneratorAArch64::fmul(aux2, aux2, tmpLog2);
+    h->CodeGeneratorAArch64::movprfx(src, p, coeff[4]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[3]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[2]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[1]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
+    h->CodeGeneratorAArch64::fscale(src, p, aux1); // src *= 2^aux0
+}
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::relu_compute_vector(const Vmm &vmm_src)
@@ -222,7 +337,8 @@ void jit_uni_eltwise_injector_f32<isa>::relu_zero_ns_compute_vector(
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::elu_compute_vector(const Vmm &vmm_src) {
     const int alpha_off = 25, zero_off = 26;
-
+    Xbyak::Xbyak_aarch64::LabelAArch64 l0;
+    
     // compute exponent
     h->uni_vmovups(vmm_aux3, vmm_src);
     exp_compute_vector(vmm_src);
@@ -244,6 +360,54 @@ void jit_uni_eltwise_injector_f32<isa>::elu_compute_vector(const Vmm &vmm_src) {
         h->vblendmps(vmm_src | k_mask, vmm_src, vmm_aux3);
     }
 }
+
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+template <>
+void jit_uni_eltwise_injector_f32<avx512_common>::tanh_compute_vector(const Vmm &vmm_src) {
+    using namespace Xbyak::Xbyak_aarch64;
+
+    ZRegS min(expMin.getIdx());
+    ZRegS max(expMax.getIdx());
+    ZRegS tmpLog2(log2.getIdx());
+    ZRegS tmpLog2_e(log2_e.getIdx());
+    ZRegS src(vmm_src.getIdx());
+    // Intel's exp used aux1 and aux2 as temporal registers.
+    ZRegS aux1(vmm_aux1.getIdx());
+    ZRegS aux2(vmm_aux2.getIdx());
+    ZRegS coeff[5] = { ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0}, ZRegS{0} } ;
+
+    for (size_t i = 0; i < expN; i++) {
+        coeff[i] = ZRegS(expCoeff[i].getIdx());
+    }
+    // 2x
+    h->CodeGeneratorAArch64::fadd(src, src, src);
+    // exp(2x)
+    h->CodeGeneratorAArch64::fmin(src, p/T_m, max);
+    h->CodeGeneratorAArch64::fmax(src, p/T_m, min);
+    h->CodeGeneratorAArch64::fmul(src, src, tmpLog2_e);
+    h->CodeGeneratorAArch64::frintn(aux2, p/T_m, src); // rounding : float -> float
+    h->CodeGeneratorAArch64::fcvtzs(aux1, p/T_m, aux2); // float -> int
+    h->CodeGeneratorAArch64::fsub(aux2, src, aux2);
+    h->CodeGeneratorAArch64::fmul(aux2, aux2, tmpLog2);
+    h->CodeGeneratorAArch64::movprfx(src, p, coeff[4]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[3]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[2]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[1]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
+    h->CodeGeneratorAArch64::fmad(src, p, aux2, coeff[0]);
+    h->CodeGeneratorAArch64::fscale(src, p, aux1); // src *= 2^aux0
+    // 1+exp(2x)
+    h->CodeGeneratorAArch64::fadd(src, src, coeff[0]); // 1
+    // 1/(1+exp(2x))
+    h->CodeGeneratorAArch64::frecpe(aux1, src);
+    h->CodeGeneratorAArch64::frecps(src, src, aux1);
+    h->CodeGeneratorAArch64::fmul(src, src, aux1);
+    // 2/(1+exp(2x))
+    h->CodeGeneratorAArch64::fadd(src, src, src);
+    // 1-2/(1+exp(2x))
+    h->CodeGeneratorAArch64::fsub(src, coeff[0], src);
+}
+#endif //#ifdef DNNL_INDIRECT_JIT_AARCH64
 
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::tanh_compute_vector(const Vmm &vmm_src)
@@ -602,6 +766,30 @@ void jit_uni_eltwise_injector_f32<isa>::relu_prepare_table() {
 }
 
 template <cpu_isa_t isa>
+void jit_uni_eltwise_injector_f32<isa>::exp_prepare_table() {
+  // Do nothing
+}
+
+#ifdef DNNL_NATIVE_JIT_AARCH64
+template <>
+void jit_uni_eltwise_injector_f32<avx512_common>::exp_prepare_table() {
+    const unsigned int cvals[] = {
+            0x3f317218, // log2 = std::log(2.0f)
+            0x3fb8aa3b, // log2_e = 1.0f / log2;
+            0xc2aeac50, // expMin
+            0x42b17218, // expMax
+            0x3f800000,
+            0x3effff12,
+            0x3e2aaa56,
+            0x3d2b89cc,
+            0x3c091331,
+    };
+
+    for (size_t i = 0; i < sizeof(cvals) / sizeof(float); ++i) h->dd(cvals[i]);
+}
+#endif
+
+template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::elu_prepare_table() {
     const unsigned int cvals[] = {
             0x3f800000, // [0] 1.0f
@@ -710,17 +898,26 @@ template <cpu_isa_t isa>
 int jit_uni_eltwise_injector_f32<isa>::aux_vecs_count(alg_kind_t alg_) {
     switch (alg_) {
     case alg_kind::eltwise_relu: return (alpha_ == 0.f) ? 0 : 2;
-    case alg_kind::eltwise_elu: return 4;
-    case alg_kind::eltwise_tanh: return 5;
     case alg_kind::eltwise_square: return 0;
     case alg_kind::eltwise_abs: return 0;
     case alg_kind::eltwise_sqrt: return 2;
     case alg_kind::eltwise_linear: return 1;
     case alg_kind::eltwise_bounded_relu: return 0;
     case alg_kind::eltwise_soft_relu: return 4;
+#ifdef DNNL_NATIVE_JIT_AARCH64
+    // elu, tanh and logistic uses JIT-ed code of exp
+    case alg_kind::eltwise_elu: return 14;
+    case alg_kind::eltwise_tanh: return 14;
+    case alg_kind::eltwise_logistic: return 14;
+    case alg_kind::eltwise_exp: return 14;
+    case alg_kind::eltwise_gelu: return 14;
+#else
+    case alg_kind::eltwise_elu: return 4;
+    case alg_kind::eltwise_tanh: return 5;
     case alg_kind::eltwise_logistic: return 4;
     case alg_kind::eltwise_exp: return 3;
     case alg_kind::eltwise_gelu: return 5;
+#endif
     default: assert(!"unsupported eltwise algorithm");
     }
 
@@ -780,7 +977,9 @@ void jit_uni_eltwise_injector_f32<isa>::prepare_table(bool gen_table) {
         case eltwise_logistic:
         case eltwise_exp:
         case eltwise_gelu:
-            elu_prepare_table(); break;
+            elu_prepare_table();
+	    this->exp_prepare_table();
+	    break;
         case eltwise_soft_relu: soft_relu_prepare_table(); break;
         case eltwise_abs: abs_prepare_table(); break;
         case eltwise_sqrt: sqrt_prepare_table(); break;
