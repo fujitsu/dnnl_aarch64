@@ -44,9 +44,11 @@ using namespace mkldnn::impl::types;
 
 #define PRFMMIN  (-256)
 #define PRFMMAX   255
+#define PRFWMAX    31
 #define LDRMAX    255
 #define LDRWMAX   252
 #define ADDMAX   4095
+#define PRFMMAX 32760
 #define MOVMAX  65535
 
 namespace mkldnn {
@@ -55,6 +57,8 @@ namespace cpu {
 
 #define CGA64 CodeGeneratorAArch64
 namespace xa = Xbyak::Xbyak_aarch64;
+/* Get vector offsets, ofs / VL(VL: 512bits = 64Bytes) */
+#define VL_OFS(ofs) ((ofs)>>6)
 
 struct jit_sve_1x1_conv_kernel : public jit_generator {
     jit_sve_1x1_conv_kernel(jit_1x1_conv_conf_t ajcp,
@@ -140,6 +144,51 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
             if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
             else              CGA64::sub(out, in, reg_tmp_imm);
         }
+    }
+
+    void prefetch(const std::string prfop, int level, reg64_t in, long long int ofs) {
+        bool for_load;
+        if (prfop == "LD") {
+            for_load = true;
+        } else if (prfop == "ST") {
+            for_load = false;
+        } else {
+            assert(!"invalid prfop");
+        }
+
+        bool cacheline_alinged = ((ofs&0xFF)==0) ? true : false;
+        if (cacheline_alinged == true) {
+            xa::Prfop op;
+            switch (level) {
+            case 1: op = (for_load == true) ? xa::PLDL1KEEP : xa::PSTL1KEEP; break;
+            case 2: op = (for_load == true) ? xa::PLDL2KEEP : xa::PSTL2KEEP; break;
+            case 3: op = (for_load == true) ? xa::PLDL3KEEP : xa::PSTL3KEEP; break;
+            default: assert(!"invalid prfop"); break;
+          }
+
+          if((ofs <= PRFMMAX) && (ofs >= 0)) {
+              CGA64::prfm(op, xa::ptr(in, static_cast<int32_t>(ofs)));
+          }else{
+              add_imm(reg_tmp_ofs, in, ofs);
+              CGA64::prfm(op, xa::ptr(reg_tmp_ofs));
+          }
+        } else {
+            xa::PrfopSve op_sve;
+            switch (level) {
+            case 1: op_sve = (for_load == true) ? xa::PLDL1KEEP_SVE : xa::PSTL1KEEP_SVE; break;
+            case 2: op_sve = (for_load == true) ? xa::PLDL2KEEP_SVE : xa::PSTL2KEEP_SVE; break;
+            case 3: op_sve = (for_load == true) ? xa::PLDL3KEEP_SVE : xa::PSTL3KEEP_SVE; break;
+            default: assert(!"invalid prfop"); break;
+        }
+
+        if((VL_OFS(ofs) <= PRFWMAX) &&
+           (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
+            CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(in, static_cast<int32_t>(VL_OFS(ofs))));
+        }else{
+            add_imm(reg_tmp_ofs, in, ofs);
+            CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(reg_tmp_ofs));
+        }
+      }
     }
 
     jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
