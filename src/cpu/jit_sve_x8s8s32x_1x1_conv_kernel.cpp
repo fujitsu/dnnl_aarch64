@@ -197,7 +197,15 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
           if((-0x40 <= re) && (re < 0x40) && ((re%4) == 0))
               CGA64::ld1rw(xa::ZRegS(bcast_reg.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(xa::XReg(base.getIdx()), static_cast<int32_t>(re)));
           else {
-              add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re);
+              auto reg_tmp_adr = ((i_ur % 4) == 0)? reg_tmp0_adr
+                                 : ((i_ur % 4) == 1)? reg_tmp1_adr
+                                 : ((i_ur % 4) == 2)? reg_tmp2_adr
+                                 : reg_tmp3_adr;
+              auto reg_tmp_imm = ((i_ur % 4) == 0)? reg_tmp0_imm
+                                 : ((i_ur % 4) == 1)? reg_tmp1_imm
+                                 : ((i_ur % 4) == 2)? reg_tmp2_imm
+                                                   : reg_tmp3_imm;
+              add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re, reg_tmp_imm);
               CGA64::ld1rw(xa::ZRegS(bcast_reg.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(reg_tmp_adr));
           }
         }
@@ -332,7 +340,16 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 auto re = offt;
                 if (scale)
                     re = re + (2 * EVEX_max_8b_offt) * scale;
-                add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re);
+
+                auto reg_tmp_adr = ((i_ur % 4) == 0)? reg_tmp0_adr
+                                   : ((i_ur % 4) == 1)? reg_tmp1_adr
+                                   : ((i_ur % 4) == 2)? reg_tmp2_adr
+                                   : reg_tmp3_adr;
+                auto reg_tmp_imm = ((i_ur % 4) == 0)? reg_tmp0_imm
+                                   : ((i_ur % 4) == 1)? reg_tmp1_imm
+                                   : ((i_ur % 4) == 2)? reg_tmp2_imm
+                                   : reg_tmp3_imm;
+                add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re, reg_tmp_imm);
 
                 switch (jcp.dst_dt) {
                 case data_type::f32:

@@ -113,8 +113,14 @@ private:
     const Xbyak::Reg64 reg_icb = reg_bias;
 
     /* Temporay registers */
-    xa::XReg reg_tmp_imm = x18; // tmp for add_imm
-    xa::XReg reg_tmp_adr = x19; // tmp for address value
+    xa::XReg reg_tmp0_imm = x18; // tmp for add_imm
+    xa::XReg reg_tmp1_imm = x19; // tmp for add_imm
+    xa::XReg reg_tmp2_imm = x18; // tmp for add_imm
+    xa::XReg reg_tmp3_imm = x19; // tmp for add_imm
+    xa::XReg reg_tmp0_adr = x20; // tmp for address value
+    xa::XReg reg_tmp1_adr = x21; // tmp for address value
+    xa::XReg reg_tmp2_adr = x20; // tmp for address value
+    xa::XReg reg_tmp3_adr = x21; // tmp for address value
 
     const Xbyak::Opmask ktail_mask = Xbyak::Opmask(2);
     const Xbyak::Opmask kblend_mask = Xbyak::Opmask(3);
@@ -228,7 +234,7 @@ private:
         return zword [re];
     }
 
-    void add_imm(xa::XReg out, xa::XReg in, long long int value){
+    void add_imm(xa::XReg out, xa::XReg in, long long int value, xa::XReg reg_tmp_imm){
         long long int val = (value >= 0) ? value : -1 * value;
         if( val <= ADDMAX ){
             if( value >= 0 )  CGA64::add(out, in, val);
