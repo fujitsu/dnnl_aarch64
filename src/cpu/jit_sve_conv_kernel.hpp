@@ -168,7 +168,7 @@ private:
 
         bool cacheline_alinged = ((ofs&0xFF)==0) ? true : false;
         if (cacheline_alinged == true) {
-            xa::Prfop op;
+            xa::Prfop op = xa::PLDL1KEEP;
             switch (level) {
             case 1: op = (for_load == true) ? xa::PLDL1KEEP : xa::PSTL1KEEP; break;
             case 2: op = (for_load == true) ? xa::PLDL2KEEP : xa::PSTL2KEEP; break;
@@ -183,7 +183,7 @@ private:
                 CGA64::prfm(op, xa::ptr(reg_tmp_addr));
             }
         } else {
-            xa::PrfopSve op_sve;
+            xa::PrfopSve op_sve = xa::PLDL1KEEP_SVE;
             switch (level) {
             case 1: op_sve = (for_load == true) ? xa::PLDL1KEEP_SVE : xa::PSTL1KEEP_SVE; break;
             case 2: op_sve = (for_load == true) ? xa::PLDL2KEEP_SVE : xa::PSTL2KEEP_SVE; break;
@@ -329,7 +329,7 @@ private:
     reg64_t reg_ker             = x2;
     reg64_t reg_src             = x3;
 
-    reg64_t reg_dst_prf         = x4;
+    reg64_t reg_dst_prf         = x23;
     reg64_t reg_ker_prf         = x5;
     reg64_t reg_src_prf         = x6;
 
@@ -490,7 +490,7 @@ private:
     reg64_t reg_input      = x1;
     reg64_t reg_kernel     = x2;
     reg64_t reg_output     = x3;
-    reg64_t b_ic           = x4;
+    reg64_t b_ic           = x20;
     reg64_t kj             = x5;
     reg64_t reg_kh         = x6;
     reg64_t reg_ur_w_trips = x7;

@@ -60,12 +60,6 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
     assert(preserved_vecs_count == vecs_to_preserve);
 
-#ifdef DNNL_NATIVE_JIT_AARCH64
-    h->CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
-    h->CodeGeneratorAArch64::str(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
-    h->CodeGeneratorAArch64::ptrue(p.s, Xbyak::Xbyak_aarch64::ALL);
-#endif
-
     if (save_state_) {
         h->push(p_table);
 
@@ -80,7 +74,14 @@ void jit_uni_eltwise_injector_f32<isa>::injector_preamble(size_t start_idx,
 
     }
 
+#ifdef DNNL_NATIVE_JIT_AARCH64
+    h->CodeGeneratorAArch64::sub(h->X_TRANSLATOR_STACK, h->X_TRANSLATOR_STACK, 8);
+    h->CodeGeneratorAArch64::str(p, Xbyak::Xbyak_aarch64::ptr(h->X_TRANSLATOR_STACK));
+    h->CodeGeneratorAArch64::ptrue(p.s, Xbyak::Xbyak_aarch64::ALL);
+#endif
+
     assign_regs();
+
 #ifdef DNNL_INDIRECT_JIT_AARCH64
     switch(alg_) {
     case alg_kind::eltwise_exp:
