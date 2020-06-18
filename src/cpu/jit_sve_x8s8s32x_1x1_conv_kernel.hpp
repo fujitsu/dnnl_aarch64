@@ -119,12 +119,12 @@ struct jit_sve_x8s8s32x_1x1_conv_kernel: public jit_generator {
     /* Temporay registers */
     xa::XReg reg_tmp0_imm = x18; // tmp for add_imm
     xa::XReg reg_tmp1_imm = x19; // tmp for add_imm
-    xa::XReg reg_tmp2_imm = x18; // tmp for add_imm
-    xa::XReg reg_tmp3_imm = x19; // tmp for add_imm
-    xa::XReg reg_tmp0_adr = x20; // tmp for address value
-    xa::XReg reg_tmp1_adr = x21; // tmp for address value
-    xa::XReg reg_tmp2_adr = x20; // tmp for address value
-    xa::XReg reg_tmp3_adr = x21; // tmp for address value
+    xa::XReg reg_tmp2_imm = x20; // tmp for add_imm
+    xa::XReg reg_tmp3_imm = x21; // tmp for add_imm
+    xa::XReg reg_tmp0_adr = x23; // tmp for address value
+    xa::XReg reg_tmp1_adr = x24; // tmp for address value
+    xa::XReg reg_tmp2_adr = x25; // tmp for address value
+    xa::XReg reg_tmp3_adr = x26; // tmp for address value
 
     reg64_t reg_last_load = r8;
     mask_t ktail_mask = k6;
