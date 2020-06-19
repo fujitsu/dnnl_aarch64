@@ -12,10 +12,10 @@ job0:
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
-    #  - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
+  - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
     #  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
-    #  - export CC="fcc -Nclang -Kfast"
-    #  - export CXX="FCC -Nclang -Kfast" 
+  - export CC="fcc -Nclang -Kfast"
+  - export CXX="FCC -Nclang -Kfast" 
   - mkdir third_party/build_xed_aarch64
   - pushd third_party/build_xed_aarch64/
   - ../xbyak_translator_aarch64/translator/third_party/xed/mfile.py --shared examples install
@@ -31,9 +31,9 @@ job0:
   - ./test_reorder 
 #  - ctest
 #  - ctest -R test_concat
-  - cd ../benchdnn
-  - ./benchdnn --conv --batch=inputs/conv_resnet_50
-  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
+#  - cd ../benchdnn
+#  - ./benchdnn --conv --batch=inputs/conv_resnet_50
+#  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
 
 #  tags:
 #    - instruction_unit
