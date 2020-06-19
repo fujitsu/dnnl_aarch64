@@ -14,8 +14,8 @@ job0:
   - git submodule update --init --recursive
   - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
     #  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
-  - export CC="fcc -Nclang -Kfast"
-  - export CXX="FCC -Nclang -Kfast" 
+  - export CC="fcc -Nclang -Knolargepage"
+  - export CXX="FCC -Nclang -Knolargepage" 
   - mkdir third_party/build_xed_aarch64
   - pushd third_party/build_xed_aarch64/
   - ../xbyak_translator_aarch64/translator/third_party/xed/mfile.py --shared examples install
