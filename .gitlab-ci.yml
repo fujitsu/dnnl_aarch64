@@ -27,7 +27,9 @@ job0:
   - cmake ..
   - make -j40
   - cd tests/gtests
-  - ctest
+  - export MKLDNN_VERBOSE=1
+  - ./test_reorder 
+#  - ctest
 #  - ctest -R test_concat
   - cd ../benchdnn
   - ./benchdnn --conv --batch=inputs/conv_resnet_50
