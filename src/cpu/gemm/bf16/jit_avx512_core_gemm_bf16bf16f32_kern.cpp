@@ -185,7 +185,12 @@ void jit_avx512_core_gemm_bf16bf16f32_kern::innerloop(int unroll_m,
         vmovups(a_regs_[i], ptr[AO_ + isize_ * (32 * i - offset_a_)]);
 
     mov(LoopCount_, K_);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::asr(Xbyak::Xbyak_aarch64::XReg(LoopCount_.getIdx()), Xbyak::Xbyak_aarch64::XReg(LoopCount_.getIdx()), 0x3);
+    CodeGeneratorAArch64::cmp(Xbyak::Xbyak_aarch64::XReg(LoopCount_.getIdx()), 0);
+#else
     sar(LoopCount_, 3);
+#endif
     jle(label_k_remainder_loop_begin, T_NEAR);
 
     // Main k loops, broken into three parts to time C prefetching.
@@ -394,10 +399,15 @@ void jit_avx512_core_gemm_bf16bf16f32_kern::generate() {
     postamble();
 }
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+jit_avx512_core_gemm_bf16bf16f32_kern::jit_avx512_core_gemm_bf16bf16f32_kern(
+        bool beta_zero) : jit_generator(nullptr, 1024 * 1024 * 2), arg_a_(0), arg_b_(0),
+    arg_c_(0), arg_ldc_(0), arg_coffset_c_(0), arg_coffset_r_(0) {
+#else
 jit_avx512_core_gemm_bf16bf16f32_kern::jit_avx512_core_gemm_bf16bf16f32_kern(
         bool beta_zero) : jit_generator(nullptr, 170000), arg_a_(0), arg_b_(0),
     arg_c_(0), arg_ldc_(0), arg_coffset_c_(0), arg_coffset_r_(0) {
-
+#endif
     beta_zero_ = beta_zero;
     bfloat16_ = mayiuse(avx512_core_bf16);
     assert(mayiuse(avx512_core));
@@ -433,6 +443,17 @@ jit_avx512_core_gemm_bf16bf16f32_kern::jit_avx512_core_gemm_bf16bf16f32_kern(
             c_regs_[i][j] = Zmm(8 + rn++);
 
     // Assign stack variables.
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    stack_alloc_size_ = 32;
+    auto args_offset = stack_alloc_size_ + get_size_of_abi_save_regs_aarch64();
+
+    /* 10 args. First - sixth args are passed by register. */
+    arg_c_ = ptr[rsp + (args_offset - 32)];
+    arg_ldc_ = ptr[rsp + (args_offset - 24)];
+
+    arg_coffset_c_ = ptr[rsp + (args_offset + 0)];
+    arg_coffset_r_ = ptr[rsp + (args_offset + 8)];
+#else
     stack_alloc_size_ = 32;
     auto args_offset = stack_alloc_size_ + get_size_of_abi_save_regs()
         + 8 + (is_windows ? 48 : 0);
@@ -445,6 +466,7 @@ jit_avx512_core_gemm_bf16bf16f32_kern::jit_avx512_core_gemm_bf16bf16f32_kern(
 
     arg_coffset_c_ = ptr[rsp + (args_offset + 16)];
     arg_coffset_r_ = ptr[rsp + (args_offset + 24)];
+#endif
 
     bf16_emu_ = nullptr;
     if (!bfloat16_) {

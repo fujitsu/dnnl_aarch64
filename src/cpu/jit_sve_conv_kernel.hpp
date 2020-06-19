@@ -46,6 +46,7 @@
 #define LDRMAX    255
 #define LDRWMAX   252
 #define ADDMAX   4095
+#define PRFMMAX 32760
 #define MOVMAX  65535
 
 namespace mkldnn {
@@ -54,7 +55,8 @@ namespace cpu {
 
 #define CGA64 CodeGeneratorAArch64
 namespace xa = Xbyak::Xbyak_aarch64;
-
+/* Get vector offsets, ofs / VL(VL: 512bits = 64Bytes) */
+#define VL_OFS(ofs) ((ofs)>>6)
 
 template<typename Vmm>
 struct _jit_sve_conv_fwd_kernel : public jit_generator {
@@ -94,53 +96,48 @@ private:
     reg64_t reg_inp             = x1;  
     reg64_t reg_ker             = x2;  
     reg64_t reg_out             = x3;  
-
-    reg64_t reg_inp_prf         = x18;  
+    reg64_t reg_inp_prf         = x20;   
     reg64_t reg_ker_prf         = x5;  
     reg64_t reg_owb             = x5;  
     reg64_t reg_out_prf         = x6;  
 
     reg64_t aux_reg_inp         = x7;  
     reg64_t aux_reg_ker         = x8;  
-
     reg64_t aux_reg_inp_prf     = x9;  
     reg64_t aux_reg_ker_prf     = x10; 
+    reg64_t reg_channel         = x9;
+    reg64_t reg_bias            = x10;
 
-    reg64_t reg_channel         = x9;  
-    reg64_t reg_bias            = x10; 
-
-    reg64_t aux_reg_ker_d       = x2;  
-    reg64_t aux_reg_inp_d       = x11; 
-    reg64_t aux_reg_inp_d_prf   = x6;  
-    reg64_t aux_reg_ker_d_prf   = x12; 
-    reg64_t reg_ki              = x3;  
+    reg64_t aux_reg_ker_d       = x2;
+    reg64_t aux_reg_inp_d       = x11;
+    reg64_t aux_reg_inp_d_prf   = x6;
+    reg64_t aux_reg_ker_d_prf   = x12;
+    reg64_t reg_ki              = x3;
 
     reg64_t reg_kj              = x13; 
     reg64_t reg_relu_ns         = x13; 
     reg64_t reg_oi              = x11; 
     reg64_t reg_kh              = x12; 
-
     reg64_t reg_ic_loop         = x10; 
     reg64_t reg_inp_loop        = x9;  
-
     reg64_t reg_init_flag       = x6;  
 
     reg64_t aux_reg_ic          = x5;  
     reg64_t reg_binp            = x13; 
-    reg64_t reg_bout            = x18;  
+    reg64_t reg_bout            = x20;   
     reg64_t aux1_reg_inp        = x11; 
     reg64_t aux_reg_out         = x12; 
-
-    reg64_t reg_long_offt       = x18;  
+    reg64_t reg_long_offt       = x20;   
     reg64_t reg_out_long_offt   = x7;  
-
-    reg64_t imm_addr64          = x8; 
 
     /* Temporary registers for ARM insts */
     reg64_t reg_tmp_addr        = x14;
     reg64_t reg_prev_bcast_addr = x15;
     reg64_t reg_prev_wei_addr   = x16;
-    reg64_t reg_tmp_imm         = x17; 
+    reg64_t reg_tmp_imm         = x17;
+
+    reg64_t reg_out_org         = x18;
+    reg64_t reg_oi_org          = x19;
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
         long long int val = (value >= 0) ? value : -1 * value;
@@ -157,6 +154,53 @@ private:
             else              CGA64::sub(out, in, reg_tmp_imm);
         }
     }
+
+
+    void prefetch(const std::string prfop, int level, reg64_t in, long long int ofs) {
+        bool for_load;
+        if (prfop == "LD") {
+            for_load = true;
+        } else if (prfop == "ST") {
+            for_load = false;
+        } else {
+            assert(!"invalid prfop");
+        }
+
+        bool cacheline_alinged = ((ofs&0xFF)==0) ? true : false;
+        if (cacheline_alinged == true) {
+            xa::Prfop op = xa::PLDL1KEEP;
+            switch (level) {
+            case 1: op = (for_load == true) ? xa::PLDL1KEEP : xa::PSTL1KEEP; break;
+            case 2: op = (for_load == true) ? xa::PLDL2KEEP : xa::PSTL2KEEP; break;
+            case 3: op = (for_load == true) ? xa::PLDL3KEEP : xa::PSTL3KEEP; break;
+            default: assert(!"invalid prfop"); break;
+            }
+
+            if((ofs <= PRFMMAX) && (ofs >= 0)) {
+                CGA64::prfm(op, xa::ptr(in, static_cast<int32_t>(ofs)));
+            }else{
+              add_imm(reg_tmp_addr, in, ofs);
+                CGA64::prfm(op, xa::ptr(reg_tmp_addr));
+            }
+        } else {
+            xa::PrfopSve op_sve = xa::PLDL1KEEP_SVE;
+            switch (level) {
+            case 1: op_sve = (for_load == true) ? xa::PLDL1KEEP_SVE : xa::PSTL1KEEP_SVE; break;
+            case 2: op_sve = (for_load == true) ? xa::PLDL2KEEP_SVE : xa::PSTL2KEEP_SVE; break;
+            case 3: op_sve = (for_load == true) ? xa::PLDL3KEEP_SVE : xa::PSTL3KEEP_SVE; break;
+            default: assert(!"invalid prfop"); break;
+            }
+
+            if((VL_OFS(ofs) <= PRFWMAX) &&
+               (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
+                CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(in, static_cast<int32_t>(VL_OFS(ofs))));
+            }else{
+                add_imm(reg_tmp_addr, in, ofs);
+                CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(reg_tmp_addr));
+            }
+        }
+    }
+
 
     jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
 
@@ -281,40 +325,45 @@ private:
     };
 
     reg64_t param               = abi_param1_aarch64;
-    reg64_t reg_dst             = x1;  
-    reg64_t reg_ker             = x2;  
-    reg64_t reg_src             = x3;  
+    reg64_t reg_dst             = x1;
+    reg64_t reg_ker             = x2;
+    reg64_t reg_src             = x3;
 
-    reg64_t reg_dst_prf         = x4;  
-    reg64_t reg_ker_prf         = x5;  
-    reg64_t reg_src_prf         = x6;  
+    reg64_t reg_dst_prf         = x23;
+    reg64_t reg_ker_prf         = x5;
+    reg64_t reg_src_prf         = x6;
 
-    reg64_t aux_reg_dst         = x7;  
-    reg64_t aux_reg_ker         = x8;  
+    reg64_t aux_reg_dst         = x7;
+    reg64_t aux_reg_ker         = x8;
 
-    reg64_t aux_reg_dst_prf     = x9;  
-    reg64_t aux_reg_ker_prf     = x10; 
+    reg64_t aux_reg_dst_prf     = x9;
+    reg64_t aux_reg_ker_prf     = x10;
 
-    reg64_t aux_reg_dst_d_prf   = x6;  
-    reg64_t aux_reg_dst_d       = x11; 
-    reg64_t aux_reg_ker_d_prf   = x12; 
-    reg64_t aux_reg_ker_d       = x2;  
-    reg64_t reg_ki              = x3;  
+    reg64_t aux_reg_dst_d_prf   = x6;
+    reg64_t aux_reg_dst_d       = x11;
+    reg64_t aux_reg_ker_d_prf   = x12;
+    reg64_t aux_reg_ker_d       = x2;
+    reg64_t reg_ki              = x3;
 
-    reg64_t reg_kj              = x13; 
-    reg64_t reg_oi              = x11; 
-    reg64_t reg_kh              = x12; 
+    reg64_t reg_kj              = x13;
+    reg64_t reg_oi              = x11;
+    reg64_t reg_kh              = x12;
 
-    reg64_t reg_channel         = x9;  
+    reg64_t reg_channel         = x9;
 
-    reg64_t reg_tmp             = x14; 
-    reg64_t reg_long_offt       = x7;  
+    reg64_t reg_tmp             = x14;
+    reg64_t reg_long_offt       = x7;
 
+    /* Temporary registers for ARM insts */
     reg64_t reg_prev_bcast_addr = x15; 
     reg64_t reg_tmp_imm         = x16; 
     reg64_t reg_tmp_addr        = x18; 
 
-    const xa::PReg reg_p_all_ones  = p1;
+    reg64_t reg_src_prf_org     = x19;
+    reg64_t reg_src_org         = x20;
+    reg64_t reg_oi_org          = x21;
+
+    const xa::PReg reg_p_all_ones  = p2;
 
     void add_imm(reg64_t out, reg64_t in, long long int value){
         long long int val = (value >= 0) ? value : -1 * value;
@@ -329,6 +378,51 @@ private:
 
             if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
             else              CGA64::sub(out, in, reg_tmp_imm);
+        }
+    }
+
+    void prefetch(const std::string prfop, int level, reg64_t in, long long int ofs) {
+        bool for_load;
+        if (prfop == "LD") {
+            for_load = true;
+        } else if (prfop == "ST") {
+            for_load = false;
+        } else {
+            assert(!"invalid prfop");
+        }
+
+        bool cacheline_alinged = ((ofs&0xFF)==0) ? true : false;
+        if (cacheline_alinged == true) {
+            xa::Prfop op;
+            switch (level) {
+            case 1: op = (for_load == true) ? xa::PLDL1KEEP : xa::PSTL1KEEP; break;
+            case 2: op = (for_load == true) ? xa::PLDL2KEEP : xa::PSTL2KEEP; break;
+            case 3: op = (for_load == true) ? xa::PLDL3KEEP : xa::PSTL3KEEP; break;
+            default: assert(!"invalid prfop"); break;
+            }
+
+            if((ofs <= PRFMMAX) && (ofs >= 0)) {
+              CGA64::prfm(op, xa::ptr(in, static_cast<int32_t>(ofs)));
+            }else{
+              add_imm(reg_tmp_addr, in, ofs);
+              CGA64::prfm(op, xa::ptr(reg_tmp_addr));
+            }
+        } else {
+            xa::PrfopSve op_sve;
+            switch (level) {
+            case 1: op_sve = (for_load == true) ? xa::PLDL1KEEP_SVE : xa::PSTL1KEEP_SVE; break;
+            case 2: op_sve = (for_load == true) ? xa::PLDL2KEEP_SVE : xa::PSTL2KEEP_SVE; break;
+            case 3: op_sve = (for_load == true) ? xa::PLDL3KEEP_SVE : xa::PSTL3KEEP_SVE; break;
+            default: assert(!"invalid prfop"); break;
+            }
+
+            if((VL_OFS(ofs) <= PRFWMAX) &&
+               (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
+                CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(in, static_cast<int32_t>(VL_OFS(ofs))));
+            }else{
+                add_imm(reg_tmp_addr, in, ofs);
+                CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(reg_tmp_addr));
+            }
         }
     }
 
@@ -393,34 +487,39 @@ private:
     static const int min_oh_reduce;
 
     reg64_t param          = abi_param1_aarch64;
-    reg64_t reg_input      = x1;  
-    reg64_t reg_kernel     = x2;  
-    reg64_t reg_output     = x3;  
-    reg64_t b_ic           = x4; 
-    reg64_t kj             = x5;  
-    reg64_t reg_kh         = x6;  
-    reg64_t reg_ur_w_trips = x7;  
-    reg64_t reg_oj         = x8;  
-    reg64_t reg_ih_count   = x9;  
-    reg64_t reg_tmp        = x10; 
-    reg64_t reg_long_offt  = x10; 
+    reg64_t reg_input      = x1;
+    reg64_t reg_kernel     = x2;
+    reg64_t reg_output     = x3;
+    reg64_t b_ic           = x20;
+    reg64_t kj             = x5;
+    reg64_t reg_kh         = x6;
+    reg64_t reg_ur_w_trips = x7;
+    reg64_t reg_oj         = x8;
+    reg64_t reg_ih_count   = x9;
+    reg64_t reg_tmp        = x10;
+    reg64_t reg_long_offt  = x10;
 
-    reg64_t ki             = x11; 
-    reg64_t reg_kd_count   = x12; 
-    reg64_t reg_oi         = x12; 
-    reg64_t reg_d_index    = x13; 
-    reg64_t reg_input_d    = x8;  
-    reg64_t reg_output_d   = x9;  
-    reg64_t aux_reg_input  = x12; 
-    reg64_t aux_reg_kernel = x13; 
-    reg64_t reg_bias       = x9;  
+    reg64_t ki             = x11;
+    reg64_t reg_kd_count   = x12;
+    reg64_t reg_oi         = x12;
+    reg64_t reg_d_index    = x13;
+    reg64_t reg_input_d    = x8;
+    reg64_t reg_output_d   = x9;
+    reg64_t aux_reg_input  = x12;
+    reg64_t aux_reg_kernel = x13;
+    reg64_t reg_bias       = x9;
 
     reg64_t reg_add_tmp    = x14;
     reg64_t reg_tmp_imm    = x15;
 
+    reg64_t reg_kd_count_org = x16;
+    reg64_t reg_input_d_org  = x17;
+    reg64_t reg_output_d_org = x18;
+    reg64_t reg_d_index_org  = x19;
+
     xa::ZRegS zreg_idata   = xa::ZRegS(31);
 
-    const xa::PReg reg_p_all_ones = p1;
+    const xa::PReg reg_p_all_ones = p2;
 
     void mov_imm(reg64_t out, long long int value){
         assert(value >= 0);
@@ -456,6 +555,51 @@ private:
 
             if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
             else              CGA64::sub(out, in, reg_tmp_imm);
+        }
+    }
+
+    void prefetch(const std::string prfop, int level, reg64_t in, long long int ofs) {
+        bool for_load;
+        if (prfop == "LD") {
+            for_load = true;
+        } else if (prfop == "ST") {
+            for_load = false;
+        } else {
+            assert(!"invalid prfop");
+        }
+
+        bool cacheline_alinged = ((ofs&0xFF)==0) ? true : false;
+        if (cacheline_alinged == true) {
+            xa::Prfop op;
+            switch (level) {
+            case 1: op = (for_load == true) ? xa::PLDL1KEEP : xa::PSTL1KEEP; break;
+            case 2: op = (for_load == true) ? xa::PLDL2KEEP : xa::PSTL2KEEP; break;
+            case 3: op = (for_load == true) ? xa::PLDL3KEEP : xa::PSTL3KEEP; break;
+            default: assert(!"invalid prfop"); break;
+            }
+
+            if((ofs <= PRFMMAX) && (ofs >= 0)) {
+                CGA64::prfm(op, xa::ptr(in, static_cast<int32_t>(ofs)));
+            }else{
+                add_imm(reg_add_tmp, in, ofs);
+                CGA64::prfm(op, xa::ptr(reg_add_tmp));
+            }
+        } else {
+            xa::PrfopSve op_sve;
+            switch (level) {
+            case 1: op_sve = (for_load == true) ? xa::PLDL1KEEP_SVE : xa::PSTL1KEEP_SVE; break;
+            case 2: op_sve = (for_load == true) ? xa::PLDL2KEEP_SVE : xa::PSTL2KEEP_SVE; break;
+            case 3: op_sve = (for_load == true) ? xa::PLDL3KEEP_SVE : xa::PSTL3KEEP_SVE; break;
+            default: assert(!"invalid prfop"); break;
+            }
+
+            if((VL_OFS(ofs) <= PRFWMAX) &&
+               (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
+                CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(in, static_cast<int32_t>(VL_OFS(ofs))));
+            }else{
+                add_imm(reg_add_tmp, in, ofs);
+                CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(reg_add_tmp));
+            }
         }
     }
 
