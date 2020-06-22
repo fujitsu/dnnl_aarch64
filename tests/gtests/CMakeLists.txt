@@ -40,10 +40,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/in
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpu
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak/xbyak
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak/translator/include/xbyak_translator_for_aarch64
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak/translator/third_party/xbyak_aarch64/xbyak_aarch64
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak_translator_aarch64
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak_translator_aarch64/translator/include/xbyak_translator_for_aarch64
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/xbyak_translator_aarch64/translator/third_party/xbyak_aarch64/xbyak_aarch64
                     )
 
 if(DNNL_INDIRECT_JIT_AARCH64)
@@ -104,9 +103,9 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_convolution_backward_weights_s16s16s32.cpp
                               test_deconvolution.cpp
                               test_gemm_f32.cpp
-                              # test_gemm_s8u8s32.cpp
-                              # test_gemm_s8s8s32.cpp
-                              # test_gemm_bf16bf16f32.cpp
+                              test_gemm_s8u8s32.cpp
+                              test_gemm_s8s8s32.cpp
+                              test_gemm_bf16bf16f32.cpp
                               test_rnn_forward.cpp
                               )
 

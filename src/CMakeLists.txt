@@ -34,9 +34,9 @@ file(GLOB_RECURSE HEADERS
     ${PROJECT_BINARY_DIR}/include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/xbyak/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/include/xbyak_translator_for_aarch64/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/third_party/xbyak_aarch64/xbyak_aarch64/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_translator_aarch64/xbyak/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_translator_aarch64/translator/include/xbyak_translator_for_aarch64/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator_aarch64/translator/third_party/xbyak_aarch64/xbyak_aarch64/*.h
     )
 file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.c
@@ -49,9 +49,9 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/common
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/include/xbyak_translator_for_aarch64
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak/translator/third_party/xbyak_aarch64/xbyak_aarch64
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_translator_aarch64
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_translator_aarch64/translator/include/xbyak_translator_for_aarch64
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xbyak_translator_aarch64/translator/third_party/xbyak_aarch64/xbyak_aarch64
     )
 
 if(DNNL_NATIVE_JIT_AARCH64)

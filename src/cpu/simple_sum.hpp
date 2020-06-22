@@ -21,6 +21,8 @@
 #include "cpu_isa_traits.hpp"
 #include "bfloat16_utils.hpp"
 
+#define MAX_NUM_SINGLE 4096
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -76,11 +78,15 @@ struct simple_sum_t: public cpu_primitive_t {
         sum_bf16_params_t bf16_p_;
         size_t block_size_, nelems_, blocks_number_, tail_;
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+        static const size_t cacheline_size_ = 256; // bytes
+        static const size_t half_L1_size_ = 32 * 1024; // bytes
+#else //#ifdef DNNL_INDIRECT_JIT_AARCH64
+        static const size_t cacheline_size_ = 64; // bytes
+        static const size_t half_L1_size_ = 16 * 1024; // bytes
+#endif
+
         private:
-
-            const size_t cacheline_size_ = 64; // bytes
-            const size_t half_L1_size_ = 16 * 1024; // bytes
-
             void compute_blocking() {
                 block_size_ = (src_data_type == data_type::bf16
                         ?  16 * cacheline_size_
