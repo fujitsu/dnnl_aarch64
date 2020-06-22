@@ -24,7 +24,7 @@ job0:
   - popd
   - mkdir build_aarch64
   - cd build_aarch64/
-  - cmake ..
+  - cmake .. -DWITH_BLAS=ssl2
   - make -j40
   - cd tests/gtests
   - ctest
