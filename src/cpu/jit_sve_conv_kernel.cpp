@@ -358,15 +358,12 @@ void _jit_sve_conv_fwd_kernel<Vmm>::compute_loop_fma_core(int ur_w,
     auto wei_load = [=](int aux_kernel_offset, int reg_idx, int prev_ofs){
         int ofs = aux_kernel_offset;
 
-        if( (VL_OFS(ofs) < LDRMAX) &&
-            (VL_OFS(ofs) >= (-1.0* LDRMAX)) &&
-            ((ofs&0x3f) == 0)){
+        if( (VL_OFS(ofs) <= LDRMAX) && (VL_OFS(ofs) >= (-1.0* LDRMAX))){
             CGA64::ldr(zreg_wei(reg_idx),
                        xa::ptr(aux_reg_ker, static_cast<int32_t>(VL_OFS(ofs))));
         }else{
             int ofs_tmp = ofs - prev_ofs;
-            if( (prev_ofs != -1) && (VL_OFS(ofs_tmp)>0) &&
-                (VL_OFS(ofs_tmp) < LDRMAX) ){
+            if( (prev_ofs != -1) && (VL_OFS(ofs_tmp)>=(-1.0* LDRMAX)) && (VL_OFS(ofs_tmp) <= LDRMAX) ){
                 CGA64::ldr(zreg_wei(reg_idx),
                            xa::ptr(reg_prev_wei_addr, static_cast<int32_t>(VL_OFS(ofs_tmp))));
             }else{
@@ -1551,8 +1548,7 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
         int ofs = aux_kernel_offset;
 
         if( (VL_OFS(ofs) < LDRMAX) &&
-            (VL_OFS(ofs) >= (-1.0* LDRMAX)) &&
-            ((ofs&0x3f) == 0)){
+            (VL_OFS(ofs) >= (-1.0* LDRMAX)) ){
             CGA64::ldr(zreg_wei(), xa::ptr(aux_reg_ker, static_cast<int32_t>(VL_OFS(ofs))));
         }else{
             add_imm(reg_tmp_addr, aux_reg_ker, ofs);
