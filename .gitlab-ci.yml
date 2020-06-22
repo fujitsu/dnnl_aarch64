@@ -12,7 +12,7 @@ job0:
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
-#  - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
+  - PATH=${PATH}:NONE/ssl2/cblas/
 #  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
 #  - export CC="fcc -Nclang -Knolargepage"
 #  - export CXX="FCC -Nclang -Knolargepage" 
