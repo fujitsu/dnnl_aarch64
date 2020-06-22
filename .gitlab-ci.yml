@@ -12,8 +12,8 @@ job0:
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
-  - PATH=${PATH}:/usr/lib64/
 #  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
+  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libopenblas.so.0
 #  - export CC="fcc -Nclang -Knolargepage"
 #  - export CXX="FCC -Nclang -Knolargepage" 
   - mkdir third_party/build_xed_aarch64
