@@ -253,7 +253,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         } else{
           if((prev_ofs != -1) &&
              (VL_OFS(ofs - prev_ofs) >= (-1 * PRFWMAX - 1)) &&
-             (VL_OFS(ofs - prev_ofs) <= PRFMMAX)){
+             (VL_OFS(ofs - prev_ofs) <= PRFWMAX)){
             CGA64::prfw(xa::PLDL1KEEP_SVE, reg_p_all_ones, xa::ptr(reg_prev_bcast_addr, static_cast<int32_t>VL_OFS(ofs-prev_ofs)));
           }else{
             if((prev_ofs != -1) &&

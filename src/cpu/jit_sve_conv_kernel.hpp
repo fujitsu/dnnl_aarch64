@@ -321,7 +321,7 @@ private:
     using reg64_t = const xa::XReg;
     enum {
         typesize = sizeof(float),
-        ker_reg_base_idx = 26,
+        ker_reg_base_idx = 28,
     };
 
     reg64_t param               = abi_param1_aarch64;
