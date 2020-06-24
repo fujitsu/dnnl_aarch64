@@ -29,9 +29,9 @@ job0:
   - cd tests/gtests
   - ctest
 #  - ctest -R test_concat
-  - cd ../benchdnn
-  - ./benchdnn --conv --batch=inputs/conv_resnet_50
-  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
+#  - cd ../benchdnn
+#  - ./benchdnn --conv --batch=inputs/conv_resnet_50
+#  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
 
 #  tags:
 #    - instruction_unit
