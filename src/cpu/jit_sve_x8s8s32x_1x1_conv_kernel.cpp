@@ -622,7 +622,7 @@ status_t jit_sve_x8s8s32x_1x1_conv_kernel::init_conf(
                 gOIhw4i16o4i_s8s8, OIhw4i16o4i_s8s8)) {
         return status::unimplemented;
     }
-    jcp.ver = ver_vnni;
+    jcp.ver = ver_sve;
 
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
     jcp.mb = src_d.dims()[0];
@@ -706,7 +706,7 @@ status_t jit_sve_x8s8s32x_1x1_conv_kernel::init_conf(
     int size_treshold = 28;
     int max_regs = 0;
     int min_regs = 6;
-    if (jcp.ver == ver_vnni)
+    if (jcp.ver == ver_sve)
         max_regs = ((jcp.oh > size_treshold && jcp.ow > size_treshold)
                     && (jcp.oc < 128 || jcp.ic < 128)) ?  min_regs : 9;
     else

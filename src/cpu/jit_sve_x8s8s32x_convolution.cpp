@@ -76,19 +76,6 @@ void jit_sve_x8s8s32x_convolution_fwd_t<src_type,
     assert(jcp.nb_ch % jcp.nb_ch_blocking == 0);
 
     const float *oscales = pd()->attr()->output_scales_.scales_;
-    if (jcp.signed_input && jcp.ver != ver_vnni) {
-        auto local_scales = scratchpad().template get<float>(
-                key_conv_adjusted_scales);
-        size_t count = pd()->attr()->output_scales_.count_;
-        float factor = 1.f / pd()->jcp_.wei_adj_scale;
-        if (count == 1) {
-            utils::array_set(local_scales, oscales[0] * factor, 16);
-        } else {
-            for (size_t c = 0; c < count; c++)
-                local_scales[c] = oscales[c] * factor;
-        }
-        oscales = local_scales;
-    }
 
     size_t offset = weights_d.size() - weights_d.additional_buffer_size();
     auto w = const_cast<wei_data_t *>(weights);
@@ -196,19 +183,6 @@ void jit_sve_x8s8s32x_convolution_fwd_t<src_type,
     assert(jcp.nb_ch % jcp.nb_ch_blocking == 0);
 
     const float *oscales = pd()->attr()->output_scales_.scales_;
-    if (jcp.signed_input && jcp.ver != ver_vnni) {
-        auto local_scales = scratchpad().template get<float>(
-                key_conv_adjusted_scales);
-        size_t count = pd()->attr()->output_scales_.count_;
-        float factor = 1.f / pd()->jcp_.wei_adj_scale;
-        if (count == 1) {
-            utils::array_set(local_scales, oscales[0] * factor, 16);
-        } else {
-            for (size_t c = 0; c < count; c++)
-                local_scales[c] = oscales[c] * factor;
-        }
-        oscales = local_scales;
-    }
 
     size_t offset = weights_d.size() - weights_d.additional_buffer_size();
     auto w = const_cast<wei_data_t *>(weights);
@@ -348,19 +322,6 @@ void jit_sve_x8s8s32x_convolution_fwd_t<src_type,
     assert(jcp.nb_ch % jcp.nb_ch_blocking == 0);
 
     const float *oscales = pd()->attr()->output_scales_.scales_;
-    if (jcp.signed_input && jcp.ver != ver_vnni) {
-        auto local_scales = scratchpad().template get<float>(
-                key_conv_adjusted_scales);
-        size_t count = pd()->attr()->output_scales_.count_;
-        float factor = 1.f / pd()->jcp_.wei_adj_scale;
-        if (count == 1) {
-            utils::array_set(local_scales, oscales[0] * factor, 16);
-        } else {
-            for (size_t c = 0; c < count; c++)
-                local_scales[c] = oscales[c] * factor;
-        }
-        oscales = local_scales;
-    }
 
     size_t offset = weights_d.size() - weights_d.additional_buffer_size();
     auto w = const_cast<wei_data_t *>(weights);
