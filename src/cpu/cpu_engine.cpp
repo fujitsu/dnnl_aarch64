@@ -48,6 +48,7 @@
 #include "cpu/jit_avx512_core_bf16_1x1_convolution.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
 #include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
+#include "cpu/jit_avx512_core_x8s8s32x_convolution.hpp"
 #else // #ifndef DNNL_NATIVE_JIT_AARCH64
 #include "cpu/jit_sve_1x1_convolution.hpp"
 #include "cpu/jit_sve_convolution.hpp"
