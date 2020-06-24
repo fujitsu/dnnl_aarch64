@@ -204,7 +204,7 @@ if((NOT BLAS_LIBRARIES)
   BLAS
   sgemm
   ""
-  "openblas")
+  "openblas-r0.3.3")
   if (BLAS_LIBRARIES)
     set(BLAS_INFO "openblas")
   endif (BLAS_LIBRARIES)
