@@ -174,6 +174,7 @@ void jit_avx512_core_gemv_s8u8s32_kern::update_c(int nreg_acc, Xbyak::Reg64 Y,
     L_aligned(store_label);
     for (k = 0, l = 2; k < nreg_acc; k += 8, l += 3) {
         last_it = (k + 8) > nreg_acc;
+
         if (use_mask && last_it)
             vmovdqu32(ptr[Y + (k / 8) * 32], Xbyak::Ymm(start_a_idx + l)
                     | mask_m);
@@ -226,6 +227,13 @@ T jit_avx512_core_gemv_s8u8s32_kern::generate(int use_vnni) {
 
     preamble();
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    if(use_vnni) {
+      /* First float arg is passed by xmm0. */
+      CodeGeneratorAArch64::mov(Xbyak::Xbyak_aarch64::VReg4S(beta.getIdx())[0], w3);
+    }
+#endif
+
     if (is_windows) {
         mov(lda, ptr[rsp + get_size_of_abi_save_regs() + 40]);
         mov(X, ptr[rsp + get_size_of_abi_save_regs() + 48]);
@@ -251,10 +259,20 @@ T jit_avx512_core_gemv_s8u8s32_kern::generate(int use_vnni) {
     // load/store on the C matrix use Ymm so tail according to Ymm size
     mov(rax, 7); // 8 * 32 = 256 Ymm size
     and_(rax, m); // rax contains m & 7
+#ifndef DNNL_INDIRECT_JIT_AARCH64
     mov(rbx, 1);
     shlx(rbx, rbx, rax);
     sub(rbx, 1);
     kmovq(mask_m, rbx);
+#else
+    CodeGeneratorAArch64::mov(Xbyak::Xbyak_aarch64::PRegB(mask_m.getIdx()), P_ALL_ONE.b);
+    CodeGeneratorAArch64::index(Xbyak::Xbyak_aarch64::ZRegS(31), 1, 1);
+    CodeGeneratorAArch64::dup(Xbyak::Xbyak_aarch64::ZRegS(30), Xbyak::Xbyak_aarch64::WReg(rax.getIdx()));
+    CodeGeneratorAArch64::cmpge(Xbyak::Xbyak_aarch64::PRegS(mask_m.getIdx()),
+			      Xbyak::Xbyak_aarch64::PReg(mask_m.getIdx())/Xbyak::Xbyak_aarch64::T_z,
+			      Xbyak::Xbyak_aarch64::ZRegS(30),
+			      Xbyak::Xbyak_aarch64::ZRegS(31));
+#endif
     // mask_m set (AVX512 only), can use rax and rbx again
 
     // setup register of ones when VNNI instructions not available
@@ -323,8 +341,14 @@ T jit_avx512_core_gemv_s8u8s32_kern::generate(int use_vnni) {
     // N tail
     L_aligned(n_tail_label);
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    CodeGeneratorAArch64::ands(P_TMP_0.b, P_ALL_ONE/Xbyak::Xbyak_aarch64::T_z,
+			       Xbyak::Xbyak_aarch64::PRegB(mask_n.getIdx()),
+			       Xbyak::Xbyak_aarch64::PRegB(k3.getIdx()));
+#else
     ktestq(mask_n, k3);
-    je(update_c_label, T_NEAR);
+#endif
+    je(update_c_label, T_NEAR); // jump if zf = 1
     n_loop_body(zmm_idx, zmm_idx + nreg_A, zmm_idx + nreg_A_acc, nreg_acc,
                 r13, lda, r11, tmp, one, swap, use_vnni, 1, mask_n);
 
@@ -379,7 +403,13 @@ T jit_avx512_core_gemv_s8u8s32_kern::generate(int use_vnni) {
 
         // N tail
         L_aligned(n_tail_label_case[ii - 1]);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+        CodeGeneratorAArch64::ands(P_TMP_0.b, P_ALL_ONE/Xbyak::Xbyak_aarch64::T_z,
+				   Xbyak::Xbyak_aarch64::PRegB(mask_n.getIdx()),
+				   Xbyak::Xbyak_aarch64::PRegB(k3.getIdx()));
+#else
         ktestq(mask_n, k3);
+#endif
         je(update_c_label_case[ii - 1], T_NEAR);
         n_loop_body(zmm_idx, zmm_idx + nreg_A, zmm_idx + nreg_A_acc, ii, r13,
                     lda, r11, tmp, one, swap, use_vnni, 1, mask_n);

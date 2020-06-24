@@ -48,7 +48,11 @@ class jit_avx512_core_gemv_s8u8s32_kern : jit_generator {
     void update_c(int, Xbyak::Reg64, int, int, Xbyak::Xmm, int, Xbyak::Opmask);
 
 public:
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    jit_avx512_core_gemv_s8u8s32_kern() : jit_generator(nullptr, 1024 * 1024 * 2) {};
+#else
     jit_avx512_core_gemv_s8u8s32_kern() : jit_generator(nullptr, 16384) {};
+#endif
 
     // m, n, alpha, a, lda, x, beta, y
     typedef void (*gemv_s8u8s32_kernel_t)(const dim_t, const dim_t, const
