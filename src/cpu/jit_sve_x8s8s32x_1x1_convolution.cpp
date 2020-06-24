@@ -61,20 +61,6 @@ void jit_sve_x8s8s32x_1x1_convolution_fwd_t
 
     auto scratchpad = this->scratchpad();
 
-    if (pd()->jcp_.signed_input && pd()->jcp_.ver != ver_vnni) {
-        auto local_scales = scratchpad.template get<float>(
-                key_conv_adjusted_scales);
-        auto scales = pd()->attr()->output_scales_.scales_;
-        size_t count = pd()->attr()->output_scales_.count_;
-        float factor = 1.f / pd()->jcp_.wei_adj_scale;
-        if (count == 1) {
-            utils::array_set(local_scales, scales[0] * factor, 16);
-        } else {
-            for (size_t c = 0; c < count; c++)
-                local_scales[c] = scales[c] * factor;
-        }
-    }
-
     parallel(kernel_->jcp.nthr, [&](const int ithr, const int nthr) {
         execute_forward_thr(ithr, nthr, src, weights, bias, dst, scratchpad);
     });
@@ -94,7 +80,6 @@ void jit_sve_x8s8s32x_1x1_convolution_fwd_t<src_type, dst_type>
 
     const auto &jcp = kernel_->jcp;
     auto rtus_space = scratchpad.get<src_data_t>(key_conv_rtus_space);
-    auto local_scales = scratchpad.get<float>(key_conv_adjusted_scales);
 
     const int work_amount = jcp.mb * jcp.ngroups * jcp.nb_bcast;
 
@@ -190,9 +175,7 @@ void jit_sve_x8s8s32x_1x1_convolution_fwd_t<src_type, dst_type>
         p.bias_data = &bias[_ocb * jcp.oc_block * bia_dt_size];
         p.compensation = (jcp.signed_input)
             ? &compensation[_ocb * jcp.oc_block] : 0;
-        p.scales = (jcp.signed_input && jcp.ver != ver_vnni)
-            ? &local_scales[jcp.is_oc_scale * _ocb * jcp.oc_block]
-            : &oscales.scales_[jcp.is_oc_scale * _ocb * jcp.oc_block];
+        p.scales = &oscales.scales_[jcp.is_oc_scale * _ocb * jcp.oc_block];
         if (pd()->rtus_.reduce_src_) {
             rp.ws = rtus_space + ithr * pd()->rtus_.space_per_thread_
                 + _icb * jcp.is * jcp.ic_block;

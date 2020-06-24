@@ -1030,8 +1030,8 @@ status_t jit_sve_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
     if (jcp.with_eltwise)
         jcp.eltwise = p.entry_[eltwise_ind].eltwise;
 
-    jcp.ver = ver_vnni ;
-    jcp.is_fast_depthwise = true && jcp.is_depthwise && jcp.ver == ver_vnni
+    jcp.ver = ver_sve ;
+    jcp.is_fast_depthwise = true && jcp.is_depthwise
             && jcp.ngroups % jcp.ch_block == 0; // for groups not multiple of 16
                                                 // would require byte masking
                                                 // for load from src
@@ -1039,9 +1039,9 @@ status_t jit_sve_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
             && jcp.kw < 4 && jcp.dilate_w == 0;
     if (jcp.is_depthwise) {
         jcp.max_regs_ur = 31 - jcp.is_fast_depthwise - !jcp.is_resrc_depthwise
-                - 2 * jcp.signed_input - (jcp.ver != ver_vnni);
+                - 2 * jcp.signed_input;
     } else {
-        jcp.max_regs_ur = jcp.ver == ver_vnni ? 31 : 28;
+        jcp.max_regs_ur = 31 ;
     }
 
     auto src_format = pick(ndims - 3, nwc, nhwc);
@@ -1119,7 +1119,7 @@ status_t jit_sve_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
     // TODO: generalize this condition and rewrite it in appropriate manner
     int ncores_per_socket =
         (int)cpu.getNumCores(Xbyak::util::IntelCpuTopologyLevel::CoreLevel);
-    if (jcp.ver == ver_vnni && jcp.mb == 1 && jcp.kh == 3 && jcp.kw == 3
+    if (jcp.ver == ver_sve && jcp.mb == 1 && jcp.kh == 3 && jcp.kw == 3
             && jcp.stride_w == 1 && jcp.ic % 64 == 0
             && nthreads <= ncores_per_socket)
         max_threading_nb_oc_chunk = 2;
