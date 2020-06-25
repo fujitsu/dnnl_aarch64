@@ -29,12 +29,11 @@ gcc_w/o_OpenBLAS:
   - cmake .. 
   - make -j48
   - cd tests/gtests
-  - ctest
+#  - ctest
 #  - ctest -R test_concat
 #  - cd ../benchdnn
 #  - ./benchdnn --conv --batch=inputs/conv_resnet_50
 #  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
-
 #  tags:
 #    - instruction_unit
 #
@@ -47,7 +46,7 @@ gcc_w/_OpenBLAS:
   - git submodule update --init --recursive
 #  - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
 #  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
-  - export LD_LIBRARY_PATH=/usr/lib64/libopenblas-r0.3.3.so
+  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/include:/usr/lib64/libopenblas-r0.3.3.so
 #   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libopenblas-r0.3.3.so
 #  - export CC="fcc -Nclang -Knolargepage"
 #  - export CXX="FCC -Nclang -Knolargepage" 
@@ -62,22 +61,23 @@ gcc_w/_OpenBLAS:
   - cmake .. -DWITH_BLAS=openblas
   - make -j48
   - cd tests/gtests
-  - ctest
+#  - ctest
 #  - ctest -R test_concat
 #  - cd ../benchdnn
 #  - ./benchdnn --conv --batch=inputs/conv_resnet_50
 #  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
-
 #  tags:
 #    - instruction_unit
 
-fcc_w/o_ssl2:
+fcc_w/o_SSL2:
   stage: test
   image: 8fcb1027bc89
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
-  - export LD_LIBRARY_PATH=/usr/lib64/libcblas.so
+  - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
+  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
+#  - export LD_LIBRARY_PATH=/usr/lib64/libcblas.so
 #   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libopenblas-r0.3.3.so
   - export CC="fcc -Nclang -Knolargepage"
   - export CXX="FCC -Nclang -Knolargepage" 
@@ -92,22 +92,23 @@ fcc_w/o_ssl2:
   - cmake ..
   - make -j48
   - cd tests/gtests
-  - ctest
+#  - ctest
 #  - ctest -R test_concat
 #  - cd ../benchdnn
 #  - ./benchdnn --conv --batch=inputs/conv_resnet_50
 #  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
-
 #  tags:
 #    - instruction_unit
 
-fcc_w/_ssl2:
+fcc_w/_SSL2:
   stage: test
   image: 8fcb1027bc89
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
-  - export LD_LIBRARY_PATH=/usr/lib64/libcblas.so
+  - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
+  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
+#  - export LD_LIBRARY_PATH=/usr/lib64/libcblas.so
 #   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libopenblas-r0.3.3.so
   - export CC="fcc -Nclang -Knolargepage"
   - export CXX="FCC -Nclang -Knolargepage" 
@@ -122,12 +123,11 @@ fcc_w/_ssl2:
   - cmake .. -DWITH_BLAS=ssl2
   - make -j48
   - cd tests/gtests
-  - ctest
+#  - ctest
 #  - ctest -R test_concat
 #  - cd ../benchdnn
 #  - ./benchdnn --conv --batch=inputs/conv_resnet_50
 #  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
-
 #  tags:
 #    - instruction_unit
 
