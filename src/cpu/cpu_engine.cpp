@@ -51,6 +51,8 @@
 #else // #ifndef DNNL_NATIVE_JIT_AARCH64
 #include "cpu/jit_sve_1x1_convolution.hpp"
 #include "cpu/jit_sve_convolution.hpp"
+#include "cpu/jit_sve_x8s8s32x_1x1_convolution.hpp"
+#include "cpu/jit_sve_x8s8s32x_convolution.hpp"
 #endif // #ifndef DNNL_NATIVE_JIT_AARCH64
 
 #include "cpu/jit_avx512_core_fp32_wino_conv_4x3.hpp"
@@ -170,6 +172,22 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_sve_convolution_fwd_t<f32>),
     INSTANCE(jit_sve_convolution_bwd_data_t<f32>),
     INSTANCE(jit_sve_convolution_bwd_weights_t<f32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<u8,f32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<u8,s32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<u8,u8>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<u8,s8>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<s8,f32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<s8,s32>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<s8,u8>),
+    INSTANCE(jit_sve_x8s8s32x_1x1_convolution_fwd_t<s8,s8>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<u8,f32>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<u8,s32>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<u8,u8>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<u8,s8>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<s8,f32>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<s8,s32>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<s8,u8>),
+    INSTANCE(jit_sve_x8s8s32x_convolution_fwd_t<s8,s8>),
 #endif // #ifndef DNNL_NATIVE_JIT_AARCH64
     INSTANCE(gemm_convolution_fwd_t),
     INSTANCE(gemm_convolution_bwd_data_t),
