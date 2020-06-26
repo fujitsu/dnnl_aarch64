@@ -26,6 +26,9 @@ gcc_w/o_OpenBLAS:
   - popd
   - mkdir build_aarch64
   - cd build_aarch64/
+  - yum install which
+  - which -a cmake
+  - echo $PATH  
   - cmake .. 
   - make -j48
   - cd tests/gtests
