@@ -12,12 +12,7 @@ gcc_w/o_OpenBLAS:
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
-  - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin:/opt/cmake/3_17_3/bin/
-#  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
   - export LD_LIBRARY_PATH=/usr/lib64/libopenblas-r0.3.3.so
-#   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libopenblas-r0.3.3.so
-#  - export CC="fcc -Nclang -Knolargepage"
-#  - export CXX="FCC -Nclang -Knolargepage" 
   - mkdir third_party/build_xed_aarch64
   - pushd third_party/build_xed_aarch64/
   - ../xbyak_translator_aarch64/translator/third_party/xed/mfile.py --shared examples install
@@ -30,7 +25,7 @@ gcc_w/o_OpenBLAS:
   - make -j48
   - cd tests/gtests
   - ctest
-  - ctest -R test_concat
+#  - ctest -R test_concat
   - cd ../benchdnn
   - ./benchdnn --conv --batch=inputs/conv_resnet_50
   - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
@@ -44,12 +39,7 @@ gcc_w/_OpenBLAS:
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
-#  - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
-#  - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
   - export LD_LIBRARY_PATH=/usr/lib64/libopenblas-r0.3.3.so
-#   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libopenblas-r0.3.3.so
-#  - export CC="fcc -Nclang -Knolargepage"
-#  - export CXX="FCC -Nclang -Knolargepage" 
   - mkdir third_party/build_xed_aarch64
   - pushd third_party/build_xed_aarch64/
   - ../xbyak_translator_aarch64/translator/third_party/xed/mfile.py --shared examples install
@@ -77,8 +67,6 @@ fcc_w/o_SSL2:
   - git submodule update --init --recursive
   - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
-#  - export LD_LIBRARY_PATH=/usr/lib64/libcblas.so
-#   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libopenblas-r0.3.3.so
   - export CC="fcc -Nclang -Knolargepage"
   - export CXX="FCC -Nclang -Knolargepage" 
   - mkdir third_party/build_xed_aarch64
@@ -108,8 +96,6 @@ fcc_w/_SSL2:
   - git submodule update --init --recursive
   - PATH=${PATH}:/opt/FJSVstclanga/v1.0.0/bin
   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libcblas.so
-#  - export LD_LIBRARY_PATH=/usr/lib64/libcblas.so
-#   - export LD_LIBRARY_PATH=/opt/FJSVstclanga/v1.0.0/lib64:/usr/lib64/libopenblas-r0.3.3.so
   - export CC="fcc -Nclang -Knolargepage"
   - export CXX="FCC -Nclang -Knolargepage" 
   - mkdir third_party/build_xed_aarch64
