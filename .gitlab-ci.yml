@@ -6,31 +6,31 @@ stages:
     
 before_script:
 
-        #gcc_w/o_OpenBLAS:
-        #  stage: test
-        #  image: 904e71105a6a
-        #  script:
-        #  - git submodule sync --recursive
-        #  - git submodule update --init --recursive
-        #  - export LD_LIBRARY_PATH=/usr/lib64/libopenblas-r0.3.3.so
-        #  - mkdir third_party/build_xed_aarch64
-        #  - pushd third_party/build_xed_aarch64/
-        #  - ../xbyak_translator_aarch64/translator/third_party/xed/mfile.py --shared examples install
-        #  - cd kits/
-        #  - ln -sf xed-install-base-* xed
-        #  - popd
-        #  - mkdir build_aarch64
-        #  - cd build_aarch64/
-        #  - cmake .. 
-        #  - make -j48
-        #  - cd tests/gtests
-        #  - ctest
-        ##  - ctest -R test_concat
-        #  - cd ../benchdnn
-        #  - ./benchdnn --conv --batch=inputs/conv_resnet_50
-        #  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
-        ##  tags:
-        ##    - instruction_unit
+gcc_w/o_OpenBLAS:
+  stage: test
+  image: 6e7c3dad9b72
+  script:
+  - git submodule sync --recursive
+  - git submodule update --init --recursive
+  - export LD_LIBRARY_PATH=/opt/OpenBLAS/lib/libopenblas_armv8p-r0.3.10.dev.so
+  - mkdir third_party/build_xed_aarch64
+  - pushd third_party/build_xed_aarch64/
+  - ../xbyak_translator_aarch64/translator/third_party/xed/mfile.py --shared examples install
+  - cd kits/
+  - ln -sf xed-install-base-* xed
+  - popd
+  - mkdir build_aarch64
+  - cd build_aarch64/
+  - cmake .. 
+  - make -j48
+  - cd tests/gtests
+  - ctest
+#  - ctest -R test_concat
+  - cd ../benchdnn
+  - ./benchdnn --conv --batch=inputs/conv_resnet_50
+  - ./benchdnn --bnorm --batch=inputs/bnorm/bnorm_resnet_50
+#  tags:
+#    - instruction_unit
 
 gcc_w/_OpenBLAS:
   stage: test
@@ -38,7 +38,6 @@ gcc_w/_OpenBLAS:
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
-#  - export LD_LIBRARY_PATH=/usr/lib64/libopenblas-r0.3.3.so
   - export LD_LIBRARY_PATH=/opt/OpenBLAS/lib/libopenblas_armv8p-r0.3.10.dev.so
   - mkdir third_party/build_xed_aarch64
   - pushd third_party/build_xed_aarch64/
@@ -61,7 +60,7 @@ gcc_w/_OpenBLAS:
 
 fcc_w/o_SSL2:
   stage: test
-  image: 904e71105a6a
+  image: 6e7c3dad9b72
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
@@ -90,7 +89,7 @@ fcc_w/o_SSL2:
 
 fcc_w/_SSL2:
   stage: test
-  image: 904e71105a6a
+  image: 6e7c3dad9b72
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
