@@ -444,11 +444,11 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::store_dst_avg_op(int jj, int l
             break;
         default: assert(!"unsupported src data type");
     }
-    
+
     size_t nsimd = 512/(data_size*8);
     size_t nbit  = 64/nsimd;
-    
-    if ( data_size == 1 ) {
+
+    if ( data_size == 1 && jpp.src_dt == s8) {
         for (int ll = 0; ll < max_num_ll; ll++) {
             uint64_t tail_aarch64 = jpp.tail[ll];
             uint16_t w_tail_aarch64[4];
@@ -484,7 +484,7 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::store_dst_avg_op(int jj, int l
     }
 
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-    if ( data_size == 1 ) {
+    if ( data_size == 1 && jpp.src_dt == s8) {
         data_size    = 4;
         nsimd        = 512/(data_size*8);
         nbit         = 64/nsimd;
