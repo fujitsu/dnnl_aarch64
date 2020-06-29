@@ -471,7 +471,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 			// 7‚Ì”ÍˆÍ
 
             if(rsvdOffsetIn != off * itype_sz) {
-                add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp, reg_tmp1);
+                add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp);
                 rsvdOffsetIn = off * itype_sz;
             }
             ur = 0;
@@ -481,7 +481,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
                 ur += 4;
                 if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
-                    add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
+                    add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp);
                     rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
                 }
             }
@@ -491,7 +491,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
                 ur += 1;
                 if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
-                    add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
+                    add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp);
                     rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
                 }
             }
@@ -502,7 +502,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             }
 
             if(rsvdOffsetIn != ((off+ur*simd_w) * itype_sz)) {
-                add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp, reg_tmp1);
+                add_imm(reg_tmpIn, reg_ptr_in, (off+ur*simd_w) * itype_sz, reg_tmp);
                 rsvdOffsetIn = (off+ur*simd_w) * itype_sz;
             }
 
@@ -539,7 +539,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             }
 
             if(rsvdOffsetOut != off * otype_sz) {
-                add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp, reg_tmp1);
+                add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp);
                 rsvdOffsetOut = off * otype_sz;
             }
             ur = 0;
@@ -549,7 +549,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 st4w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpOut));
                 ur += 4;
                 if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
-                    add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
+                    add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp);
                     rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
                 }
             }
@@ -559,7 +559,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 st1w(ZReg(ur).s, reg_p_all_one.s, ptr(reg_tmpOut));
                 ur += 1;
                 if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
-                    add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
+                    add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp);
                     rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
                 }
 
@@ -571,7 +571,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 ur += 4;
             }
             if(rsvdOffsetOut != ((off+ur*simd_w) * otype_sz)) {
-                add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp, reg_tmp1);
+                add_imm(reg_tmpOut, reg_ptr_out, (off+ur*simd_w) * otype_sz, reg_tmp);
                 rsvdOffsetOut = (off+ur*simd_w) * otype_sz;
             }
 		
@@ -628,7 +628,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 // 7‚Ì”ÍˆÍ
 
 			if(rsvdOffsetIn != off * itype_sz) {
-			  add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp, reg_tmp1);
+			  add_imm(reg_tmpIn, reg_ptr_in, off * itype_sz, reg_tmp);
 			  rsvdOffsetIn = off * itype_sz;
 			}
 			ur = 0;
@@ -670,7 +670,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 			}
 
 			if(rsvdOffsetOut != off * otype_sz) {
-			  add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp, reg_tmp1);
+			  add_imm(reg_tmpOut, reg_ptr_out, off * otype_sz, reg_tmp);
 			  rsvdOffsetOut = off * otype_sz;
 			}
 			ur = 0;
@@ -899,7 +899,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                     DBG_MSG_JIT_REORDER(load with stride addr, imm);
 
                     if(rsvdOffsetIn != imm) {
-                        add_imm(reg_tmpIn, reg_ptr_in, imm, reg_tmp, reg_tmp1);
+                        add_imm(reg_tmpIn, reg_ptr_in, imm, reg_tmp);
                         rsvdOffsetIn = imm;
                     }
 
@@ -915,13 +915,13 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
             }
         } else {
             if(i_off[0] * itype_sz != rsvdOffsetIn) {
-                add_imm(reg_tmpIn, reg_ptr_in, i_off[0] * itype_sz, reg_tmp, reg_tmp1); // Set 0-th addresss
+                add_imm(reg_tmpIn, reg_ptr_in, i_off[0] * itype_sz, reg_tmp); // Set 0-th addresss
                 rsvdOffsetIn = i_off[0] * itype_sz;
             }
 
             for (int ur = 0; ur < reg_unroll; ur += load_step) {
                 if(rsvdOffsetIn != i_off[ur] * itype_sz) { // Address is not preset.
-                    add_imm(reg_tmpIn, reg_ptr_in, i_off[ur] * itype_sz, reg_tmp, reg_tmp1);
+                    add_imm(reg_tmpIn, reg_ptr_in, i_off[ur] * itype_sz, reg_tmp);
                     rsvdOffsetIn = i_off[ur] * itype_sz;
                 }
 	    
@@ -949,7 +949,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                         cvt2int(VReg(ur), prb_.otype,
                                 interim_f32 ? f32 : prb_.itype);
                     for (int r = 0; r < load_step; ++r) {
-                        add_imm(reg_tmpOut, reg_ptr_out, o_off[ur + r] * otype_sz, reg_tmp, reg_tmp1);
+                        add_imm(reg_tmpOut, reg_ptr_out, o_off[ur + r] * otype_sz, reg_tmp);
 
                         DBG_MSG_JIT_REORDER(store, o_off[ur + r] * otype_sz);
 
@@ -1003,7 +1003,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                             scale_load_type = scale_load_type_t::load;
 
                     if (scale_load_type == scale_load_type_t::bcast) {
-                        add_imm(reg_tmpScale, reg_ptr_scale, s_off[ur] * stype_sz, reg_tmp, reg_tmp1);
+                        add_imm(reg_tmpScale, reg_ptr_scale, s_off[ur] * stype_sz, reg_tmp);
                         add(reg_tmpScale, reg_tmpScale, reg_off_scale);
                         ld1((xmm_scale.s4)[0], ptr(reg_tmpScale));
 
@@ -1019,7 +1019,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
                     if (scale_load_type == scale_load_type_t::load) {
                         int64_t tmpOffset = s_off[ur] * stype_sz;
-                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp);
                         add(reg_tmpScale, reg_tmpScale, reg_off_scale);
                         ld1(xmm_scale.s4, ptr(reg_tmpScale));
                         fmul(VReg(ur).s4, VReg(ur).s4, xmm_scale.s4);
@@ -1030,7 +1030,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                     // so gather the scale factors one by one
                     for (int r = ur; r < ur + ur_step; ++r) {
                         int64_t tmpOffset = s_off[r] * stype_sz;
-                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp);
                         add(reg_tmpScale, reg_tmpScale, reg_off_scale);
                         ld1((xmm_scale.s4)[r - ur], ptr(reg_tmpScale));
                     }
@@ -1045,7 +1045,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                     if (prb_.otype == f32) {
                         int64_t tmpOffset = o_off[ur] * otype_sz;
                         if(rsvdOffsetOut != tmpOffset) {
-                            add_imm(reg_tmpOut, reg_ptr_out, tmpOffset, reg_tmp, reg_tmp1);
+                            add_imm(reg_tmpOut, reg_ptr_out, tmpOffset, reg_tmp);
                             rsvdOffsetOut = tmpOffset;
                         }
                         AdrPostImm addr(reg_tmpOut, 4);
@@ -1071,7 +1071,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 for (int ur = 0; ur < reg_unroll; ur += ur_step) {
                     int64_t tmpOffset = s_off[ur] * stype_sz;
                     if(rsvdOffsetScale != tmpOffset) {
-                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp, reg_tmp1);
+                        add_imm(reg_tmpScale, reg_ptr_scale, tmpOffset, reg_tmp);
                         rsvdOffsetScale = tmpOffset;
                     }
                     AdrPostImm addr(reg_tmpScale, 4);
@@ -1090,7 +1090,7 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
                 for (int ur = 0; ur < reg_unroll; ur += ur_step) {
                     int64_t tmpOffset = o_off[ur] * otype_sz;
                     if(rsvdOffsetOut != tmpOffset) {
-                        add_imm(reg_tmpOut, reg_ptr_out, tmpOffset, reg_tmp, reg_tmp1);
+                        add_imm(reg_tmpOut, reg_ptr_out, tmpOffset, reg_tmp);
                         rsvdOffsetOut = tmpOffset;
                     }
 
@@ -1133,13 +1133,13 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
 
 
         if(o_off[0] * otype_sz != rsvdOffsetOut) {
-            add_imm(reg_tmpOut, reg_ptr_out, o_off[0] * otype_sz, reg_tmp, reg_tmp1); // Set 0-th address
+            add_imm(reg_tmpOut, reg_ptr_out, o_off[0] * otype_sz, reg_tmp); // Set 0-th address
             rsvdOffsetOut = o_off[0] * otype_sz;
         }
 	
         for (int ur = 0; ur < reg_unroll; ur += ur_step) {
             if(rsvdOffsetOut != o_off[ur] * otype_sz) { // Address is not preset.
-                add_imm(reg_tmpOut, reg_ptr_out, o_off[ur] * otype_sz, reg_tmp, reg_tmp1); 
+                add_imm(reg_tmpOut, reg_ptr_out, o_off[ur] * otype_sz, reg_tmp); 
                 rsvdOffsetOut = o_off[ur] * otype_sz;
             }
 
@@ -1225,11 +1225,11 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         DBG_MSG_JIT_REORDER(add load addr, iTmp);
         DBG_MSG_JIT_REORDER(add store addr, iTmp);
 
-        add_imm(reg_ptr_in, reg_ptr_in, iTmp, reg_tmp, reg_tmp1);
-        add_imm(reg_ptr_out, reg_ptr_out, oTmp, reg_tmp, reg_tmp1);
+        add_imm(reg_ptr_in, reg_ptr_in, iTmp, reg_tmp);
+        add_imm(reg_ptr_out, reg_ptr_out, oTmp, reg_tmp);
 
         if (flag) {
-            add_imm(reg_ptr_scale, reg_ptr_scale, s_step * stype_sz, reg_tmp, reg_tmp1);
+            add_imm(reg_ptr_scale, reg_ptr_scale, s_step * stype_sz, reg_tmp);
         }
         CodeGeneratorAArch64::sub(reg_cnt, reg_cnt, 1);
         cbnz(reg_cnt, l);
@@ -1238,11 +1238,11 @@ struct jit_uni_reorder_kernel_f32: public kernel_t, public jit_generator_aarch64
         DBG_MSG_JIT_REORDER(sub load addr, iTmp*len);
         DBG_MSG_JIT_REORDER(sub store addr, iTmp*len);
 
-        sub_imm(reg_ptr_in, reg_ptr_in, iTmp * len, reg_tmp, reg_tmp1);
-        sub_imm(reg_ptr_out, reg_ptr_out, oTmp * len, reg_tmp, reg_tmp1);
+        sub_imm(reg_ptr_in, reg_ptr_in, iTmp * len, reg_tmp);
+        sub_imm(reg_ptr_out, reg_ptr_out, oTmp * len, reg_tmp);
 
         if (flag) {
-            sub_imm(reg_ptr_scale, reg_ptr_scale, len * s_step * stype_sz, reg_tmp, reg_tmp1);
+            sub_imm(reg_ptr_scale, reg_ptr_scale, len * s_step * stype_sz, reg_tmp);
         }
     }
 
