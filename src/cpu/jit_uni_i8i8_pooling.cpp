@@ -431,45 +431,6 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::store_dst_avg_op(int jj, int l
             vreg_dst_s32(jj, ll) | mask(ll) :
             vreg_dst_s32(jj, ll);
 
-#ifdef DNNL_INDIRECT_JIT_AARCH64
-    size_t data_size    = 4;
-    
-    switch (jpp.src_dt) {
-        case s32:
-            data_size = 4;
-            break;
-        case s8:
-        case u8:
-            data_size = 1;
-            break;
-        default: assert(!"unsupported src data type");
-    }
-    
-    size_t nsimd = 512/(data_size*8);
-    size_t nbit  = 64/nsimd;
-    
-    if ( data_size == 1 ) {
-        for (int ll = 0; ll < max_num_ll; ll++) {
-            uint64_t tail_aarch64 = jpp.tail[ll];
-            uint16_t w_tail_aarch64[4];
-            
-            w_tail_aarch64[0] = (uint16_t) ((tail_aarch64    ) & 0x000000000000ffff);
-            w_tail_aarch64[1] = (uint16_t) ((tail_aarch64>>16) & 0x000000000000ffff);
-            w_tail_aarch64[2] = (uint16_t) ((tail_aarch64>>32) & 0x000000000000ffff);
-            w_tail_aarch64[3] = (uint16_t) ((tail_aarch64>>48) & 0x000000000000ffff);
-            
-            CodeGeneratorAArch64::movz(Xbyak_aarch64::XReg(reg_mask.getIdx()), uint64_t(w_tail_aarch64[0]), 0 );
-            CodeGeneratorAArch64::movk(Xbyak_aarch64::XReg(reg_mask.getIdx()), uint64_t(w_tail_aarch64[1]), 16);
-            CodeGeneratorAArch64::movk(Xbyak_aarch64::XReg(reg_mask.getIdx()), uint64_t(w_tail_aarch64[2]), 32);
-            CodeGeneratorAArch64::movk(Xbyak_aarch64::XReg(reg_mask.getIdx()), uint64_t(w_tail_aarch64[3]), 48);
-            CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
-            CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(reg_mask.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
-            CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(mask(ll).getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
-            CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
-        }
-    }
-#endif
-
     switch (jpp.dst_dt) {
         case s32:
             vmovups(ptr[reg_ptr_dst_i8 + offset], vr_dst);
@@ -482,38 +443,6 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::store_dst_avg_op(int jj, int l
             break;
         default: assert(!"unsupported dst data_type");
     }
-
-#ifdef DNNL_INDIRECT_JIT_AARCH64
-    if ( data_size == 1 ) {
-        data_size    = 4;
-        nsimd        = 512/(data_size*8);
-        nbit         = 64/nsimd;
-
-        for (int ll = 0; ll < max_num_ll; ll++) {
-            uint64_t tail_x86_64  = jpp.tail[ll];
-            uint64_t tail_aarch64 = 0x000000;
-            uint16_t w_tail_aarch64[4];
-            
-            for ( int ii = 0; ii < nsimd; ii++ ) {
-                tail_aarch64 = tail_aarch64 + ((tail_x86_64 & 0x0001) << ii*nbit);
-                tail_x86_64 = tail_x86_64 >> 1;
-            }
-            w_tail_aarch64[0] = (uint16_t) ((tail_aarch64    ) & 0x000000000000ffff);
-            w_tail_aarch64[1] = (uint16_t) ((tail_aarch64>>16) & 0x000000000000ffff);
-            w_tail_aarch64[2] = (uint16_t) ((tail_aarch64>>32) & 0x000000000000ffff);
-            w_tail_aarch64[3] = (uint16_t) ((tail_aarch64>>48) & 0x000000000000ffff);
-            
-            CodeGeneratorAArch64::movz(Xbyak_aarch64::XReg(reg_mask.getIdx()), uint64_t(w_tail_aarch64[0]), 0 );
-            CodeGeneratorAArch64::movk(Xbyak_aarch64::XReg(reg_mask.getIdx()), uint64_t(w_tail_aarch64[1]), 16);
-            CodeGeneratorAArch64::movk(Xbyak_aarch64::XReg(reg_mask.getIdx()), uint64_t(w_tail_aarch64[2]), 32);
-            CodeGeneratorAArch64::movk(Xbyak_aarch64::XReg(reg_mask.getIdx()), uint64_t(w_tail_aarch64[3]), 48);
-            CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
-            CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(reg_mask.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
-            CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(mask(ll).getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
-            CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
-        }
-    }
-#endif
 }
 
 
@@ -852,10 +781,8 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::init_mask() {
         nsimd = 512/(data_size*8);
         nbit  = 64/nsimd;
     }
-#endif
 
     for (int ll = 0; ll < max_num_ll; ll++) {
-#ifdef DNNL_INDIRECT_JIT_AARCH64
         uint64_t tail_x86_64  = jpp.tail[ll];
         uint64_t tail_aarch64 = 0x000000;
         uint16_t w_tail_aarch64[4] = { 0x0000, 0x0000, 0x0000, 0x0000 };
@@ -863,7 +790,7 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::init_mask() {
         if ( nbit == 1 ) {
             tail_aarch64 = tail_x86_64;
         } else {
-            for ( int ii = 0; ii < nsimd; ii++ ) {
+            for ( unsigned int ii = 0; ii < nsimd; ii++ ) {
                 tail_aarch64 = tail_aarch64 + ((tail_x86_64 & 0x0001) << ii*nbit);
                 tail_x86_64 = tail_x86_64 >> 1;
             }
@@ -881,11 +808,13 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::init_mask() {
         CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(reg_mask.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
         CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(mask(ll).getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
         CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+    }
 #else
+    for (int ll = 0; ll < max_num_ll; ll++) {
         mov(reg_mask, jpp.tail[ll]);
         kmovq(mask(ll), reg_mask);
-#endif
     }
+#endif
 }
 
 template <cpu_isa_t isa>
