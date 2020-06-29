@@ -106,10 +106,10 @@ fcc_w/_SSL2:
   - popd
   - mkdir build_aarch64
   - cd build_aarch64/
-  - cmake .. -DWITH_BLAS=ssl2 -FLIB_SCCR_CNTL=FALSE
+  - cmake .. -DWITH_BLAS=ssl2 
   - make -j48
   - cd tests/gtests
-  - ctest
+  - ctest -FLIB_SCCR_CNTL=TRUE
 #  - ctest -R test_concat
   - cd ../benchdnn
   - ./benchdnn --conv --batch=inputs/conv_resnet_50
