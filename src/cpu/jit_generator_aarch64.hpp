@@ -133,7 +133,7 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
 #endif // #ifdef _WIN32
 #endif // __ARM_ARCH
 
-inline unsigned int get_A64FX_cache_size(int level, bool per_core = true, int nthreads = 1) {
+inline unsigned int get_A64FX_cache_size_aarch64(int level, bool per_core = true, int nthreads = 1) {
     unsigned int l = level - 1;
     // Currently, if XByak is not able to fetch the cache topology
     // we default to 64KiB of L1 per core, 8MiB of L2 per 1CMG.

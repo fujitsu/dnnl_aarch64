@@ -8,7 +8,7 @@ before_script:
 
 job0:
   stage: test
-  image: 779e2bd88ba7
+  image: 6e7c3dad9b72
   script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
