@@ -109,7 +109,7 @@ fcc_w/_SSL2:
   - cmake .. -DWITH_BLAS=ssl2 
   - make -j48
   - cd tests/gtests
-  - ctest FLIB_SCCR_CNTL=TRUE
+  - FLIB_SCCR_CNTL=FALSE ctest -j 4
 #  - ctest -R test_concat
   - cd ../benchdnn
   - ./benchdnn --conv --batch=inputs/conv_resnet_50
