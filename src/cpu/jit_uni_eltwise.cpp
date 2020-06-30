@@ -1208,10 +1208,21 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                               Vmm(i + 1), vmm_mask); 
 
                 } else {
-                    if (is_bwd())
+                    if (is_bwd()){
+#ifdef __ARM_ARCH
+                        // k_mask is PReg(1)
+                        CGA64::fcmgt(xa::PRegS(1), xa::PReg(5)/xa::T_z, xa::ZRegS(uf+i+1), xa::ZRegS(31));
+#else // #ifdef __ARM_ARCH
                         vcmpps(k_mask, Vmm(uf + i + 1), vmm_zero, _cmp_nle_us); // target
-                    else
+#endif // #ifdef __ARM_ARCH
+                    }else{
+#ifdef __ARM_ARCH
+                        // k_mask is PReg(1)
+                        CGA64::fcmgt(xa::PRegS(1), xa::PReg(5)/xa::T_z, xa::ZRegS(i+1), xa::ZRegS(31));
+#else // #ifdef __ARM_ARCH
                         vcmpps(k_mask, Vmm(i + 1), vmm_zero, _cmp_nle_us); // target
+#endif // #ifdef __ARM_ARCH
+                    }
                     vblendmps(Vmm(2 * uf + i + 1) | k_mask, Vmm(2 * uf + i + 1),
                               Vmm(i + 1)); 
                 }
@@ -1288,9 +1299,12 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
 #ifdef __ARM_ARCH
         // Push p7 
         CGA64::sub(x22, x22, 0x8);
-        CGA64::str(p7, xa::ptr(x22));
+        CGA64::str(p5, xa::ptr(x22));
         CGA64::sub(x22, x22, 0x8);
         CGA64::str(p6, xa::ptr(x22));
+        CGA64::sub(x22, x22, 0x8);
+        CGA64::str(p7, xa::ptr(x22));
+        CGA64::ptrue(xa::PRegS(5));
         CGA64::ptrue(xa::PRegS(6), xa::VL1);
         CGA64::ptrue(xa::PRegS(7), xa::VL4);
 #endif // ifdef ARM_ARCH
@@ -1347,6 +1361,8 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
 
 #ifdef __ARM_ARCH
         // Pop p6, 7 
+        CGA64::ldr(p5, xa::ptr(x22));
+        CGA64::add(x22, x22, 0x8);
         CGA64::ldr(p6, xa::ptr(x22));
         CGA64::add(x22, x22, 0x8);
         CGA64::ldr(p7, xa::ptr(x22));
