@@ -1129,7 +1129,7 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                     vmovups(Ymm_src(i + 1), addr_fwd);
                     vpermw(Vmm(i + 1) | k_mask_cvt | T_z, zmm_idx, Zmm_src(i + 1));
                 } else {
-                    uni_vmovups(Vmm(i + 1), addr_fwd);
+                    uni_vmovups(Vmm(i + 1), addr_fwd); // not pred_reg
                 }
                 if (is_bwd()) {
                     if (is_bf16_) {
@@ -1146,7 +1146,17 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                     vpermw(Vmm(i + 1) | k_mask_cvt | T_z, zmm_idx,
                             Zmm_src(i + 1));
                 } else {
-                    movss(Xmm(i + 1), addr_fwd);
+#ifdef __ARM_ARCH
+                    // reg_from is xreg(0)
+                    if((i*shift) != 0){
+                        add_imm(xa::XReg(29), xa::XReg(0), i*shift, xa::XReg(30)); 
+                        CGA64::ldr(xa::ZReg(i+1), xa::ptr(xa::XReg(29)));
+                    }else{
+                        CGA64::ldr(xa::ZReg(i+1), xa::ptr(xa::XReg(0)));
+                    }
+#else // #ifdef __ARM_ARCH
+                    movss(Xmm(i + 1), addr_fwd); // target?
+#endif
                 }
                 if (is_bwd()) {
                     if (is_bf16_) {
@@ -1154,7 +1164,17 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                         vpermw(Vmm(uf + i + 1) | k_mask_cvt | T_z, zmm_idx,
                                 Zmm_src(uf + i + 1));
                     } else {
-                        movss(Xmm(uf + i + 1), addr_bwd);
+#ifdef __ARM_ARCH
+                    // reg_for_com is xreg(2)
+                    if((i*shift) != 0){
+                        add_imm(xa::XReg(29), xa::XReg(2), i*shift, xa::XReg(30)); 
+                        CGA64::ldr(xa::ZReg(uf+i+1), xa::ptr(xa::XReg(29)));
+                    }else{
+                        CGA64::ldr(xa::ZReg(uf+i+1), xa::ptr(xa::XReg(2)));
+                    }
+#else // #ifdef __ARM_ARCH
+                        movss(Xmm(uf + i + 1), addr_bwd); // target?
+#endif
                     }
                 }
             }
@@ -1176,24 +1196,24 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                 blendvps(Vmm(2 * uf + i + 1), Vmm(i + 1));
             }
         } else {
-            for (int i = 0; i < uf; i++) {
-                vmulps(Vmm(2 * uf + i + 1), Vmm(i + 1), vmm_ns);
+            for (int i = 0; i < uf; i++) { // here
+                vmulps(Vmm(2 * uf + i + 1), Vmm(i + 1), vmm_ns); 
                 if (isa == avx2) {
                     if (is_bwd())
-                        vcmpgtps(vmm_mask, Vmm(uf + i + 1), vmm_zero);
+                        vcmpgtps(vmm_mask, Vmm(uf + i + 1), vmm_zero); // target
                     else
-                        vcmpgtps(vmm_mask, Vmm(i + 1), vmm_zero);
+                        vcmpgtps(vmm_mask, Vmm(i + 1), vmm_zero); // target
 
                     vblendvps(Vmm(2 * uf + i + 1), Vmm(2 * uf + i + 1),
-                              Vmm(i + 1), vmm_mask);
+                              Vmm(i + 1), vmm_mask); 
 
                 } else {
                     if (is_bwd())
-                        vcmpps(k_mask, Vmm(uf + i + 1), vmm_zero, _cmp_nle_us);
+                        vcmpps(k_mask, Vmm(uf + i + 1), vmm_zero, _cmp_nle_us); // target
                     else
-                        vcmpps(k_mask, Vmm(i + 1), vmm_zero, _cmp_nle_us);
+                        vcmpps(k_mask, Vmm(i + 1), vmm_zero, _cmp_nle_us); // target
                     vblendmps(Vmm(2 * uf + i + 1) | k_mask, Vmm(2 * uf + i + 1),
-                              Vmm(i + 1));
+                              Vmm(i + 1)); 
                 }
             }
         }
@@ -1207,16 +1227,29 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         };
 
         for (int i = 0; i < uf; i++) {
-            if (vectorize)
-                if(is_bf16_)
+            if (vectorize){
+                if(is_bf16_){
                     store_data(k_full_mask, i);
-                else
+                }else{
                     uni_vmovups(ptr[reg_to + i * shift], Vmm(2 * uf + i + 1));
-            else
-                if (is_bf16_)
+                }
+            }else
+                if (is_bf16_){
                     store_data(k_tail_mask, i);
-                else
-                    movss(ptr[reg_to + i * shift], Xmm(2 * uf + i + 1));
+                }else{
+#ifdef __ARM_ARCH
+                    // reg_to is xreg(8)
+                    if((i*shift) != 0){
+                        add_imm(xa::XReg(29), xa::XReg(8), i*shift, xa::XReg(30)); 
+                        CGA64::st1w(xa::ZRegS(2*uf+i+1), xa::PReg(6), xa::ptr(xa::XReg(29)));
+                    }else{
+                        CGA64::st1w(xa::ZRegS(2*uf+i+1), xa::PReg(6), xa::ptr(xa::XReg(8)));
+
+                    }
+#else // #ifdef __ARM_ARCH
+                    movss(ptr[reg_to + i * shift], Xmm(2 * uf + i + 1)); // target?
+#endif
+                }
         }
     }
 
@@ -1251,6 +1284,16 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         const bool loop_vectorize[] = {true, false};
 
         preamble();
+
+#ifdef __ARM_ARCH
+        // Push p7 
+        CGA64::sub(x22, x22, 0x8);
+        CGA64::str(p7, xa::ptr(x22));
+        CGA64::sub(x22, x22, 0x8);
+        CGA64::str(p6, xa::ptr(x22));
+        CGA64::ptrue(xa::PRegS(6), xa::VL1);
+        CGA64::ptrue(xa::PRegS(7), xa::VL4);
+#endif // ifdef ARM_ARCH
 
         if (is_bf16_) {
             mov(mask_reg, 0xAAAAAAAA);
@@ -1301,6 +1344,15 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         }
 
         L(loop_label[2]);
+
+#ifdef __ARM_ARCH
+        // Pop p6, 7 
+        CGA64::ldr(p6, xa::ptr(x22));
+        CGA64::add(x22, x22, 0x8);
+        CGA64::ldr(p7, xa::ptr(x22));
+        CGA64::add(x22, x22, 0x8);
+#endif // ifdef JIT_DIRECT
+
         postamble();
 
         if (is_bf16_) {

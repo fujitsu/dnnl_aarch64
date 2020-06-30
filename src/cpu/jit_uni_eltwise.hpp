@@ -30,6 +30,9 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+#define CGA64 CodeGeneratorAArch64
+namespace xa = Xbyak::Xbyak_aarch64;
+
 template <cpu_isa_t isa>
 struct jit_uni_eltwise_injector_f32 {
     using Vmm = typename utils::conditional3<isa == sse42, Xbyak::Xmm,
