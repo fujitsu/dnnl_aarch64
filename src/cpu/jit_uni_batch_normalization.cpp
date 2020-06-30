@@ -1088,6 +1088,9 @@ struct jit_bnorm_t: public jit_generator {
         unroll_regs = isa == avx512_common && !is_spatial_thr_ ? 4 : 1;
 
         preamble();
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+	setAll1Preg0_7(7);
+#endif
 
         if (is_bf16_) {
             // init emulation of bfloat16 operations
@@ -1118,6 +1121,9 @@ struct jit_bnorm_t: public jit_generator {
             backward();
         }
         add(rsp, stack_size_required);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+	clearAll1Preg0_7();
+#endif
         postamble();
 
         ker = reinterpret_cast<decltype(ker)>(const_cast<uint8_t*>(
