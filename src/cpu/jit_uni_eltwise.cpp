@@ -1283,16 +1283,17 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                     bf16_emu_reserv_5, bf16_emu_reserv_6);
 
         const int simd_w = cpu_isa_traits<isa>::vlen / sizeof(float);
-        const int loop_dec[] = {simd_w, 1};
-        const int uf[] = {1, 1};
+        const int num_unroll_pattern = 4;
+        const int loop_dec[] = {simd_w, simd_w, simd_w, 1};
+        const int uf[] = {8, 4, 1, 1};
 
         int _shift = (is_bf16_) ? sizeof(mkldnn_bfloat16_t) : sizeof(float);
         int _vlen = (is_bf16_)
             ? cpu_isa_traits<isa>::vlen / 2
             : cpu_isa_traits<isa>::vlen;
 
-        const int shift[] = {_vlen, _shift};
-        const bool loop_vectorize[] = {true, false};
+        const int shift[] = {_vlen, _vlen, _vlen, _shift};
+        const bool loop_vectorize[] = {true, true, true, false};
 
         preamble();
 
@@ -1331,14 +1332,19 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         }
 
         mov(imm_addr64, float2int(desc.alpha));
+#ifdef __ARM_ARCH
+        // imm_addr63 is xreg(3)
+        CGA64::fmov(xa::ZRegS(14));
+        CGA64::mov(xa::ZRegD(14), xa::PReg(6)/ xa::T_m, xa::XReg(3));
+#else // #ifdef __ARM_ARCH
         movq(xmm_ns, imm_addr64);
+#endif // #ifdef __ARM_ARCH
         uni_vbroadcastss(vmm_ns, xmm_ns);
-
         uni_vpxor(vmm_zero, vmm_zero, vmm_zero);
 
-        Label loop_label[3];
+        Label loop_label[num_unroll_pattern+1];
 
-        for (int id = 0; id < 2; id++) {
+        for (int id = 0; id < num_unroll_pattern; id++) {
             L(loop_label[id]);
             cmp(reg_work_amount, uf[id] * loop_dec[id] - 1);
             jle(loop_label[id + 1], T_NEAR);
@@ -1354,7 +1360,7 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
             jmp(loop_label[id]);
         }
 
-        L(loop_label[2]);
+        L(loop_label[num_unroll_pattern]);
 
 #ifdef __ARM_ARCH
         // Pop p5, 6
