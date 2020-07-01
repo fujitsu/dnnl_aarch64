@@ -1283,17 +1283,17 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                     bf16_emu_reserv_5, bf16_emu_reserv_6);
 
         const int simd_w = cpu_isa_traits<isa>::vlen / sizeof(float);
-        const int num_unroll_pattern = 4;
-        const int loop_dec[] = {simd_w, simd_w, simd_w, 1};
-        const int uf[] = {8, 4, 1, 1};
+        const int num_unroll_pattern = 3;
+        const int loop_dec[] = {simd_w, simd_w, 1};
+        const int uf[] = {4, 1, 1};
 
         int _shift = (is_bf16_) ? sizeof(mkldnn_bfloat16_t) : sizeof(float);
         int _vlen = (is_bf16_)
             ? cpu_isa_traits<isa>::vlen / 2
             : cpu_isa_traits<isa>::vlen;
 
-        const int shift[] = {_vlen, _vlen, _vlen, _shift};
-        const bool loop_vectorize[] = {true, true, true, false};
+        const int shift[] = {_vlen, _vlen, _shift};
+        const bool loop_vectorize[] = {true, true, false};
 
         preamble();
 
