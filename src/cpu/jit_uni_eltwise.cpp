@@ -1251,6 +1251,9 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         const bool loop_vectorize[] = {true, false};
 
         preamble();
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+        setAll1Preg0_7(4);
+#endif
 
         if (is_bf16_) {
             mov(mask_reg, 0xAAAAAAAA);
@@ -1301,6 +1304,9 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         }
 
         L(loop_label[2]);
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+        clearAll1Preg0_7();
+#endif
         postamble();
 
         if (is_bf16_) {
