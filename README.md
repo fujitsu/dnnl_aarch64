@@ -53,11 +53,10 @@ Currently, DNNL_aarch64 is intended to run on CPUs of ARMv8-A with SVE. If you r
 git clone https://github.com/fujitsu/dnnl_aarch64.git
 ```
 
-2. Switch branch to **fjdev** from master and **update submodule**
+2. Update submodule
 
 ```
 cd dnnl_aarch64/
-git checkout -b fjdev origin/fjdev
 git submodule update --init --recursive
 ```
 
@@ -66,7 +65,7 @@ git submodule update --init --recursive
 ```
 mkdir third_party/build_xed_aarch64
 pushd third_party/build_xed_aarch64/
-../xbyak/translator/third_party/xed/mfile.py --shared examples install
+../xbyak_translator_aarch64/translator/third_party/xed/mfile.py --shared examples install
 cd kits/
 ln -sf xed-install-base-* xed
 popd
