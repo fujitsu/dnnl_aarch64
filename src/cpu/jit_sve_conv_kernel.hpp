@@ -139,23 +139,6 @@ private:
     reg64_t reg_out_org         = x18;
     reg64_t reg_oi_org          = x19;
 
-    void add_imm(reg64_t out, reg64_t in, long long int value){
-        long long int val = (value >= 0) ? value : -1 * value;
-        if( val <= ADDMAX ){
-            if( value >= 0 )  CGA64::add(out, in, val);
-            else              CGA64::sub(out, in, val);
-        }else{
-            CGA64::mov(reg_tmp_imm, val&0xffff);
-            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
-            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
-            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
-
-            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
-            else              CGA64::sub(out, in, reg_tmp_imm);
-        }
-    }
-
-
     void prefetch(const std::string prfop, int level, reg64_t in, long long int ofs) {
         bool for_load;
         if (prfop == "LD") {
@@ -179,7 +162,7 @@ private:
             if((ofs <= PRFMMAX) && (ofs >= 0)) {
                 CGA64::prfm(op, xa::ptr(in, static_cast<int32_t>(ofs)));
             }else{
-              add_imm(reg_tmp_addr, in, ofs);
+                CGA64::add_imm(reg_tmp_addr, in, ofs, reg_tmp_imm);
                 CGA64::prfm(op, xa::ptr(reg_tmp_addr));
             }
         } else {
@@ -188,19 +171,18 @@ private:
             case 1: op_sve = (for_load == true) ? xa::PLDL1KEEP_SVE : xa::PSTL1KEEP_SVE; break;
             case 2: op_sve = (for_load == true) ? xa::PLDL2KEEP_SVE : xa::PSTL2KEEP_SVE; break;
             case 3: op_sve = (for_load == true) ? xa::PLDL3KEEP_SVE : xa::PSTL3KEEP_SVE; break;
-            default: assert(!"invalid prfop"); break;
+            default: assert(!"invalid level"); break;
             }
 
             if((VL_OFS(ofs) <= PRFWMAX) &&
                (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
                 CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(in, static_cast<int32_t>(VL_OFS(ofs))));
             }else{
-                add_imm(reg_tmp_addr, in, ofs);
+                CGA64::add_imm(reg_tmp_addr, in, ofs, reg_tmp_imm);
                 CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(reg_tmp_addr));
             }
         }
     }
-
 
     jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
 
@@ -365,22 +347,6 @@ private:
 
     const xa::PReg reg_p_all_ones  = p2;
 
-    void add_imm(reg64_t out, reg64_t in, long long int value){
-        long long int val = (value >= 0) ? value : -1 * value;
-        if( val <= ADDMAX ){
-            if( value >= 0 )  CGA64::add(out, in, val);
-            else              CGA64::sub(out, in, val);
-        }else{
-            CGA64::mov(reg_tmp_imm, val&0xffff);
-            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
-            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
-            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
-
-            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
-            else              CGA64::sub(out, in, reg_tmp_imm);
-        }
-    }
-
     void prefetch(const std::string prfop, int level, reg64_t in, long long int ofs) {
         bool for_load;
         if (prfop == "LD") {
@@ -404,7 +370,7 @@ private:
             if((ofs <= PRFMMAX) && (ofs >= 0)) {
               CGA64::prfm(op, xa::ptr(in, static_cast<int32_t>(ofs)));
             }else{
-              add_imm(reg_tmp_addr, in, ofs);
+              CGA64::add_imm(reg_tmp_addr, in, ofs, reg_tmp_imm);
               CGA64::prfm(op, xa::ptr(reg_tmp_addr));
             }
         } else {
@@ -420,7 +386,7 @@ private:
                (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
                 CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(in, static_cast<int32_t>(VL_OFS(ofs))));
             }else{
-                add_imm(reg_tmp_addr, in, ofs);
+                CGA64::add_imm(reg_tmp_addr, in, ofs, reg_tmp_imm);
                 CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(reg_tmp_addr));
             }
         }
@@ -521,43 +487,6 @@ private:
 
     const xa::PReg reg_p_all_ones = p2;
 
-    void mov_imm(reg64_t out, long long int value){
-        assert(value >= 0);
-        if(value <= MOVMAX){
-            CGA64::mov(out, value);
-        }else{
-            int first_flag = 1;
-            long long int val = value;
-            int shift_bits = 0;
-            while(val != 0){
-                if(first_flag){
-                    CGA64::movz(out, val&0xffff, shift_bits);
-                    first_flag = 0;
-                }else{
-                    CGA64::movk(out, val&0xffff, shift_bits);
-                }
-                val = val >> 16;
-                shift_bits += 16;
-            }
-        }
-    }
-
-    void add_imm(reg64_t out, reg64_t in, long long int value){
-        long long int val = (value >= 0) ? value : -1 * value;
-        if( val <= ADDMAX ){
-            if( value >= 0 )  CGA64::add(out, in, val);
-            else              CGA64::sub(out, in, val);
-        }else{
-            CGA64::mov(reg_tmp_imm, val&0xffff);
-            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
-            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
-            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
-
-            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
-            else              CGA64::sub(out, in, reg_tmp_imm);
-        }
-    }
-
     void prefetch(const std::string prfop, int level, reg64_t in, long long int ofs) {
         bool for_load;
         if (prfop == "LD") {
@@ -581,7 +510,7 @@ private:
             if((ofs <= PRFMMAX) && (ofs >= 0)) {
                 CGA64::prfm(op, xa::ptr(in, static_cast<int32_t>(ofs)));
             }else{
-                add_imm(reg_add_tmp, in, ofs);
+                CGA64::add_imm(reg_add_tmp, in, ofs, reg_tmp_imm);
                 CGA64::prfm(op, xa::ptr(reg_add_tmp));
             }
         } else {
@@ -597,7 +526,7 @@ private:
                (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
                 CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(in, static_cast<int32_t>(VL_OFS(ofs))));
             }else{
-                add_imm(reg_add_tmp, in, ofs);
+                CGA64::add_imm(reg_add_tmp, in, ofs, reg_tmp_imm);
                 CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(reg_add_tmp));
             }
         }

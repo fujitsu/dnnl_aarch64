@@ -104,6 +104,8 @@ include("cmake/translate.cmake")
 enable_testing()
 
 include_directories(include)
+include_directories(/opt/FJSVstclanga/v1.0.0/include)
+
 
 if(DNNL_INDIRECT_JIT_AARCH64)
     append(CMAKE_C_FLAGS "-DDNNL_INDIRECT_JIT_AARCH64")
