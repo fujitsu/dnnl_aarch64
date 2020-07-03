@@ -601,6 +601,9 @@ template <cpu_isa_t isa>
 void jit_uni_pool_kernel<isa>::generate() {
 
     this->preamble();
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    setAll1Preg0_7(3);
+#endif
 
     Label idx_table;
 
@@ -776,7 +779,9 @@ void jit_uni_pool_kernel<isa>::generate() {
             step_high_half(ur_w_tail, 0, r_pad);
         }
     }
-
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+    clearAll1Preg0_7();
+#endif
     this->postamble();
 
     if (jpp.is_bf16) {
