@@ -43,7 +43,6 @@
 using namespace mkldnn::impl::types;
 
 #define PRFMMIN  (-256)
-#define PRFMMAX   255
 #define PRFWMAX    31
 #define LDRMAX    255
 #define LDRWMAX   252
@@ -130,22 +129,6 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
     reg64_t reg_tmp_imm             = x18; // tmp for add_imm
     reg64_t reg_tmp_ofs             = x19; // tmp reg to calc bwd wei offset in out_load
 
-    void add_imm(reg64_t out, reg64_t in, long long int value){
-        long long int val = (value >= 0) ? value : -1 * value;
-        if( val <= ADDMAX ){
-            if( value >= 0 )  CGA64::add(out, in, val);
-            else              CGA64::sub(out, in, val);
-        }else{
-            CGA64::mov(reg_tmp_imm, val&0xffff);
-            if(val > MOVMAX) CGA64::movk(reg_tmp_imm, (val>>16)&0xffff, 16);
-            if(val > 0xffffffff) CGA64::movk(reg_tmp_imm, (val>>32)&0xffff, 32);
-            if(val > 0xffffffffffff) CGA64::movk(reg_tmp_imm, (val>>48)&0xffff, 48);
-
-            if( value >= 0 )  CGA64::add(out, in, reg_tmp_imm);
-            else              CGA64::sub(out, in, reg_tmp_imm);
-        }
-    }
-
     void prefetch(const std::string prfop, int level, reg64_t in, long long int ofs) {
         bool for_load;
         if (prfop == "LD") {
@@ -169,7 +152,7 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
           if((ofs <= PRFMMAX) && (ofs >= 0)) {
               CGA64::prfm(op, xa::ptr(in, static_cast<int32_t>(ofs)));
           }else{
-              add_imm(reg_tmp_ofs, in, ofs);
+              CGA64::add_imm(reg_tmp_ofs, in, ofs, reg_tmp_imm);
               CGA64::prfm(op, xa::ptr(reg_tmp_ofs));
           }
         } else {
@@ -185,7 +168,7 @@ struct jit_sve_1x1_conv_kernel : public jit_generator {
            (VL_OFS(ofs) >= (-1 * PRFWMAX - 1))) {
             CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(in, static_cast<int32_t>(VL_OFS(ofs))));
         }else{
-            add_imm(reg_tmp_ofs, in, ofs);
+            CGA64::add_imm(reg_tmp_ofs, in, ofs, reg_tmp_imm);
             CGA64::prfw(op_sve, reg_p_all_ones, xa::ptr(reg_tmp_ofs));
         }
       }
