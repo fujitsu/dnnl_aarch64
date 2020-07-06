@@ -1672,22 +1672,34 @@ void jit_uni_eltwise_fwd_t<isa, d_type>::execute_forward() const {
     src += data_d.blocking_desc().offset_padding;
     dst += data_d.blocking_desc().offset_padding;
 
-    const int cache_line = 16;
-    parallel(0, [&](const int ithr, const int nthr) {
-        size_t start{0}, end{0};
-
-        balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
-        start = nstl::min(nelems, start * cache_line);
-        end = nstl::min(nelems, end * cache_line);
-
+    if (nelems <= MAX_NUM_SINGLE_ELTWISE) {
         auto arg = jit_args();
-        arg.from = (const void*)&src[start];
-        arg.for_comparison = (const void*)&src[start];
-        arg.to = (const void*)&dst[start];
-        arg.work_amount = end - start;
+        arg.from = (const void*)&src[0];
+        arg.for_comparison = (const void*)&src[0];
+        arg.to = (const void*)&dst[0];
+        arg.work_amount = nelems;
         if (arg.work_amount)
             (*kernel_)(&arg);
-    });
+    } else {
+        int num_threads = std::min<long unsigned int>(mkldnn_get_max_threads(),
+                ((nelems+MAX_NUM_SINGLE_ELTWISE-1)/MAX_NUM_SINGLE_ELTWISE));
+        const int cache_line = 16;
+        parallel(num_threads, [&](const int ithr, const int nthr) {
+            size_t start{0}, end{0};
+
+            balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
+            start = nstl::min(nelems, start * cache_line);
+            end = nstl::min(nelems, end * cache_line);
+
+            auto arg = jit_args();
+            arg.from = (const void*)&src[start];
+            arg.for_comparison = (const void*)&src[start];
+            arg.to = (const void*)&dst[start];
+            arg.work_amount = end - start;
+            if (arg.work_amount)
+                (*kernel_)(&arg);
+        });
+    }
 }
 
 template <cpu_isa_t isa, data_type_t d_type>
@@ -1738,24 +1750,35 @@ void jit_uni_eltwise_bwd_t<isa, d_type>::execute_backward() const {
     diff_dst += diff_data_d.blocking_desc().offset_padding;
     diff_src += diff_data_d.blocking_desc().offset_padding;
 
-    parallel(0, [&](const int ithr, const int nthr) {
-        size_t start{0}, end{0};
-
-        const int cache_line = 16;
-
-        balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
-        start = nstl::min(nelems, start * cache_line);
-        end = nstl::min(nelems, end * cache_line);
-
+    if (nelems <= MAX_NUM_SINGLE_ELTWISE) {
         auto arg = jit_args();
-        arg.from = (const void*)&diff_dst[start];
-        arg.to = (const void*)&diff_src[start];
-        arg.for_comparison = (const void*)&src[start];
-        arg.work_amount = end - start;
-        if (arg.work_amount) {
+        arg.from = (const void*)&diff_dst[0];
+        arg.to = (const void*)&diff_src[0];
+        arg.for_comparison = (const void*)&src[0];
+        arg.work_amount = nelems;
+        if (arg.work_amount)
             (*kernel_)(&arg);
-        }
-    });
+    } else {
+        int num_threads = std::min<long unsigned int>(mkldnn_get_max_threads(),
+                ((nelems+MAX_NUM_SINGLE_ELTWISE-1)/MAX_NUM_SINGLE_ELTWISE));
+        const int cache_line = 16;
+        parallel(num_threads, [&](const int ithr, const int nthr) {
+            size_t start{0}, end{0};
+
+            balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
+            start = nstl::min(nelems, start * cache_line);
+            end = nstl::min(nelems, end * cache_line);
+
+            auto arg = jit_args();
+            arg.from = (const void*)&diff_dst[start];
+            arg.to = (const void*)&diff_src[start];
+            arg.for_comparison = (const void*)&src[start];
+            arg.work_amount = end - start;
+            if (arg.work_amount) {
+                (*kernel_)(&arg);
+            }
+        });
+     }
 }
 
 template struct jit_uni_eltwise_fwd_t<sse42, data_type::f32>;
