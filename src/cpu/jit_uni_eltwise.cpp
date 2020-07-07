@@ -1129,7 +1129,7 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                     vmovups(Ymm_src(i + 1), addr_fwd);
                     vpermw(Vmm(i + 1) | k_mask_cvt | T_z, zmm_idx, Zmm_src(i + 1));
                 } else {
-                    uni_vmovups(Vmm(i + 1), addr_fwd);
+                    uni_vmovups(Vmm(i + 1), addr_fwd); // not pred_reg
                 }
                 if (is_bwd()) {
                     if (is_bf16_) {
@@ -1146,7 +1146,17 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                     vpermw(Vmm(i + 1) | k_mask_cvt | T_z, zmm_idx,
                             Zmm_src(i + 1));
                 } else {
-                    movss(Xmm(i + 1), addr_fwd);
+#ifdef __ARM_ARCH
+                    // reg_from is xreg(0)
+                    if((i*shift) != 0){
+                        add_imm(xa::XReg(29), xa::XReg(0), i*shift, xa::XReg(30)); 
+                        CGA64::ldr(xa::ZReg(i+1), xa::ptr(xa::XReg(29)));
+                    }else{
+                        CGA64::ldr(xa::ZReg(i+1), xa::ptr(xa::XReg(0)));
+                    }
+#else // #ifdef __ARM_ARCH
+                    movss(Xmm(i + 1), addr_fwd); // target?
+#endif
                 }
                 if (is_bwd()) {
                     if (is_bf16_) {
@@ -1154,7 +1164,17 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                         vpermw(Vmm(uf + i + 1) | k_mask_cvt | T_z, zmm_idx,
                                 Zmm_src(uf + i + 1));
                     } else {
-                        movss(Xmm(uf + i + 1), addr_bwd);
+#ifdef __ARM_ARCH
+                    // reg_for_com is xreg(2)
+                    if((i*shift) != 0){
+                        add_imm(xa::XReg(29), xa::XReg(2), i*shift, xa::XReg(30)); 
+                        CGA64::ldr(xa::ZReg(uf+i+1), xa::ptr(xa::XReg(29)));
+                    }else{
+                        CGA64::ldr(xa::ZReg(uf+i+1), xa::ptr(xa::XReg(2)));
+                    }
+#else // #ifdef __ARM_ARCH
+                        movss(Xmm(uf + i + 1), addr_bwd); // target?
+#endif
                     }
                 }
             }
@@ -1176,24 +1196,35 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                 blendvps(Vmm(2 * uf + i + 1), Vmm(i + 1));
             }
         } else {
-            for (int i = 0; i < uf; i++) {
-                vmulps(Vmm(2 * uf + i + 1), Vmm(i + 1), vmm_ns);
+            for (int i = 0; i < uf; i++) { // here
+                vmulps(Vmm(2 * uf + i + 1), Vmm(i + 1), vmm_ns); 
                 if (isa == avx2) {
                     if (is_bwd())
-                        vcmpgtps(vmm_mask, Vmm(uf + i + 1), vmm_zero);
+                        vcmpgtps(vmm_mask, Vmm(uf + i + 1), vmm_zero); // target
                     else
-                        vcmpgtps(vmm_mask, Vmm(i + 1), vmm_zero);
+                        vcmpgtps(vmm_mask, Vmm(i + 1), vmm_zero); // target
 
                     vblendvps(Vmm(2 * uf + i + 1), Vmm(2 * uf + i + 1),
-                              Vmm(i + 1), vmm_mask);
+                              Vmm(i + 1), vmm_mask); 
 
                 } else {
-                    if (is_bwd())
-                        vcmpps(k_mask, Vmm(uf + i + 1), vmm_zero, _cmp_nle_us);
-                    else
-                        vcmpps(k_mask, Vmm(i + 1), vmm_zero, _cmp_nle_us);
+                    if (is_bwd()){
+#ifdef __ARM_ARCH
+                        // k_mask is PReg(1)
+                        CGA64::fcmgt(xa::PRegS(1), xa::PReg(5)/xa::T_z, xa::ZRegS(uf+i+1), xa::ZRegS(31));
+#else // #ifdef __ARM_ARCH
+                        vcmpps(k_mask, Vmm(uf + i + 1), vmm_zero, _cmp_nle_us); // target
+#endif // #ifdef __ARM_ARCH
+                    }else{
+#ifdef __ARM_ARCH
+                        // k_mask is PReg(1)
+                        CGA64::fcmgt(xa::PRegS(1), xa::PReg(5)/xa::T_z, xa::ZRegS(i+1), xa::ZRegS(31));
+#else // #ifdef __ARM_ARCH
+                        vcmpps(k_mask, Vmm(i + 1), vmm_zero, _cmp_nle_us); // target
+#endif // #ifdef __ARM_ARCH
+                    }
                     vblendmps(Vmm(2 * uf + i + 1) | k_mask, Vmm(2 * uf + i + 1),
-                              Vmm(i + 1));
+                              Vmm(i + 1)); 
                 }
             }
         }
@@ -1207,16 +1238,29 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         };
 
         for (int i = 0; i < uf; i++) {
-            if (vectorize)
-                if(is_bf16_)
+            if (vectorize){
+                if(is_bf16_){
                     store_data(k_full_mask, i);
-                else
+                }else{
                     uni_vmovups(ptr[reg_to + i * shift], Vmm(2 * uf + i + 1));
-            else
-                if (is_bf16_)
+                }
+            }else
+                if (is_bf16_){
                     store_data(k_tail_mask, i);
-                else
-                    movss(ptr[reg_to + i * shift], Xmm(2 * uf + i + 1));
+                }else{
+#ifdef __ARM_ARCH
+                    // reg_to is xreg(8)
+                    if((i*shift) != 0){
+                        add_imm(xa::XReg(29), xa::XReg(8), i*shift, xa::XReg(30)); 
+                        CGA64::st1w(xa::ZRegS(2*uf+i+1), xa::PReg(6), xa::ptr(xa::XReg(29)));
+                    }else{
+                        CGA64::st1w(xa::ZRegS(2*uf+i+1), xa::PReg(6), xa::ptr(xa::XReg(8)));
+
+                    }
+#else // #ifdef __ARM_ARCH
+                    movss(ptr[reg_to + i * shift], Xmm(2 * uf + i + 1)); // target?
+#endif
+                }
         }
     }
 
@@ -1239,21 +1283,32 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
                     bf16_emu_reserv_5, bf16_emu_reserv_6);
 
         const int simd_w = cpu_isa_traits<isa>::vlen / sizeof(float);
-        const int loop_dec[] = {simd_w, 1};
-        const int uf[] = {1, 1};
+        const int num_unroll_pattern = 3;
+        const int loop_dec[] = {simd_w, simd_w, 1};
+        const int uf[] = {4, 1, 1};
 
         int _shift = (is_bf16_) ? sizeof(mkldnn_bfloat16_t) : sizeof(float);
         int _vlen = (is_bf16_)
             ? cpu_isa_traits<isa>::vlen / 2
             : cpu_isa_traits<isa>::vlen;
 
-        const int shift[] = {_vlen, _shift};
-        const bool loop_vectorize[] = {true, false};
+        const int shift[] = {_vlen, _vlen, _shift};
+        const bool loop_vectorize[] = {true, true, false};
 
         preamble();
 #ifdef DNNL_INDIRECT_JIT_AARCH64
         setAll1Preg0_7(4);
 #endif
+
+#ifdef __ARM_ARCH
+        // Push p5, 6
+        CGA64::sub(x22, x22, 0x8);
+        CGA64::str(p5, xa::ptr(x22));
+        CGA64::sub(x22, x22, 0x8);
+        CGA64::str(p6, xa::ptr(x22));
+        CGA64::ptrue(xa::PRegS(5));
+        CGA64::ptrue(xa::PRegS(6), xa::VL1);
+#endif // ifdef ARM_ARCH
 
         if (is_bf16_) {
             mov(mask_reg, 0xAAAAAAAA);
@@ -1280,14 +1335,19 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         }
 
         mov(imm_addr64, float2int(desc.alpha));
+#ifdef __ARM_ARCH
+        // imm_addr63 is xreg(3)
+        CGA64::fmov(xa::ZRegS(14));
+        CGA64::mov(xa::ZRegD(14), xa::PReg(6)/ xa::T_m, xa::XReg(3));
+#else // #ifdef __ARM_ARCH
         movq(xmm_ns, imm_addr64);
+#endif // #ifdef __ARM_ARCH
         uni_vbroadcastss(vmm_ns, xmm_ns);
-
         uni_vpxor(vmm_zero, vmm_zero, vmm_zero);
 
-        Label loop_label[3];
+        Label loop_label[num_unroll_pattern+1];
 
-        for (int id = 0; id < 2; id++) {
+        for (int id = 0; id < num_unroll_pattern; id++) {
             L(loop_label[id]);
             cmp(reg_work_amount, uf[id] * loop_dec[id] - 1);
             jle(loop_label[id + 1], T_NEAR);
@@ -1303,7 +1363,16 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
             jmp(loop_label[id]);
         }
 
-        L(loop_label[2]);
+        L(loop_label[num_unroll_pattern]);
+
+#ifdef __ARM_ARCH
+        // Pop p5, 6
+        CGA64::ldr(p5, xa::ptr(x22));
+        CGA64::add(x22, x22, 0x8);
+        CGA64::ldr(p6, xa::ptr(x22));
+        CGA64::add(x22, x22, 0x8);
+#endif // ifdef JIT_DIRECT
+
 #ifdef DNNL_INDIRECT_JIT_AARCH64
         clearAll1Preg0_7();
 #endif
@@ -1609,22 +1678,34 @@ void jit_uni_eltwise_fwd_t<isa, d_type>::execute_forward() const {
     src += data_d.blocking_desc().offset_padding;
     dst += data_d.blocking_desc().offset_padding;
 
-    const int cache_line = 16;
-    parallel(0, [&](const int ithr, const int nthr) {
-        size_t start{0}, end{0};
-
-        balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
-        start = nstl::min(nelems, start * cache_line);
-        end = nstl::min(nelems, end * cache_line);
-
+    if (nelems <= MAX_NUM_SINGLE_ELTWISE) {
         auto arg = jit_args();
-        arg.from = (const void*)&src[start];
-        arg.for_comparison = (const void*)&src[start];
-        arg.to = (const void*)&dst[start];
-        arg.work_amount = end - start;
+        arg.from = (const void*)&src[0];
+        arg.for_comparison = (const void*)&src[0];
+        arg.to = (const void*)&dst[0];
+        arg.work_amount = nelems;
         if (arg.work_amount)
             (*kernel_)(&arg);
-    });
+    } else {
+        int num_threads = std::min<long unsigned int>(mkldnn_get_max_threads(),
+                ((nelems+MAX_NUM_SINGLE_ELTWISE-1)/MAX_NUM_SINGLE_ELTWISE));
+        const int cache_line = 16;
+        parallel(num_threads, [&](const int ithr, const int nthr) {
+            size_t start{0}, end{0};
+
+            balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
+            start = nstl::min(nelems, start * cache_line);
+            end = nstl::min(nelems, end * cache_line);
+
+            auto arg = jit_args();
+            arg.from = (const void*)&src[start];
+            arg.for_comparison = (const void*)&src[start];
+            arg.to = (const void*)&dst[start];
+            arg.work_amount = end - start;
+            if (arg.work_amount)
+                (*kernel_)(&arg);
+        });
+    }
 }
 
 template <cpu_isa_t isa, data_type_t d_type>
@@ -1675,24 +1756,35 @@ void jit_uni_eltwise_bwd_t<isa, d_type>::execute_backward() const {
     diff_dst += diff_data_d.blocking_desc().offset_padding;
     diff_src += diff_data_d.blocking_desc().offset_padding;
 
-    parallel(0, [&](const int ithr, const int nthr) {
-        size_t start{0}, end{0};
-
-        const int cache_line = 16;
-
-        balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
-        start = nstl::min(nelems, start * cache_line);
-        end = nstl::min(nelems, end * cache_line);
-
+    if (nelems <= MAX_NUM_SINGLE_ELTWISE) {
         auto arg = jit_args();
-        arg.from = (const void*)&diff_dst[start];
-        arg.to = (const void*)&diff_src[start];
-        arg.for_comparison = (const void*)&src[start];
-        arg.work_amount = end - start;
-        if (arg.work_amount) {
+        arg.from = (const void*)&diff_dst[0];
+        arg.to = (const void*)&diff_src[0];
+        arg.for_comparison = (const void*)&src[0];
+        arg.work_amount = nelems;
+        if (arg.work_amount)
             (*kernel_)(&arg);
-        }
-    });
+    } else {
+        int num_threads = std::min<long unsigned int>(mkldnn_get_max_threads(),
+                ((nelems+MAX_NUM_SINGLE_ELTWISE-1)/MAX_NUM_SINGLE_ELTWISE));
+        const int cache_line = 16;
+        parallel(num_threads, [&](const int ithr, const int nthr) {
+            size_t start{0}, end{0};
+
+            balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
+            start = nstl::min(nelems, start * cache_line);
+            end = nstl::min(nelems, end * cache_line);
+
+            auto arg = jit_args();
+            arg.from = (const void*)&diff_dst[start];
+            arg.to = (const void*)&diff_src[start];
+            arg.for_comparison = (const void*)&src[start];
+            arg.work_amount = end - start;
+            if (arg.work_amount) {
+                (*kernel_)(&arg);
+            }
+        });
+     }
 }
 
 template struct jit_uni_eltwise_fwd_t<sse42, data_type::f32>;

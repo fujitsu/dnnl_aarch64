@@ -65,6 +65,10 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_1x1_convolution.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_conv_kernel.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_convolution.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_1x1_conv_kernel.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_1x1_convolution.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_conv_kernel.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_convolution.hpp
         )
 endif()
 
@@ -220,4 +224,10 @@ if(WIN32)
             "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/build_xed_x86_64/kits/xed/bin")
     endif()
     set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}" PARENT_SCOPE)
+endif()
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.16.0)
+  target_precompile_headers(${LIB_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_generator.hpp
+    )
 endif()
