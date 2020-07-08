@@ -1121,6 +1121,7 @@ struct jit_bnorm_t: public jit_generator {
             backward();
         }
         add(rsp, stack_size_required);
+	
 #ifdef DNNL_INDIRECT_JIT_AARCH64
 	clearAll1Preg0_7();
 #endif
