@@ -1296,6 +1296,9 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         const bool loop_vectorize[] = {true, true, false};
 
         preamble();
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+        setAll1Preg0_7(4);
+#endif
 
 #ifdef __ARM_ARCH
         // Push p5, 6
@@ -1370,6 +1373,9 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         CGA64::add(x22, x22, 0x8);
 #endif // ifdef JIT_DIRECT
 
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+        clearAll1Preg0_7();
+#endif
         postamble();
 
         if (is_bf16_) {

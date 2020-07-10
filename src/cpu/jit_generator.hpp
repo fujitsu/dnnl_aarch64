@@ -330,9 +330,9 @@ public:
 	CodeGeneratorAArch64::mov(x8, x4);
 	CodeGeneratorAArch64::mov(x9, x5); /* 6-th arg. */
 	/* Note:If # of args is more than 6, 7-th, 8-th, ..., args are passed by stack. */
-
 	CodeGeneratorAArch64::mov(x4, CodeGeneratorAArch64::sp); /* Intel64's stack register is 4-th register. */
 	CodeGeneratorAArch64::sub_imm(X_TRANSLATOR_STACK, x4, xt_stack_offset, X_TMP_0);
+	CodeGeneratorAArch64::mov_imm(X_TMP_0, getTranslatorVersion()); /*get translator version info */
 #else //#ifdef DNNL_INDIRECT_JIT_AARCH64
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len); // subtract by imm
