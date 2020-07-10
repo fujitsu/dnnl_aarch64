@@ -179,12 +179,24 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
             if (jcp.with_bias)
                 vaddps(vmm, vmm, vmm_bias);
 
-            const Vmm vmm_k = vmm_mask(vmm, mask_flag);
-            if (!jcp.is_fast_depthwise)
-                vmulps(vmm_k, vmm, vmm_comp);
-            else
-                vmulps(vmm_k, vmm,
+            // const Vmm vmm_k = vmm_mask(vmm, mask_flag);
+            if (!jcp.is_fast_depthwise) {
+                // vmulps(vmm_k, vmm, vmm_comp);
+                vmulps(vmm, vmm, vmm_comp);
+                if (mask_flag) {
+                    CGA64::not_(xa::PRegB(mask_tmp.getIdx()), xa::PRegB(mask_all_one.getIdx()), xa::PRegB(ktail_mask.getIdx()));
+                    CGA64::mov(xa::ZRegS(vmm.getIdx()),xa::PReg(mask_tmp.getIdx())/xa::T_m, 0);
+                }
+            } else {
+                // vmulps(vmm_k, vmm,
+                //        SVE_compress_addr(reg_ptr_scales, scale_offset));
+                vmulps(vmm, vmm,
                        SVE_compress_addr(reg_ptr_scales, scale_offset));
+                if (mask_flag) {
+                    CGA64::not_(xa::PRegB(mask_tmp.getIdx()), xa::PRegB(mask_all_one.getIdx()), xa::PRegB(ktail_mask.getIdx()));
+                    CGA64::mov(xa::ZRegS(vmm.getIdx()),xa::PReg(mask_tmp.getIdx())/xa::T_m, 0);
+                }
+            }
         }
     }
 
@@ -279,6 +291,7 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
             Vmm vmm = vmm_out(j, k);
             const Vmm r_vmm = vmm_mask(vmm, mask_flag, true);
 
+            auto _mask = mask_flag ? ktail_mask : mask_all_one;
             switch (jcp.dst_dt) {
             case data_type::f32:
             case data_type::s32: vmovups(addr, r_vmm); break;
@@ -286,12 +299,12 @@ void _jit_sve_x8s8s32x_fwd_kernel<Vmm>::store_output(
             case data_type::s8: 
                 CGA64::smin(xa::ZRegS(r_vmm.getIdx()), 127);
                 CGA64::smax(xa::ZRegS(r_vmm.getIdx()), -128);
-                CGA64::st1b(xa::ZRegS(r_vmm.getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(reg_tmp_adr));
+                CGA64::st1b(xa::ZRegS(r_vmm.getIdx()), xa::PReg(_mask.getIdx()), xa::ptr(reg_tmp_adr));
                 break;
             // case data_type::u8: //< vpmovusdb(addr, r_vmm); break;
             case data_type::u8:
                 CGA64::umin(xa::ZRegS(r_vmm.getIdx()), 255);
-                CGA64::st1b(xa::ZRegS(r_vmm.getIdx()), xa::PReg(mask_all_one.getIdx()), xa::ptr(reg_tmp_adr));
+                CGA64::st1b(xa::ZRegS(r_vmm.getIdx()), xa::PReg(_mask.getIdx()), xa::ptr(reg_tmp_adr));
                 break;
             default: assert(!"unknown dst_dt");
             }

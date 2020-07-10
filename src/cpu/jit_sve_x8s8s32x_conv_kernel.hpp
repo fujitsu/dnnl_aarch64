@@ -125,6 +125,7 @@ private:
     const Xbyak::Opmask ktail_mask = Xbyak::Opmask(2);
     const Xbyak::Opmask kblend_mask = Xbyak::Opmask(3);
 
+    const Xbyak::Opmask mask_tmp = Xbyak::Opmask(6);
     const Xbyak::Opmask mask_all_one = Xbyak::Opmask(7);
 
     const Vmm vmm_wei = Vmm(31);
