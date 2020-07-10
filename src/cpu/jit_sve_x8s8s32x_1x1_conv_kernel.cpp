@@ -264,6 +264,7 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     vaddps(r, r, zmm_bias);
 
                 zmm_t mask_zmm = mask_flag ? r | ktail_mask | T_z : r;
+                if(mask_flag) assert(!"unimplemented");
                 // vmulps(mask_zmm, r, scale_ptr(i_load));
                 CGA64::fmul(xa::ZRegS(mask_zmm.getIdx()), xa::ZRegS(r.getIdx()), xa::ZRegS(zmm_scale.getIdx()));
             }
@@ -351,6 +352,7 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                                    : reg_tmp3_imm;
                 add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re, reg_tmp_imm);
 
+                auto _mask = mask_flag ? ktail_mask : vmask;
                 switch (jcp.dst_dt) {
                 case data_type::f32:
                 case data_type::s32:
@@ -359,12 +361,12 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     // vpmovsdb(output_ptr(i_load, i_ur), r_zmm); break;
                     CGA64::smin(xa::ZRegS(r_zmm.getIdx()), 127);
                     CGA64::smax(xa::ZRegS(r_zmm.getIdx()), -128);
-                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(reg_tmp_adr));
+                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(_mask.getIdx()), xa::ptr(reg_tmp_adr));
                     break;
                 case data_type::u8:
                     // vpmovusdb(output_ptr(i_load, i_ur), r_zmm); break;
                     CGA64::umin(xa::ZRegS(r_zmm.getIdx()), 255);
-                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(reg_tmp_adr));
+                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(_mask.getIdx()), xa::ptr(reg_tmp_adr));
                     break;
                 default: assert(!"unknown dst_dt");
                 }
@@ -397,7 +399,8 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     for (int r = 0; r < tail_size; ++r)
                         vpinsrb(xmm_bcast, xmm_bcast, ptr[aux_reg_bcast_data
                         + jcp.ic_without_padding * i_ur + i_reduce + r], r);
-                    vpbroadcastd(zmm_bcast, xmm_bcast);
+                    Zmm _bcast = ((i_ur % 2) == 0)? zmm_bcast : zmm_bcast2;
+                    vpbroadcastd(_bcast, xmm_bcast);
                 } else {
                   if(i_ur == 0) {
                       // vpbroadcastd(zmm_bcast, bcast_ptr(i_reduce, i_ur, false));
