@@ -208,6 +208,7 @@ private:
     void cvt2ps(data_type_t type_in, Vmm ymm_in, const Xbyak::Operand &op,
         bool mask_flag);
     const Vmm vmm_mask(const Vmm vmm_in, bool mask_flag, bool store = false);
+    void vmm_mask_all_one(const Xbyak::Opmask mask_in);
     Xbyak::Address SVE_compress_addr(Xbyak::Reg64 base, int raw_offt)
     {
         using Xbyak::Zmm;
