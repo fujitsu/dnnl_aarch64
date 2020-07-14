@@ -1627,9 +1627,8 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
             }
         }
         CGA64::add_imm(aux_reg_ker, aux_reg_ker, shift_ker_ptr, reg_tmp_imm);
-        assert(shift_dst_ptr < 4095);
-        assert(shift_dst_ptr > 0);
-        CGA64::sub(aux_reg_dst, aux_reg_dst, shift_dst_ptr);
+        assert(shift_dst_ptr >= 0);
+        CGA64::sub_imm(aux_reg_dst, aux_reg_dst, shift_dst_ptr, reg_tmp_imm);
         //dec(reg_kj);
         CGA64::sub(reg_kj, reg_kj, 1);
         CGA64::cmp(reg_kj, 0);
@@ -1637,9 +1636,8 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
     }
 
     if (jcp.ndims == 5) {
-        assert((typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block) < 4095);
-        CGA64::sub(aux_reg_dst_d, aux_reg_dst_d,
-                typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block);
+        CGA64::sub_imm(aux_reg_dst_d, aux_reg_dst_d,
+                typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block, reg_tmp_imm);
         CGA64::add_imm(aux_reg_ker_d, aux_reg_ker_d,  typesize * jcp.kw * jcp.kh * oc_block * ic_block, reg_tmp_imm);
 
         CGA64::sub(reg_ki, reg_ki, 1);
