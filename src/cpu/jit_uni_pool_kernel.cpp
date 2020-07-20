@@ -604,7 +604,6 @@ void jit_uni_pool_kernel<isa>::generate() {
 #ifdef DNNL_INDIRECT_JIT_AARCH64
     setAll1Preg0_7(3);
 #endif
-
     Label idx_table;
 
     int ow = jpp.ow;
@@ -616,168 +615,182 @@ void jit_uni_pool_kernel<isa>::generate() {
     int stride_w = jpp.stride_w;
     int l_pad = jpp.l_pad;
     int ur_w_tail = jpp.ur_w_tail;
-
+    
     int n_oi = ow / ur_w;
-
+    
     prev_kw = 0;
-
+    
     int vlen = cpu_isa_traits<isa>::vlen;
+
+    for(int phase = 0; phase < 2; phase++){
+      if ( phase == 0){
+	initSearchPReg();
+	initSearchZReg();
+	unSetGenJitMode();
+      } else {
+	setGenJitMode();
+      }
+
 
 #if defined(_WIN32)
     // Always mimic the Unix ABI (see the note about maskmovdqu in the header
     // file).
-    xor_(rdi, rcx);
-    xor_(rcx, rdi);
-    xor_(rdi, rcx);
+      xor_(rdi, rcx);
+      xor_(rcx, rdi);
+      xor_(rdi, rcx);
 #endif
-    if (!isa_has_bf16(jpp.isa) && jpp.is_bf16)
+      if (!isa_has_bf16(jpp.isa) && jpp.is_bf16)
         bf16_emu_->init_vcvtneps2bf16();
 
-    mov(reg_input, ptr[reg_param + GET_OFF(src)]);
-    mov(reg_output, ptr[reg_param + GET_OFF(dst)]);
-    if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
+      mov(reg_input, ptr[reg_param + GET_OFF(src)]);
+      mov(reg_output, ptr[reg_param + GET_OFF(dst)]);
+      if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
         mov(reg_index, ptr[reg_param + GET_OFF(indices)]);
-    mov(reg_kh, ptr[reg_param + GET_OFF(kh_padding)]);
-    mov(reg_k_shift, ptr[reg_param + GET_OFF(kh_padding_shift)]);
-    mov(reg_ker_area_h, ptr[reg_param + GET_OFF(ker_area_h)]);
+      mov(reg_kh, ptr[reg_param + GET_OFF(kh_padding)]);
+      mov(reg_k_shift, ptr[reg_param + GET_OFF(kh_padding_shift)]);
+      mov(reg_ker_area_h, ptr[reg_param + GET_OFF(ker_area_h)]);
 
-    if (jpp.is_bf16) {
+      if (jpp.is_bf16) {
         mov(tmp_gpr.cvt32(), 0xAAAAAAAA);
         kmovd(k_mask_cvt, tmp_gpr.cvt32());
-
+	
         mov(tmp_gpr, idx_table);
         vmovups(vmm_idx(), ptr[tmp_gpr]);
-    }
+      }
 
-    if (jpp.is_backward && jpp.simple_alg)
+      if (jpp.is_backward && jpp.simple_alg)
         maybe_zero_diff_src();
-
-    if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward)) {
+      
+      if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward)) {
         mov(tmp_gpr, 1);
         movq(xmm_one, tmp_gpr);
         uni_vpbroadcastd(vmm_one, xmm_one);
-
+	
         if (isa == avx) {
-            mov(reg_shuf_mask, 0x0c080400);
+	  mov(reg_shuf_mask, 0x0c080400);
         } else if (isa >= avx512_common) {
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-	  CodeGeneratorAArch64::mov(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), uint64_t(0x000000000000ffff));
-	  CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
-	  CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
-	  CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_index_mask.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
-	  CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+	  if(getGenJitMode() == true){
+	    CodeGeneratorAArch64::mov(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), uint64_t(0x000000000000ffff));
+	    CodeGeneratorAArch64::sub(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+	    CodeGeneratorAArch64::str(Xbyak_aarch64::XReg(tmp_gpr.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+	    CodeGeneratorAArch64::ldr(Xbyak_aarch64::PReg(k_index_mask.getIdx()), Xbyak_aarch64::ptr(X_TRANSLATOR_STACK));
+	    CodeGeneratorAArch64::add(X_TRANSLATOR_STACK, X_TRANSLATOR_STACK, 8);
+	  }
 #else
-            mov(tmp_gpr.cvt32(), 0x000f);
-            kmovw(k_index_mask, tmp_gpr.cvt32());
+	  mov(tmp_gpr.cvt32(), 0x000f);
+	  kmovw(k_index_mask, tmp_gpr.cvt32());
 #endif
         }
-    }
+      }
 
-    int r_pad  = nstl::max(0, ((ow-1)*stride_w) + kw - 1 - (iw + l_pad - 1));
-    int r_pad1 = (ur_w*n_oi - 1)*stride_w + kw - 1 - (iw + l_pad - 1);
-    if (r_pad1 > 0) n_oi--;
+      int r_pad  = nstl::max(0, ((ow-1)*stride_w) + kw - 1 - (iw + l_pad - 1));
+      int r_pad1 = (ur_w*n_oi - 1)*stride_w + kw - 1 - (iw + l_pad - 1);
+      if (r_pad1 > 0) n_oi--;
 
-    if (jpp.alg == pooling_avg_exclude_padding) {
+      if (jpp.alg == pooling_avg_exclude_padding) {
         movq(xmm_ker_area_h, reg_ker_area_h);
         uni_vpbroadcastd(vmm_ker_area_h, xmm_ker_area_h);
-    }
+      }
 
-    if (jpp.alg == pooling_avg_include_padding) {
+      if (jpp.alg == pooling_avg_include_padding) {
         mov(tmp_gpr, float2int((float)(kw * kh * jpp.kd)));
         movq(xmm_tmp, tmp_gpr);
         uni_vpbroadcastd(vmm_tmp, xmm_tmp);
-    }
-    if (l_pad > 0) {
+      }
+      if (l_pad > 0) {
         n_oi--;
         if (n_oi < 0 && r_pad1 > 0) {
-            step(ur_w, l_pad, r_pad1);
+	  step(ur_w, l_pad, r_pad1);
         } else  {
-            step(ur_w, l_pad, 0);
+	  step(ur_w, l_pad, 0);
         }
 
         if (isa == sse42) {
-            if (n_oi < 0 && r_pad1 > 0) {
-                step_high_half(ur_w, l_pad, r_pad1);
-            } else  {
-                step_high_half(ur_w, l_pad, 0);
-            }
+	  if (n_oi < 0 && r_pad1 > 0) {
+	    step_high_half(ur_w, l_pad, r_pad1);
+	  } else  {
+	    step_high_half(ur_w, l_pad, 0);
+	  }
         }
 
         if (isa == sse42) {
-            add(reg_input, jpp.dt_size*(ur_w*stride_w-l_pad)*c_block - vlen);
-            add(reg_output, jpp.dt_size*ur_w*c_block - vlen);
-            if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
-                add(reg_index, (2 * ur_w - 1) * c_block / 2
-                        * types::data_type_size(jpp.ind_dt));
+	  add(reg_input, jpp.dt_size*(ur_w*stride_w-l_pad)*c_block - vlen);
+	  add(reg_output, jpp.dt_size*ur_w*c_block - vlen);
+	  if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
+	    add(reg_index, (2 * ur_w - 1) * c_block / 2
+		* types::data_type_size(jpp.ind_dt));
         } else {
-            add(reg_input, jpp.dt_size*(ur_w*stride_w - l_pad)*c_block);
-            add(reg_output, jpp.dt_size*ur_w*c_block);
-            if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
-                add(reg_index, ur_w * c_block
-                        * types::data_type_size(jpp.ind_dt));
+	  add(reg_input, jpp.dt_size*(ur_w*stride_w - l_pad)*c_block);
+	  add(reg_output, jpp.dt_size*ur_w*c_block);
+	  if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
+	    add(reg_index, ur_w * c_block
+		* types::data_type_size(jpp.ind_dt));
         }
-    }
+      }
 
-    xor_(oi_iter, oi_iter);
-    if (n_oi > 0) {
+      xor_(oi_iter, oi_iter);
+      if (n_oi > 0) {
         Label ow_loop;
         L(ow_loop); {
-            step(ur_w, 0, 0);
-
-            if (isa == sse42) {
-                step_high_half(ur_w, 0, 0);
-            }
-
-            if (isa == sse42) {
-                add(reg_input, jpp.dt_size*ur_w*stride_w*c_block - vlen);
-                add(reg_output, jpp.dt_size*ur_w*c_block - vlen);
-                if (jpp.alg == pooling_max &&
-                    (jpp.is_training || jpp.is_backward))
-                    add(reg_index, (2 * ur_w - 1) * c_block / 2
-                            * types::data_type_size(jpp.ind_dt));
-            } else {
-                add(reg_input, jpp.dt_size*ur_w*stride_w*c_block);
-                add(reg_output, jpp.dt_size*ur_w*c_block);
-                if (jpp.alg == pooling_max &&
-                    (jpp.is_training || jpp.is_backward))
-                    add(reg_index, ur_w * c_block
-                            * types::data_type_size(jpp.ind_dt));
-            }
-
-            inc(oi_iter);
-            cmp(oi_iter, n_oi);
-            jl(ow_loop, T_NEAR);
+	  step(ur_w, 0, 0);
+	  
+	  if (isa == sse42) {
+	    step_high_half(ur_w, 0, 0);
+	  }
+	  
+	  if (isa == sse42) {
+	    add(reg_input, jpp.dt_size*ur_w*stride_w*c_block - vlen);
+	    add(reg_output, jpp.dt_size*ur_w*c_block - vlen);
+	    if (jpp.alg == pooling_max &&
+		(jpp.is_training || jpp.is_backward))
+	      add(reg_index, (2 * ur_w - 1) * c_block / 2
+		  * types::data_type_size(jpp.ind_dt));
+	  } else {
+	    add(reg_input, jpp.dt_size*ur_w*stride_w*c_block);
+	    add(reg_output, jpp.dt_size*ur_w*c_block);
+	    if (jpp.alg == pooling_max &&
+		(jpp.is_training || jpp.is_backward))
+	      add(reg_index, ur_w * c_block
+		  * types::data_type_size(jpp.ind_dt));
+	  }
+	  
+	  inc(oi_iter);
+	  cmp(oi_iter, n_oi);
+	  if(getGenJitMode() == true)
+	    jl(ow_loop, T_NEAR);
         }
-    }
-
-    if (r_pad1 > 0 && n_oi >= 0) {
+      }
+      
+      if (r_pad1 > 0 && n_oi >= 0) {
         step(ur_w, 0, r_pad1);
-
+	
         if (isa == sse42) {
-            step_high_half(ur_w, 0, r_pad1);
+	  step_high_half(ur_w, 0, r_pad1);
         }
-
+	
         if (isa == sse42) {
-            add(reg_input, jpp.dt_size*ur_w*stride_w*c_block - vlen);
-            add(reg_output, jpp.dt_size*ur_w*c_block - vlen);
-            if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
-                add(reg_index, (2 * ur_w - 1) * c_block / 2
-                        * types::data_type_size(jpp.ind_dt));
+	  add(reg_input, jpp.dt_size*ur_w*stride_w*c_block - vlen);
+	  add(reg_output, jpp.dt_size*ur_w*c_block - vlen);
+	  if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
+	    add(reg_index, (2 * ur_w - 1) * c_block / 2
+		* types::data_type_size(jpp.ind_dt));
         } else {
-            add(reg_input, jpp.dt_size*ur_w*stride_w*c_block);
-            add(reg_output, jpp.dt_size*ur_w*c_block);
-            if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
-                add(reg_index, ur_w * c_block
-                        * types::data_type_size(jpp.ind_dt));
+	  add(reg_input, jpp.dt_size*ur_w*stride_w*c_block);
+	  add(reg_output, jpp.dt_size*ur_w*c_block);
+	  if (jpp.alg == pooling_max && (jpp.is_training || jpp.is_backward))
+	    add(reg_index, ur_w * c_block
+		* types::data_type_size(jpp.ind_dt));
         }
-    }
-
-    if (ur_w_tail != 0) {
+      }
+      
+      if (ur_w_tail != 0) {
         step(ur_w_tail, 0, r_pad);
-
+	
         if (isa == sse42) {
-            step_high_half(ur_w_tail, 0, r_pad);
+	  step_high_half(ur_w_tail, 0, r_pad);
         }
+      }
     }
 #ifdef DNNL_INDIRECT_JIT_AARCH64
     clearAll1Preg0_7();
