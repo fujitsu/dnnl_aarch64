@@ -125,6 +125,7 @@ private:
     const Xbyak::Opmask ktail_mask = Xbyak::Opmask(2);
     const Xbyak::Opmask kblend_mask = Xbyak::Opmask(3);
 
+    const Xbyak::Opmask mask_tmp = Xbyak::Opmask(6);
     const Xbyak::Opmask mask_all_one = Xbyak::Opmask(7);
 
     const Vmm vmm_wei = Vmm(31);
@@ -207,6 +208,7 @@ private:
     void cvt2ps(data_type_t type_in, Vmm ymm_in, const Xbyak::Operand &op,
         bool mask_flag);
     const Vmm vmm_mask(const Vmm vmm_in, bool mask_flag, bool store = false);
+    void vmm_mask_all_one(const Xbyak::Opmask mask_in);
     Xbyak::Address SVE_compress_addr(Xbyak::Reg64 base, int raw_offt)
     {
         using Xbyak::Zmm;
