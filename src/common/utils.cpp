@@ -51,7 +51,7 @@ int mkldnn_getenv(const char *name, char *buffer, int buffer_size) {
     value_length = GetEnvironmentVariable(name, buffer, buffer_size);
 #else
     const char *value = ::getenv(name);
-    value_length = value == NULL ? 0 : Xbyak::strlen(value);
+    value_length = value == NULL ? 0 : strlen(value);
 #endif
 
     if (value_length > INT_MAX)
@@ -65,7 +65,7 @@ int mkldnn_getenv(const char *name, char *buffer, int buffer_size) {
             result = int_value_length;
 #ifndef _WIN32
             if (value)
-	      Xbyak::strncpy(buffer, value, buffer_size - 1);
+	      strncpy(buffer, value, buffer_size - 1);
 #endif
         }
     }
