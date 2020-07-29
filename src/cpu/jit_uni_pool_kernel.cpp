@@ -602,21 +602,19 @@ void jit_uni_pool_kernel<isa>::generate() {
 
     Label idx_table;
 
-    int ow = jpp.ow;
-    int iw = jpp.iw;
-    int kw = jpp.kw;
-    int kh = jpp.kh;
-    int ur_w = jpp.ur_w;
-    int c_block = jpp.c_block;
-    int stride_w = jpp.stride_w;
-    int l_pad = jpp.l_pad;
-    int ur_w_tail = jpp.ur_w_tail;
+    int ow;
+    int iw;
+    int kw;
+    int kh;
+    int ur_w;
+    int c_block;
+    int stride_w;
+    int l_pad;
+    int ur_w_tail;
     
-    int n_oi = ow / ur_w;
+    int n_oi;
     
-    prev_kw = 0;
-    
-    int vlen = cpu_isa_traits<isa>::vlen;
+    int vlen;
 
 #ifdef DNNL_INDIRECT_JIT_AARCH64
     for(int phase = 0; phase < 2; phase++){
@@ -630,6 +628,22 @@ void jit_uni_pool_kernel<isa>::generate() {
       }
       this->preamble();
       setAll1Preg0_7(3);
+
+      ow = jpp.ow;
+      iw = jpp.iw;
+      kw = jpp.kw;
+      kh = jpp.kh;
+      ur_w = jpp.ur_w;
+      c_block = jpp.c_block;
+      stride_w = jpp.stride_w;
+      l_pad = jpp.l_pad;
+      ur_w_tail = jpp.ur_w_tail;
+    
+      n_oi = ow / ur_w;
+
+      prev_kw = 0;
+
+      vlen = cpu_isa_traits<isa>::vlen;
 
 #if defined(_WIN32)
     // Always mimic the Unix ABI (see the note about maskmovdqu in the header
@@ -791,6 +805,22 @@ void jit_uni_pool_kernel<isa>::generate() {
     }
 #else
     this->preamble();
+
+    ow = jpp.ow;
+    iw = jpp.iw;
+    kw = jpp.kw;
+    kh = jpp.kh;
+    ur_w = jpp.ur_w;
+    c_block = jpp.c_block;
+    stride_w = jpp.stride_w;
+    l_pad = jpp.l_pad;
+    ur_w_tail = jpp.ur_w_tail;
+    
+    n_oi = ow / ur_w;
+
+    prev_kw = 0;
+    
+    vlen = cpu_isa_traits<isa>::vlen;
 
 #if defined(_WIN32)
     // Always mimic the Unix ABI (see the note about maskmovdqu in the header
