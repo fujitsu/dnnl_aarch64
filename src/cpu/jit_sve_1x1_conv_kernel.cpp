@@ -168,7 +168,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
       }else{
         ofs = jcp.typesize_out * jcp.load_block * i_ur;
       }
-      std::string op = "ST";
+      std::string op = "LD";
       prefetch(op, 2, r, ofs);
     };
 
@@ -228,12 +228,11 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
       ofs = jcp.typesize_in * ofs;
       int tmp_ofs = ofs;
-
       if ((ofs&0xFF)==0) { /* Alined to the cache line size */
-        if((ofs <= PRFMMAX) && (ofs >= 0)){
+        if((ofs <= PRFMMAX) && (ofs >= PRFMMIN)){
           CGA64::prfm(xa::PLDL1KEEP, xa::ptr(aux_reg_bcast_data, static_cast<int32_t>(ofs)));
         }else{
-          if((prev_ofs != -1) && ((ofs - prev_ofs)>=0)
+          if((prev_ofs != -1) && ((ofs - prev_ofs)>=PRFMMIN)
              && ((ofs - prev_ofs) <= PRFMMAX) ){
             CGA64::prfm(xa::PLDL1KEEP, xa::ptr(reg_prev_bcast_addr, static_cast<int32_t>(ofs-prev_ofs)));
           }else{
@@ -254,7 +253,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         } else{
           if((prev_ofs != -1) &&
              (VL_OFS(ofs - prev_ofs) >= (-1 * PRFWMAX - 1)) &&
-             (VL_OFS(ofs - prev_ofs) <= PRFMMAX)){
+             (VL_OFS(ofs - prev_ofs) <= PRFWMAX)){
             CGA64::prfw(xa::PLDL1KEEP_SVE, reg_p_all_ones, xa::ptr(reg_prev_bcast_addr, static_cast<int32_t>VL_OFS(ofs-prev_ofs)));
           }else{
             if((prev_ofs != -1) &&
@@ -394,13 +393,19 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
          (VL_OFS(ofs) >= (-1 * LDRMAX)) &&
          ((ofs&0x3f)==0)){
         if(bwd_iload) CGA64::madd(r, r, reg_output_stride, aux_reg_output_data);
-        CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(r, static_cast<int32_t>(VL_OFS(ofs))));
+        if (jcp.use_vmovntps)
+          CGA64::stnt1w(vreg_accum_s(i_load, i_ur), reg_p_all_ones, xa::ptr(r, static_cast<int32_t>(VL_OFS(ofs))));
+        else
+          CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(r, static_cast<int32_t>(VL_OFS(ofs))));
       }else{
         if((prev_ofs != -1) &&
            ((ofs - prev_ofs)>0) &&
            ((VL_OFS(ofs - prev_ofs)) <= LDRMAX)){
           if(bwd_iload)  CGA64::madd(r, r, reg_output_stride, reg_prev_out_addr);
           else            r = reg_prev_out_addr;
+        if (jcp.use_vmovntps)
+          CGA64::stnt1w(vreg_accum_s(i_load, i_ur), reg_p_all_ones, xa::ptr(r, static_cast<int32_t>(VL_OFS(ofs-prev_ofs))));
+        else
           CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(r, static_cast<int32_t>(VL_OFS(ofs-prev_ofs))));
         }else{
           if((prev_ofs != -1) && ((ofs - prev_ofs)>0)){
@@ -411,6 +416,9 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
           }
           if(bwd_iload) CGA64::madd(r, r, reg_output_stride, reg_prev_out_addr);
           else          r = reg_prev_out_addr;
+          if (jcp.use_vmovntps)
+            CGA64::stnt1w(vreg_accum_s(i_load, i_ur), reg_p_all_ones, xa::ptr(r));
+          else
           CGA64::str(vreg_accum(i_load, i_ur), xa::ptr(r));
 
           prev_ofs = ofs_tmp;
@@ -538,7 +546,7 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     i_pf -= n_pf_ker_l1 + n_pf_ker_l2;
                     int ofs = i_pf * jcp.load_block;
                     ofs *= jcp.typesize_out;
-                    std::string op = "ST";
+                    std::string op = "LD";
                     prefetch(op, 1, aux_reg_output_data, ofs);
                     // mic_prefetcht0(ptr[aux_reg_output_data + ofs * jcp.typesize_out]);
                 }
@@ -606,8 +614,8 @@ void jit_sve_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 CGA64::fmla(vreg_accum_s(i_load, i_ur), reg_p_all_ones,
                             vreg_load_s(i_load, 0),
                             vreg_bcast_s(bcast_reg_ofs + (i_ur % num_bcast_regs)));
-                prefetch_callback(ur, i_reduce, i_ur, i_load,
-                                  last_block, wraparound, reduce_step);
+                // prefetch_callback(ur, i_reduce, i_ur, i_load,
+                //                   last_block, wraparound, reduce_step);
               }
 
               if((num_bcast_load + i_ur) < ur)
@@ -1022,8 +1030,8 @@ status_t jit_sve_1x1_conv_kernel::init_conf(jit_1x1_conv_conf_t &jcp,
                 reduce_blocking = nstl::min(jcp.reduce_dim, 512);
             else
                 reduce_blocking = nstl::min(jcp.reduce_dim, 256);
-            if ((jcp.mb > 28 && spatial >= 14)
-                    || (jcp.mb > 112 && spatial >= 7))
+            if ((jcp.mb > 28 && spatial >= 28)
+                    || (jcp.mb > 112 && spatial >= 17))
                 jcp.use_vmovntps = true;
             else
                 jcp.use_vmovntps = false;

@@ -225,3 +225,9 @@ if(WIN32)
     endif()
     set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}" PARENT_SCOPE)
 endif()
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.16.0)
+  target_precompile_headers(${LIB_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_generator.hpp
+    )
+endif()
