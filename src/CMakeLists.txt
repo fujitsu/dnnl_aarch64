@@ -68,7 +68,7 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_1x1_conv_kernel.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_1x1_convolution.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_conv_kernel.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_convolution.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/jit_sve_x8s8s32x_convolution.cpp
         )
 endif()
 
