@@ -100,7 +100,7 @@ private:
     size_t vlen = cpu_isa_traits<isa>::vlen;
 
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-    const static size_t preserved_vecs_max = 16;
+    const static size_t preserved_vecs_max = 14;
 #else
     const static size_t preserved_vecs_max = 5;
 #endif
@@ -113,7 +113,7 @@ private:
     Vmm vmm_mask, vmm_aux0, vmm_aux1, vmm_aux2, vmm_aux3, vmm_aux4;
 #ifdef DNNL_INDIRECT_JIT_AARCH64
     const static size_t expN = 5;
-    Vmm log2, log2_e, expMin, expMax, expCoeff[5];
+    Vmm log2, log2_e, expCoeff[5];
     const Xbyak::Xbyak_aarch64::PReg p;
     Vmm geluC1;
     Vmm geluC2;
