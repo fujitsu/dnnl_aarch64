@@ -120,8 +120,8 @@ struct jit_sve_x8s8s32x_1x1_convolution_fwd_t : public cpu_primitive_t {
                 CHECK(this->dst_pd_.set_format(nhwc));
             if (this->weights_pd_.desc()->format == any)
                 CHECK(this->weights_pd_.set_format(this->with_groups()
-                    ? (is_sign_input ? gOIhw4i16o4i_s8s8 : gOIhw4i16o4i)
-                    : (is_sign_input ? OIhw4i16o4i_s8s8 : OIhw4i16o4i)));
+                    ? (!is_sign_input ? gOIhw4i16o4i_s8s8 : gOIhw4i16o4i)
+                    : (!is_sign_input ? OIhw4i16o4i_s8s8 : OIhw4i16o4i)));
             if (this->bias_pd_.desc()->format == any)
                 CHECK(this->bias_pd_.set_format(x));
             if (this->desc()->alg_kind == alg_kind::convolution_auto)
