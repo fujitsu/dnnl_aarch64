@@ -1278,12 +1278,99 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
 
         const int shift[] = {_vlen, _vlen, _shift};
         const bool loop_vectorize[] = {true, true, false};
-
-        preamble();
+	
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-        setAll1Preg0_7(4);
-#endif
+        for(int phase = 0; phase < 2; phase++){
+          if ( phase == 0){
+            initSearchPReg();
+            initSearchZReg();
+            unSetGenJitMode();
+          } else {
+            this->clearCodeArray();
+            setGenJitMode();
+          }
+	  preamble();
 
+	  setAll1Preg0_7(4);
+
+#ifdef __ARM_ARCH
+        // Push p5, 6
+	  CGA64::sub(x22, x22, 0x8);
+	  CGA64::str(p5, xa::ptr(x22));
+	  CGA64::sub(x22, x22, 0x8);
+	  CGA64::str(p6, xa::ptr(x22));
+	  CGA64::ptrue(xa::PRegS(5));
+	  CGA64::ptrue(xa::PRegS(6), xa::VL1);
+#endif // ifdef ARM_ARCH
+
+	  if (is_bf16_) {
+            mov(mask_reg, 0xAAAAAAAA);
+            kmovd(k_mask_cvt, mask_reg);
+
+            mov(mask_reg, 0x1);
+            kmovd(k_tail_mask, mask_reg);
+	    
+            mov(mask_reg, 0xffff);
+            kmovd(k_full_mask, mask_reg);
+	  }
+	  if (!mayiuse(avx512_core_bf16) && is_bf16_)
+            bf16_emu_->init_vcvtneps2bf16();
+	  
+	  mov(reg_from, ptr[param + GET_OFF(from)]);
+	  if (is_bwd())
+            mov(reg_for_comparison, ptr[param + GET_OFF(for_comparison)]);
+	  mov(reg_to, ptr[param + GET_OFF(to)]);
+	  mov(reg_work_amount, ptr[param + GET_OFF(work_amount)]);
+	  
+	  if (is_bf16_) {
+            mov(p_idx_table, idx_table);
+            vmovups(zmm_idx, ptr[p_idx_table]);
+	  }
+	  
+	  mov(imm_addr64, float2int(desc.alpha));
+#ifdef __ARM_ARCH
+        // imm_addr63 is xreg(3)
+	  CGA64::fmov(xa::ZRegS(14));
+	  CGA64::mov(xa::ZRegD(14), xa::PReg(6)/ xa::T_m, xa::XReg(3));
+#else // #ifdef __ARM_ARCH
+	  movq(xmm_ns, imm_addr64);
+#endif // #ifdef __ARM_ARCH
+	  uni_vbroadcastss(vmm_ns, xmm_ns);
+	  uni_vpxor(vmm_zero, vmm_zero, vmm_zero);
+
+	  Label loop_label[num_unroll_pattern+1];
+
+	  for (int id = 0; id < num_unroll_pattern; id++) {
+            L(loop_label[id]);
+            cmp(reg_work_amount, uf[id] * loop_dec[id] - 1);
+            jle(loop_label[id + 1], T_NEAR);
+	    
+            compute_step(loop_vectorize[id], uf[id], shift[id]);
+	    
+            add(reg_from, uf[id] * shift[id]);
+            add(reg_to, uf[id] * shift[id]);
+            if (is_bwd())
+	      add(reg_for_comparison, uf[id] * shift[id]);
+	    
+            sub(reg_work_amount, uf[id] * loop_dec[id]);
+            jmp(loop_label[id]);
+	  }
+	  
+	  L(loop_label[num_unroll_pattern]);
+
+#ifdef __ARM_ARCH
+        // Pop p5, 6
+	  CGA64::ldr(p5, xa::ptr(x22));
+	  CGA64::add(x22, x22, 0x8);
+	  CGA64::ldr(p6, xa::ptr(x22));
+	  CGA64::add(x22, x22, 0x8);
+#endif // ifdef JIT_DIRECT
+
+	  clearAll1Preg0_7();
+
+	}
+#else
+	preamble();
 #ifdef __ARM_ARCH
         // Push p5, 6
         CGA64::sub(x22, x22, 0x8);
@@ -1357,8 +1444,6 @@ struct jit_uni_relu_kernel_f32 : public jit_uni_eltwise_kernel_f32,
         CGA64::add(x22, x22, 0x8);
 #endif // ifdef JIT_DIRECT
 
-#ifdef DNNL_INDIRECT_JIT_AARCH64
-        clearAll1Preg0_7();
 #endif
         postamble();
 
