@@ -1627,9 +1627,8 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
             }
         }
         CGA64::add_imm(aux_reg_ker, aux_reg_ker, shift_ker_ptr, reg_tmp_imm);
-        assert(shift_dst_ptr < 4095);
-        assert(shift_dst_ptr > 0);
-        CGA64::sub(aux_reg_dst, aux_reg_dst, shift_dst_ptr);
+        assert(shift_dst_ptr >= 0);
+        CGA64::sub_imm(aux_reg_dst, aux_reg_dst, shift_dst_ptr, reg_tmp_imm);
         //dec(reg_kj);
         CGA64::sub(reg_kj, reg_kj, 1);
         CGA64::cmp(reg_kj, 0);
@@ -1637,9 +1636,8 @@ void jit_sve_conv_bwd_data_kernel_f32::compute_loop_fma_core(
     }
 
     if (jcp.ndims == 5) {
-        assert((typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block) < 4095);
-        CGA64::sub(aux_reg_dst_d, aux_reg_dst_d,
-                typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block);
+        CGA64::sub_imm(aux_reg_dst_d, aux_reg_dst_d,
+                typesize * (jcp.dilate_d + 1) * jcp.oh * ow * ic_block, reg_tmp_imm);
         CGA64::add_imm(aux_reg_ker_d, aux_reg_ker_d,  typesize * jcp.kw * jcp.kh * oc_block * ic_block, reg_tmp_imm);
 
         CGA64::sub(reg_ki, reg_ki, 1);
@@ -2479,10 +2477,7 @@ void jit_sve_conv_bwd_weights_kernel_f32::bias_kernel_2d() {
     {
         CGA64::add(reg_add_tmp, reg_output, reg_tmp);
         CGA64::ldr(xa::ZReg(1), xa::ptr(reg_add_tmp));
-            //vmovups(Zmm(1), ptr[reg_output + reg_tmp]);
-        //CGA64::add(xa::ZRegS(0), reg_p_all_ones, xa::ZRegS(1));
         CGA64::fadd(xa::ZRegS(0), xa::ZRegS(0), xa::ZRegS(1));
-            //vaddps(Zmm(0), Zmm(0), Zmm(1));
         CGA64::add_imm(reg_tmp, reg_tmp, jcp.typesize_out * jcp.oc_block, reg_tmp_imm);
         CGA64::sub(reg_oi, reg_oi, 1);
         CGA64::cmp(reg_oi, 0);
@@ -2523,8 +2518,9 @@ void jit_sve_conv_bwd_weights_kernel_f32::bias_kernel_3d() {
 
     CGA64::mov(reg_tmp, 0);
     CGA64::L_aarch64(bias_loop); {
-        CGA64::ldr(xa::ZReg(0), xa::ptr(reg_tmp)); //vmovups(Zmm(0), ptr[reg_output + reg_tmp]);
-        CGA64::add(xa::ZRegS(1), reg_p_all_ones, xa::ZRegS(0)); //vaddps(Zmm(1), Zmm(1), Zmm(0));
+        CGA64::add(reg_tmp_imm, reg_output, reg_tmp);
+        CGA64::ldr(xa::ZReg(0), xa::ptr(reg_tmp_imm)); //vmovups(Zmm(0), ptr[reg_output + reg_tmp]);
+        CGA64::fadd(xa::ZRegS(1), xa::ZRegS(1), xa::ZRegS(0)); 
         CGA64::add_imm(reg_tmp, reg_tmp, jcp.oc_block * jcp.typesize_out, reg_tmp_imm);
         CGA64::cmp(reg_tmp, reg_oi);
         CGA64::b(xa::LT, bias_loop);

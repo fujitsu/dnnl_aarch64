@@ -283,12 +283,12 @@ struct jit_bnorm_t: public jit_generator {
 
     void prepare_l_relu_mask_avx2() {
         Label l_mask_after;
-        jmp(l_mask_after);
+	jmp(l_mask_after);
         align(32);
         L(l_relu_mask_avx2); /* [0x80 0x40 0x20 0x10 0x08 0x04 0x02 0x01] */
         for (int i = 0; i < 8; ++i) dd(1<<i);
 #ifdef DNNL_INDIRECT_JIT_AARCH64
-        binCommit();
+	binCommit();
 #endif
         L(l_mask_after);
     }
@@ -358,7 +358,7 @@ struct jit_bnorm_t: public jit_generator {
         } else {
             vmaskmovps(Vmm(dst.getIdx()), vtail_mask, src.getAddress());
         }
-        jmp(l_ret);
+	jmp(l_ret);
     }
 
     void uni_vmovups_tail_avx512_common(const Operand &dst,
@@ -368,7 +368,7 @@ struct jit_bnorm_t: public jit_generator {
         else
             uni_vmovups(Vmm(dst.getIdx()) | ktail_mask | T_z, src.getAddress());
 
-        jmp(l_ret);
+	jmp(l_ret);
     }
 
     void uni_vmovups_maybe_tail(const Operand &dst, const Operand &src) {
@@ -377,11 +377,11 @@ struct jit_bnorm_t: public jit_generator {
         if (is_c_padded()) {
             mov(reg_tmp, ptr[rsp + stack_off_is_cblk_tail]);
             cmp(reg_tmp, 0);
-            jz(l_no_mask);
+	    jz(l_no_mask);
 
             lea(reg_tmp, ptr[reg_coff + vlen]);
             cmp(reg_tmp, reg_coff_max);
-            jl(l_no_mask);
+	    jl(l_no_mask);
             assert(isa == avx512_common || isa == avx2);
             if (isa == avx512_common)
                 uni_vmovups_tail_avx512_common(dst, src, l_ret);
@@ -400,7 +400,7 @@ struct jit_bnorm_t: public jit_generator {
     void barrier() {
         mov(reg_nnthr, ptr[rsp + stack_off_N_nthr]);
         mov(reg_bar, ptr[rsp + stack_off_barrier]);
-        simple_barrier::generate(*this, reg_bar, reg_nnthr);
+	simple_barrier::generate(*this, reg_bar, reg_nnthr);
     }
 
     Address mean_ptr(size_t offt = 0) {
@@ -456,7 +456,7 @@ struct jit_bnorm_t: public jit_generator {
 #ifdef DNNL_INDIRECT_JIT_AARCH64
 		CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
 #endif
-                jnz(label);
+		jnz(label);
             }
             if (is_spatial_thr_) {
                 add(reg_soff, ptr[rsp + stack_off_s_tail]);
@@ -507,7 +507,7 @@ struct jit_bnorm_t: public jit_generator {
 
             add(reg_coff, vlen);
             cmp(reg_coff, reg_coff_max);
-            jl(ch_label);
+	    jl(ch_label);
         }
     }
 
@@ -551,7 +551,7 @@ struct jit_bnorm_t: public jit_generator {
             uni_vmovups(vmmword[reg_rbuf1 + reg_coff], Vmm(0));
             add(reg_coff, vlen);
             cmp(reg_coff, reg_coff_max);
-            jl(ch_label);
+	    jl(ch_label);
         }
     }
 
@@ -563,7 +563,7 @@ struct jit_bnorm_t: public jit_generator {
             uni_vmovups(vmmword[reg_rbuf1 + reg_coff], Vmm(0));
             add(reg_coff, isa == sse42 ? vlen / 2 : vlen);
             cmp(reg_coff, reg_coff_max);
-            jne(zero_rbuf);
+	    jne(zero_rbuf);
         }
 
         mov(reg_src, ptr[rsp + stack_off_src]);
@@ -590,14 +590,14 @@ struct jit_bnorm_t: public jit_generator {
 
             add(reg_soff, reg_mb_stride_Bc);
             cmp(reg_soff, reg_soff_max);
-            jne(mean_spatial);
+	    jne(mean_spatial);
         }
 
         Label no_mean_reduction;
         barrier(); {
             mov(reg_tmp, ptr[rsp + stack_off_N_ithr]);
             cmp(reg_tmp, 0);
-            jne(no_mean_reduction);
+	    jne(no_mean_reduction);
             mov(reg_nnthr, ptr[rsp + stack_off_N_nthr]);
             xor_(reg_coff, reg_coff);
             Label mean_reduction_channels;
@@ -615,7 +615,7 @@ struct jit_bnorm_t: public jit_generator {
 #ifdef DNNL_INDIRECT_JIT_AARCH64
 		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
 #endif
-                    jnz(mean_reduction_thrs);
+		    jnz(mean_reduction_thrs);
                 }
                 uni_vdivps(Vmm(1), Vmm(1), vchan_size);
                 uni_vmovups_maybe_tail(mean_ptr(), Vmm(1));
@@ -623,11 +623,11 @@ struct jit_bnorm_t: public jit_generator {
                 add(reg_coff, isa == sse42 ? vlen / 2 : vlen);
 
                 cmp(reg_coff, reg_coff_max);
-                jne(mean_reduction_channels);
+		jne(mean_reduction_channels);
             }
         }
         L(no_mean_reduction);
-        barrier();
+	barrier();
 
         xor_(reg_soff, reg_soff);
         Label var_spatial;
@@ -651,14 +651,14 @@ struct jit_bnorm_t: public jit_generator {
 
             add(reg_soff, reg_mb_stride_Bc);
             cmp(reg_soff, reg_soff_max);
-            jne(var_spatial);
+	    jne(var_spatial);
         }
 
         Label no_var_reduction;
         barrier(); {
             mov(reg_tmp, ptr[rsp + stack_off_N_ithr]);
             cmp(reg_tmp, 0);
-            jne(no_var_reduction);
+	    jne(no_var_reduction);
 
             mov(reg_nnthr, ptr[rsp + stack_off_N_nthr]);
             xor_(reg_coff, reg_coff);
@@ -675,18 +675,18 @@ struct jit_bnorm_t: public jit_generator {
 #ifdef DNNL_INDIRECT_JIT_AARCH64
 		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
 #endif
-                    jnz(var_reduction_thrs);
+		    jnz(var_reduction_thrs);
                 }
                 uni_vdivps(Vmm(1), Vmm(1), vchan_size);
                 uni_vmovups_maybe_tail(var_ptr(), Vmm(1));
                 add(reg_coff, isa == sse42 ? vlen / 2 : vlen);
 
                 cmp(reg_coff, reg_coff_max);
-                jne(var_reduction_channels);
+		jne(var_reduction_channels);
             }
         }
         L(no_var_reduction);
-        barrier();
+	barrier();
     }
 
     void forward_channels() {
@@ -755,9 +755,9 @@ struct jit_bnorm_t: public jit_generator {
             } else {
                 Label unaligned_store, end_store;
                 test(reg_dst, vlen - 1);
-                jnz(unaligned_store, T_NEAR);
+		jnz(unaligned_store, T_NEAR);
                 compute(true);
-                jmp(end_store, T_NEAR);
+		jmp(end_store, T_NEAR);
                 L(unaligned_store); {
                     compute(false);
                 }
@@ -766,7 +766,7 @@ struct jit_bnorm_t: public jit_generator {
 
             add(reg_coff, vlen);
             cmp(reg_coff, reg_coff_max);
-            jl(ch_label);
+	    jl(ch_label);
         }
     }
 
@@ -798,7 +798,7 @@ struct jit_bnorm_t: public jit_generator {
 
             add(reg_soff, reg_mb_stride_Bc);
             cmp(reg_soff, reg_soff_max);
-            jnz(dst_spatial);
+	    jnz(dst_spatial);
         }
     }
 
@@ -865,7 +865,7 @@ struct jit_bnorm_t: public jit_generator {
             uni_vmovups(vmmword[reg_rbuf2 + reg_coff], Vmm(1));
             add(reg_coff, vlen);
             cmp(reg_coff, reg_coff_max);
-            jl(sh_channels);
+	    jl(sh_channels);
         }
     }
 
@@ -941,9 +941,9 @@ struct jit_bnorm_t: public jit_generator {
             } else {
                 Label unaligned_store, end_store;
                 test(reg_diff_src, vlen - 1);
-                jnz(unaligned_store, T_NEAR);
+		jnz(unaligned_store, T_NEAR);
                 compute(true);
-                jmp(end_store, T_NEAR);
+		jmp(end_store, T_NEAR);
                 L(unaligned_store); {
                     compute(false);
                 }
@@ -952,7 +952,7 @@ struct jit_bnorm_t: public jit_generator {
 
             add(reg_coff, vlen);
             cmp(reg_coff, reg_coff_max);
-            jl(diff_channels);
+	    jl(diff_channels);
         }
     }
 
@@ -966,7 +966,7 @@ struct jit_bnorm_t: public jit_generator {
             uni_vmovups(vmmword[reg_rbuf2 + reg_coff], Vmm(0));
             add(reg_coff, isa == sse42 ? vlen / 2 : vlen);
             cmp(reg_coff, reg_coff_max);
-            jne(zero_rbuf);
+	    jne(zero_rbuf);
         }
 
         mov(reg_src, ptr[rsp + stack_off_src]);
@@ -994,7 +994,7 @@ struct jit_bnorm_t: public jit_generator {
             }
             add(reg_soff, reg_mb_stride_Bc);
             cmp(reg_soff, reg_soff_max);
-            jne(sh_spatial);
+	    jne(sh_spatial);
         }
 
         mov(reg_diff_scale_shift, ptr[rsp + stack_off_diff_scale_shift]);
@@ -1004,7 +1004,7 @@ struct jit_bnorm_t: public jit_generator {
             mov(reg_tmp, ptr[rsp + stack_off_N_ithr]);
             cmp(reg_tmp, 0);
             Label sh_reduction_channels;
-            jne(no_sh_reduction, T_NEAR);
+	    jne(no_sh_reduction, T_NEAR);
 
             mov(reg_nnthr, ptr[rsp + stack_off_N_nthr]);
             xor_(reg_coff, reg_coff);
@@ -1026,7 +1026,7 @@ struct jit_bnorm_t: public jit_generator {
 #ifdef DNNL_INDIRECT_JIT_AARCH64
 		    CodeGeneratorAArch64::cmp(Xbyak_aarch64::XReg(reg_ctr.getIdx()), 0);
 #endif
-                    jnz(sh_reduction_thrs);
+		    jnz(sh_reduction_thrs);
                 }
                 uni_vmulps(Vmm(0), Vmm(0), vsqrtvar);
                 uni_vmovups_maybe_tail(diff_gamma_ptr(), Vmm(0));
@@ -1037,7 +1037,7 @@ struct jit_bnorm_t: public jit_generator {
             }
         }
         L(no_sh_reduction);
-        barrier();
+	barrier();
 
         mov(reg_diff_src, ptr[rsp + stack_off_diff_src]);
         if (with_relu) {
@@ -1087,8 +1087,51 @@ struct jit_bnorm_t: public jit_generator {
         unroll_blocks = isa == avx512_common && !is_spatial_thr_ ? 4 : 1;
         unroll_regs = isa == avx512_common && !is_spatial_thr_ ? 4 : 1;
 
-        preamble();
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+	for(int phase = 0; phase < 2; phase++){
+	  if ( phase == 0){
+	    initSearchPReg();
+	    initSearchZReg();
+	    unSetGenJitMode();
+	  } else {
+	    this->clearCodeArray();
+	    setGenJitMode();
+	  }
+	  preamble();
+	  setAll1Preg0_7(7);
+	  
+	  if (is_bf16_) {
+            // init emulation of bfloat16 operations
+            if (!mayiuse(avx512_core_bf16)) {
+	      bf16_emu_ = new bf16_emulation_t(this, vcvt_bf16_one,
+					       vcvt_bf16_eve, vcvt_bf16_sel, reg_bf16_tmp,
+					       vcvt_bf16_tmp, vcvt_bf16_tmp);
+	      bf16_emu_->init_vcvtneps2bf16();
+            }
+	  }
 
+	  if (isa == avx512_common)
+            prepare_tail_mask_avx512_common();
+	  else if (isa == avx2)
+            prepare_tail_mask_avx2_common();
+
+	  compute_static_strides();
+	  sub(rsp, stack_size_required);
+	  load_common_params();
+	  prepare_relu();
+
+	  if (bdesc_->is_fwd()) {
+            if (!bdesc_->stats_is_src()) {
+	      compute_mean_variance();
+            }
+            forward();
+	  } else {
+            backward();
+	  }
+	  add(rsp, stack_size_required);
+	}
+#else
+	preamble();
         if (is_bf16_) {
             // init emulation of bfloat16 operations
             if (!mayiuse(avx512_core_bf16)) {
@@ -1118,6 +1161,11 @@ struct jit_bnorm_t: public jit_generator {
             backward();
         }
         add(rsp, stack_size_required);
+#endif
+	
+#ifdef DNNL_INDIRECT_JIT_AARCH64
+	clearAll1Preg0_7();
+#endif
         postamble();
 
         ker = reinterpret_cast<decltype(ker)>(const_cast<uint8_t*>(

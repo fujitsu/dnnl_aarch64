@@ -65,7 +65,7 @@ int mkldnn_getenv(const char *name, char *buffer, int buffer_size) {
             result = int_value_length;
 #ifndef _WIN32
             if (value)
-                strncpy(buffer, value, buffer_size - 1);
+	      strncpy(buffer, value, buffer_size - 1);
 #endif
         }
     }

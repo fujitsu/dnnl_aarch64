@@ -26,6 +26,8 @@
 #include "utils.hpp"
 #include "jit_generator.hpp"
 
+#define MAX_NUM_SINGLE_ELTWISE 4096
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {

@@ -151,10 +151,10 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                                   jcp.typesize_bia * jcp.oc_block * i_load);
     };
 
-    // auto comp_ptr = [=](int i_load) {
-    //     return SVE_compress_addr(reg_comp_data,
-    //                               sizeof(int32_t) * jcp.oc_block * i_load);
-    // };
+    auto comp_ptr = [=](int i_load) {
+        return SVE_compress_addr(reg_comp_data,
+                                  sizeof(int32_t) * jcp.oc_block * i_load);
+    };
 
     auto scale_ptr = [=](int i_load) {
         return SVE_compress_addr(reg_ptr_scales,
@@ -234,6 +234,12 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 auto r = vreg_accum(i_load, i_ur);
                 vpxord(r, r, r);
             }
+        if (!jcp.signed_input) {
+            xor_(reg_scratch, reg_scratch);
+            Reg8 _t8 = reg_scratch.cvt8();
+            mov(_t8, (int8_t)-128);
+            vpbroadcastb(zmm_shift, _t8);
+        }
     };
 
     auto store = [=](const bool mask_flag_in) {
@@ -251,8 +257,16 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
         for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
             const bool mask_flag = mask_flag_in && i_load == load_loop_blk - 1;
             auto zmm_bias = zmm_tmp;
+            auto zmm_comp = zmm_bcast;
             if (jcp.with_bias) {
+                if (!jcp.signed_input)
+                    mov(reg_bias_data,
+                        SVE_compress_addr(rsp,reg_bias_data_off));
                 cvt2ps(jcp.bia_dt, zmm_bias, bias_ptr(i_load), mask_flag);
+            }
+            if (!jcp.signed_input) {
+                mov(reg_comp_data, SVE_compress_addr(rsp, reg_comp_data_off));
+                cvt2ps(data_type::s32, zmm_comp, comp_ptr(i_load), mask_flag);
             }
 
             auto zmm_scale = zmm_one;
@@ -260,10 +274,13 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             for (int i_ur = 0; i_ur < ur; ++i_ur) {
                 auto r = vreg_accum(i_load, i_ur);
                 CGA64::scvtf(xa::ZRegS(r.getIdx()), xa::PReg(vmask.getIdx()), xa::ZRegS(r.getIdx())); //< vcvtdq2ps(r, r);
+                if (!jcp.signed_input)
+                    vsubps(r, r, zmm_comp);
                 if (jcp.with_bias)
                     vaddps(r, r, zmm_bias);
 
                 zmm_t mask_zmm = mask_flag ? r | ktail_mask | T_z : r;
+                if(mask_flag) assert(!"unimplemented");
                 // vmulps(mask_zmm, r, scale_ptr(i_load));
                 CGA64::fmul(xa::ZRegS(mask_zmm.getIdx()), xa::ZRegS(r.getIdx()), xa::ZRegS(zmm_scale.getIdx()));
             }
@@ -351,6 +368,7 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                                    : reg_tmp3_imm;
                 add_imm(reg_tmp_adr, xa::XReg(base.getIdx()), re, reg_tmp_imm);
 
+                auto _mask = mask_flag ? ktail_mask : vmask;
                 switch (jcp.dst_dt) {
                 case data_type::f32:
                 case data_type::s32:
@@ -359,12 +377,12 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     // vpmovsdb(output_ptr(i_load, i_ur), r_zmm); break;
                     CGA64::smin(xa::ZRegS(r_zmm.getIdx()), 127);
                     CGA64::smax(xa::ZRegS(r_zmm.getIdx()), -128);
-                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(reg_tmp_adr));
+                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(_mask.getIdx()), xa::ptr(reg_tmp_adr));
                     break;
                 case data_type::u8:
                     // vpmovusdb(output_ptr(i_load, i_ur), r_zmm); break;
                     CGA64::umin(xa::ZRegS(r_zmm.getIdx()), 255);
-                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(vmask.getIdx()), xa::ptr(reg_tmp_adr));
+                    CGA64::st1b(xa::ZRegS(r_zmm.getIdx()), xa::PReg(_mask.getIdx()), xa::ptr(reg_tmp_adr));
                     break;
                 default: assert(!"unknown dst_dt");
                 }
@@ -391,28 +409,47 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             for (int i_load = 0; i_load < load_loop_blk; ++i_load)
                 vmovups(vreg_load(i_load), load_ptr(i_reduce, i_load));
             for (int i_ur = 0; i_ur < ur; ++i_ur) {
-                if (last_block && tail_size != 0
-                    && i_reduce == loop_unroll - reduce_step) {
-                    Xmm xmm_bcast = Xmm(zmm_bcast.getIdx());
-                    for (int r = 0; r < tail_size; ++r)
-                        vpinsrb(xmm_bcast, xmm_bcast, ptr[aux_reg_bcast_data
-                        + jcp.ic_without_padding * i_ur + i_reduce + r], r);
-                    vpbroadcastd(zmm_bcast, xmm_bcast);
+                if (jcp.signed_input) {
+                    if (last_block && tail_size != 0
+                        && i_reduce == loop_unroll - reduce_step) {
+                        Xmm xmm_bcast = Xmm(zmm_bcast.getIdx());
+                        for (int r = 0; r < tail_size; ++r)
+                            vpinsrb(xmm_bcast, xmm_bcast, ptr[aux_reg_bcast_data
+                            + jcp.ic_without_padding * i_ur + i_reduce + r], r);
+                        Zmm _bcast = ((i_ur % 2) == 0)? zmm_bcast : zmm_bcast2;
+                        vpbroadcastd(_bcast, xmm_bcast);
+                    } else {
+                      if(i_ur == 0) {
+                          // vpbroadcastd(zmm_bcast, bcast_ptr(i_reduce, i_ur, false));
+                          bcast_ptr(zmm_bcast, i_reduce, i_ur, false);
+                      }
+                      if ((i_ur+1) < ur) {
+                          Zmm _bcast = ((i_ur % 2) == 0)? zmm_bcast2 : zmm_bcast;
+                          // vpbroadcastd(zmm_bcast, bcast_ptr(i_reduce, (i_ur+1), false));
+                          bcast_ptr(_bcast, i_reduce, (i_ur+1), false);
+                      }
+                    }
+                    for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
+                        Zmm _bcast = ((i_ur % 2) == 0)? zmm_bcast : zmm_bcast2;
+                        compute(vreg_accum(i_load, i_ur),
+                                    vreg_load(i_load), _bcast);
+                    }
                 } else {
-                  if(i_ur == 0) {
-                      // vpbroadcastd(zmm_bcast, bcast_ptr(i_reduce, i_ur, false));
-                      bcast_ptr(zmm_bcast, i_reduce, i_ur, false);
-                  }
-                  if ((i_ur+1) < ur) {
-                      Zmm _bcast = ((i_ur % 2) == 0)? zmm_bcast2 : zmm_bcast;
-                      // vpbroadcastd(zmm_bcast, bcast_ptr(i_reduce, (i_ur+1), false));
-                      bcast_ptr(_bcast, i_reduce, (i_ur+1), false);
-                  }
-                }
-                for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
-                    Zmm _bcast = ((i_ur % 2) == 0)? zmm_bcast : zmm_bcast2;
-                    compute(vreg_accum(i_load, i_ur),
-                                vreg_load(i_load), _bcast);
+                    if (last_block && tail_size != 0
+                        && i_reduce == loop_unroll - reduce_step) {
+                        Xmm xmm_bcast = Xmm(zmm_bcast.getIdx());
+                        for (int r = 0; r < tail_size; ++r)
+                            vpinsrb(xmm_bcast, xmm_bcast, ptr[aux_reg_bcast_data
+                            + jcp.ic_without_padding * i_ur + i_reduce + r], r);
+                        vpbroadcastd(zmm_bcast, xmm_bcast);
+                    } else {
+                        bcast_ptr(zmm_bcast, i_reduce, i_ur, false);
+                    }
+                    vpaddb(zmm_bcast, zmm_bcast, zmm_shift);
+                    for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
+                        compute(vreg_accum(i_load, i_ur),
+                                    vreg_load(i_load), zmm_bcast);
+                    }
                 }
             }
         }
@@ -495,6 +532,12 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::generate()
 
     if (jcp.with_bias)
         mov(reg_bias_data, ptr[param1 + GET_OFF(bias_data)]);
+    if (!jcp.signed_input) {
+        mov(SVE_compress_addr(rsp, reg_bias_data_off), reg_bias_data);
+        mov(reg_comp_data, ptr[param1 + GET_OFF(compensation)]);
+        mov(SVE_compress_addr(rsp, reg_comp_data_off), reg_comp_data);
+    }
+
     mov(reg_ptr_scales, ptr[param1 + GET_OFF(scales)]);
     mov(SVE_compress_addr(rsp, reg_ptr_sum_scale_off), reg_ptr_scales);
     mov(reg_bcast_data, ptr[param1 + GET_OFF(bcast_data)]);
@@ -512,8 +555,18 @@ void jit_sve_x8s8s32x_1x1_conv_kernel::generate()
         bcast_loop(load_loop_blk);
         add(reg_load_data, load_loop_blk * jcp.load_loop_load_step);
         if (jcp.with_bias) {
+            if (!jcp.signed_input)
+                mov(reg_bias_data, SVE_compress_addr(rsp, reg_bias_data_off));
             add(reg_bias_data,
                 load_loop_blk * jcp.load_block * jcp.typesize_bia);
+            if (!jcp.signed_input)
+                mov(SVE_compress_addr(rsp, reg_bias_data_off), reg_bias_data);
+        }
+        if (!jcp.signed_input) {
+            mov(reg_comp_data, SVE_compress_addr(rsp, reg_comp_data_off));
+            add(reg_comp_data,
+                load_loop_blk * jcp.load_block * sizeof(int32_t));
+            mov(SVE_compress_addr(rsp, reg_comp_data_off), reg_comp_data);
         }
         mov(SVE_compress_addr(rsp, reg_bcast_data_off), reg_bcast_data);
         mov(reg_ptr_scales, SVE_compress_addr(rsp, reg_ptr_sum_scale_off));

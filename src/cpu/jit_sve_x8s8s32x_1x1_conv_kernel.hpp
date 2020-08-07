@@ -136,6 +136,7 @@ struct jit_sve_x8s8s32x_1x1_conv_kernel: public jit_generator {
     Xbyak::Zmm zmm_zero = Xbyak::Zmm(30);
     Xbyak::Zmm zmm_bcast = Xbyak::Zmm(31);
     Xbyak::Zmm zmm_bcast2 = Xbyak::Zmm(30);
+    Xbyak::Zmm zmm_shift = Xbyak::Zmm(30);
 
     int bcast_loop_work_off = 0;
     int reg_bias_data_off = 8;

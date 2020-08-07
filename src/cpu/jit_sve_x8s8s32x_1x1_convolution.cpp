@@ -93,7 +93,7 @@ void jit_sve_x8s8s32x_1x1_convolution_fwd_t<src_type, dst_type>
     int offset = jcp.ngroups * (jcp.oc / jcp.oc_block) * (jcp.ic / jcp.ic_block)
         * jcp.oc_block * jcp.ic_block;
     wei_data_t *w = const_cast<wei_data_t *>(weights);
-    int32_t* compensation = (jcp.signed_input)
+    int32_t* compensation = (!jcp.signed_input)
         ? reinterpret_cast<int32_t *>(w + offset) : 0;
 
     auto step = [](int default_step, int remaining, int tail_step) {
@@ -173,7 +173,7 @@ void jit_sve_x8s8s32x_1x1_convolution_fwd_t<src_type, dst_type>
             ? weights_d.blk_off(g, ocb, icb)
             : weights_d.blk_off(ocb, icb)];
         p.bias_data = &bias[_ocb * jcp.oc_block * bia_dt_size];
-        p.compensation = (jcp.signed_input)
+        p.compensation = (!jcp.signed_input)
             ? &compensation[_ocb * jcp.oc_block] : 0;
         p.scales = &oscales.scales_[jcp.is_oc_scale * _ocb * jcp.oc_block];
         if (pd()->rtus_.reduce_src_) {
